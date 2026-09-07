@@ -134,3 +134,33 @@ function copiarTexto(txt) {
     );
   }
 }
+
+/* Borra TODOS los datos del negocio (no toca los accesos del personal).
+   Útil para arrancar limpio después de probar con los datos de ejemplo. */
+function reiniciarDatosNegocio() {
+  pedirConfirmacion(
+    '¿Borrar TODOS los datos del negocio? (plano, mesas, ventas, inventario, movimientos, clientes, fiados, proveedores). Los accesos del personal NO se tocan. Esto no se puede deshacer.',
+    async () => {
+      const claves = [
+        STORAGE_KEY, STORAGE_KEY_INVENTARIO, STORAGE_KEY_PRODUCTOS,
+        STORAGE_KEY_VENTAS, STORAGE_KEY_MOVIMIENTOS,
+        STORAGE_KEY_CLIENTES, STORAGE_KEY_FIADOS,
+        STORAGE_KEY_PROVEEDORES, STORAGE_KEY_CXP,
+        'plano-restaurante-usuarios-v1'   // clave vieja, por si quedó
+      ];
+      try {
+        for (const k of claves) {
+          await window.storage.remove(k, true);
+          try {
+            window.localStorage.removeItem('cdp:shared:' + k);
+            window.localStorage.removeItem('cdp:local:' + k);
+          } catch (e) {}
+        }
+        mostrarNotificacion('Datos borrados. Recargando…', 'success', 'bi-trash3');
+        setTimeout(() => location.reload(), 800);
+      } catch (e) {
+        mostrarNotificacion('No se pudo borrar todo: ' + (e.message || e), 'danger', 'bi-exclamation-triangle-fill');
+      }
+    }
+  );
+}

@@ -30,79 +30,27 @@ const dbJSON = {
     { "id": "p-402", "categoryId": "cat-postres", "name": "Cheesecake de Frutos Rojos", "price": 20000, "code": "POS-02", "stock": 20 }
   ],
   "initialMesas": [
-    { "id": "mesa_bar_01", "nombre": "Bar Principal", "colorHex": "#6f42c1", "w": 6, "h": 2, "x": 0, "y": 0, "piso": 1,
-      "cuentas": [
-        { "idCuenta": 101, "nombreCuenta": "Cuenta #1", "productos": [
-          { "productId": "p-101", "nombre": "Cerveza IPA 500ml", "cant": 2, "precio": 15000 },
-          { "productId": "p-201", "nombre": "Nachos con Queso & Guacamole", "cant": 1, "precio": 25000 }
-        ]},
-        { "idCuenta": 102, "nombreCuenta": "Cuenta #2", "productos": [
-          { "productId": "p-102", "nombre": "Cocktail Mojito", "cant": 3, "precio": 22000 }
-        ]}
-      ]
-    },
-    { "id": "mesa_01", "nombre": "Mesa 1", "colorHex": "#198754", "w": 2, "h": 2, "x": 6, "y": 0, "piso": 1,
-      "cuentas": [
-        { "idCuenta": 103, "nombreCuenta": "Cuenta #1", "productos": [
-          { "productId": "p-301", "nombre": "Burger Doble Carne", "cant": 1, "precio": 38000 },
-          { "productId": "p-103", "nombre": "Gaseosa 350ml", "cant": 1, "precio": 6000 }
-        ]}
-      ]
-    },
+    { "id": "mesa_bar_01", "nombre": "Bar Principal", "colorHex": "#6f42c1", "w": 6, "h": 2, "x": 0, "y": 0, "piso": 1, "cuentas": [] },
+    { "id": "mesa_01", "nombre": "Mesa 1", "colorHex": "#198754", "w": 2, "h": 2, "x": 6, "y": 0, "piso": 1, "cuentas": [] },
     { "id": "mesa_02", "nombre": "Mesa 2", "colorHex": "#198754", "w": 2, "h": 2, "x": 8, "y": 0, "piso": 1, "cuentas": [] },
     { "id": "mesa_03", "nombre": "Mesa 3", "colorHex": "#198754", "w": 2, "h": 2, "x": 10, "y": 0, "piso": 1, "cuentas": [] },
     { "id": "mesa_04", "nombre": "Mesa 4", "colorHex": "#0d6efd", "w": 2, "h": 2, "x": 12, "y": 0, "piso": 1, "cuentas": [] },
-    { "id": "mesa_grande_01", "nombre": "Mesa Grande 1", "colorHex": "#fd7e14", "w": 4, "h": 2, "x": 14, "y": 0, "piso": 1,
-      "cuentas": [
-        { "idCuenta": 105, "nombreCuenta": "Cuenta #1", "productos": [
-          { "productId": "p-302", "nombre": "Pizza Artesanal 4 Quesos", "cant": 1, "precio": 45000 },
-          { "productId": "p-104", "nombre": "Jugo Natural", "cant": 2, "precio": 9000 }
-        ]}
-      ]
-    },
+    { "id": "mesa_grande_01", "nombre": "Mesa Grande 1", "colorHex": "#fd7e14", "w": 4, "h": 2, "x": 14, "y": 0, "piso": 1, "cuentas": [] },
     { "id": "mesa_05", "nombre": "Mesa 5", "colorHex": "#198754", "w": 2, "h": 2, "x": 0, "y": 2, "piso": 1, "cuentas": [] },
     { "id": "mesa_06", "nombre": "Mesa 6", "colorHex": "#198754", "w": 2, "h": 2, "x": 2, "y": 2, "piso": 1, "cuentas": [] },
-    { "id": "mesa_07", "nombre": "Mesa 7", "colorHex": "#198754", "w": 2, "h": 2, "x": 4, "y": 2, "piso": 1,
-      "cuentas": [
-        { "idCuenta": 106, "nombreCuenta": "Cuenta #1", "productos": [
-          { "productId": "p-203", "nombre": "Alitas Cruncy (6 und)", "cant": 1, "precio": 32000 },
-          { "productId": "p-101", "nombre": "Cerveza IPA 500ml", "cant": 2, "precio": 15000 }
-        ]}
-      ]
-    },
+    { "id": "mesa_07", "nombre": "Mesa 7", "colorHex": "#198754", "w": 2, "h": 2, "x": 4, "y": 2, "piso": 1, "cuentas": [] },
     { "id": "mesa_08", "nombre": "Mesa 8", "colorHex": "#0d6efd", "w": 2, "h": 2, "x": 6, "y": 2, "piso": 1, "cuentas": [] },
     { "id": "mesa_grande_02", "nombre": "Mesa Grande 2", "colorHex": "#fd7e14", "w": 4, "h": 2, "x": 8, "y": 2, "piso": 1, "cuentas": [] },
     { "id": "mesa_09", "nombre": "Mesa 9", "colorHex": "#d63384", "w": 2, "h": 2, "x": 12, "y": 2, "piso": 1, "cuentas": [] },
     { "id": "mesa_10", "nombre": "Mesa 10", "colorHex": "#d63384", "w": 2, "h": 2, "x": 14, "y": 2, "piso": 1, "cuentas": [] },
     { "id": "mesa_11", "nombre": "Mesa 11", "colorHex": "#20c997", "w": 2, "h": 2, "x": 16, "y": 2, "piso": 1, "cuentas": [] },
-    { "id": "zona_vip_salon", "nombre": "Zona VIP Salón", "colorHex": "#fd7e14", "w": 8, "h": 4, "x": 0, "y": 4, "piso": 1,
-      "cuentas": [
-        { "idCuenta": 107, "nombreCuenta": "Cuenta Cumpleaños", "productos": [
-          { "productId": "p-303", "nombre": "Costillas Ahumadas BBQ", "cant": 3, "precio": 62000 },
-          { "productId": "p-401", "nombre": "Volcán de Chocolate", "cant": 3, "precio": 18000 },
-          { "productId": "p-102", "nombre": "Cocktail Mojito", "cant": 4, "precio": 22000 }
-        ]}
-      ]
-    },
-    { "id": "mesa_vip_01", "nombre": "Zona VIP Terraza", "colorHex": "#fd7e14", "w": 8, "h": 4, "x": 0, "y": 0, "piso": 2,
-      "cuentas": [
-        { "idCuenta": 104, "nombreCuenta": "Cuenta Reserva VIP", "productos": [
-          { "productId": "p-303", "nombre": "Costillas Ahumadas BBQ", "cant": 2, "precio": 62000 },
-          { "productId": "p-402", "nombre": "Cheesecake de Frutos Rojos", "cant": 2, "precio": 20000 }
-        ]}
-      ]
-    },
+    { "id": "zona_vip_salon", "nombre": "Zona VIP Salón", "colorHex": "#fd7e14", "w": 8, "h": 4, "x": 0, "y": 4, "piso": 1, "cuentas": [] },
+    { "id": "mesa_vip_01", "nombre": "Zona VIP Terraza", "colorHex": "#fd7e14", "w": 8, "h": 4, "x": 0, "y": 0, "piso": 2, "cuentas": [] },
     { "id": "mesa_12", "nombre": "Mesa 12", "colorHex": "#0d6efd", "w": 2, "h": 2, "x": 8, "y": 0, "piso": 2, "cuentas": [] },
     { "id": "mesa_13", "nombre": "Mesa 13", "colorHex": "#0d6efd", "w": 2, "h": 2, "x": 10, "y": 0, "piso": 2, "cuentas": [] },
     { "id": "mesa_14", "nombre": "Mesa 14", "colorHex": "#0dcaf0", "w": 2, "h": 2, "x": 12, "y": 0, "piso": 2, "cuentas": [] },
     { "id": "mesa_15", "nombre": "Mesa 15", "colorHex": "#0dcaf0", "w": 2, "h": 2, "x": 14, "y": 0, "piso": 2, "cuentas": [] },
-    { "id": "bar_terraza", "nombre": "Bar Terraza", "colorHex": "#6f42c1", "w": 6, "h": 2, "x": 0, "y": 4, "piso": 2,
-      "cuentas": [
-        { "idCuenta": 108, "nombreCuenta": "Cuenta #1", "productos": [
-          { "productId": "p-102", "nombre": "Cocktail Mojito", "cant": 2, "precio": 22000 }
-        ]}
-      ]
-    },
+    { "id": "bar_terraza", "nombre": "Bar Terraza", "colorHex": "#6f42c1", "w": 6, "h": 2, "x": 0, "y": 4, "piso": 2, "cuentas": [] },
     { "id": "mesa_16", "nombre": "Mesa 16", "colorHex": "#198754", "w": 2, "h": 2, "x": 6, "y": 4, "piso": 2, "cuentas": [] },
     { "id": "mesa_17", "nombre": "Mesa 17", "colorHex": "#198754", "w": 2, "h": 2, "x": 8, "y": 4, "piso": 2, "cuentas": [] },
     { "id": "mesa_18", "nombre": "Mesa 18", "colorHex": "#d63384", "w": 2, "h": 2, "x": 10, "y": 4, "piso": 2, "cuentas": [] },

@@ -18,8 +18,9 @@ function registrarVenta(mesaId, cuenta) {
     fecha: new Date().toISOString(),
     mesaId, mesaNombre,
     cuentaNombre: cuenta.nombreCuenta,
-    usuarioId: cuenta.usuarioId || null,
-    usuarioNombre: cuenta.usuarioNombre || 'Sin asignar',
+    // A nombre de quien abrió la cuenta; si no tiene (cuenta vieja/importada),
+    // se imputa a quien la está liquidando ahora.
+    usuarioNombre: cuenta.usuarioNombre || obtenerNombreUsuarioActivo(),
     total,
     productos: cuenta.productos.map(p => ({ nombre: p.nombre, cant: p.cant, precio: p.precio }))
   };
