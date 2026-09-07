@@ -2,10 +2,18 @@
    js/app.js — Arranque de la aplicación
    ----------------------------------------------------------------------------
    Hidrata el estado en memoria desde window.storage (repositorios), monta el
-   plano (pisos + mesas) y deja todo listo. Último script en cargar.
+   plano (pisos + mesas) y deja todo listo.
+
+   NO arranca solo: lo dispara js/core/auth-gate.js cuando hay sesión válida
+   (modo remoto / D1) o cuando no hay backend (modo local / localStorage,
+   p. ej. al abrir el index.html directo). Así la app nunca se muestra sin
+   antes pasar por el login.
    ========================================================================== */
 
-document.addEventListener('DOMContentLoaded', async () => {
+let __cdpArrancado = false;
+window.__cdpArrancar = async function arrancarApp() {
+  if (__cdpArrancado) return;
+  __cdpArrancado = true;
   // 1) Inventario: se combina lo guardado con los valores de ejemplo.
   const inventarioGuardado = await cargarInventarioGuardado();
   if (inventarioGuardado) {
@@ -131,4 +139,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Ajuste automático de zoom para ver el plano COMPLETO al cargar.
   requestAnimationFrame(() => requestAnimationFrame(autoAjustarZoomSiCorresponde));
-});
+};

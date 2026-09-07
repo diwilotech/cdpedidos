@@ -1,0 +1,16 @@
+{
+  "name": "Control de Pedidos",
+  "short_name": "Pedidos",
+  "description": "Ventas, inventario, fiados y cuentas por pagar para restaurantes y bares.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f8f9fa",
+  "theme_color": "#0d6efd",
+  "lang": "es",
+  "icons": [
+    { "src": "/assets/img/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/assets/img/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

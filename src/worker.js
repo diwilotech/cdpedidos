@@ -1,43 +1,300 @@
 /* ============================================================================
-   src/worker.js — El Cloudflare Worker de "cdpedidos"
+   src/worker.js — Cloudflare Worker de "cdpedidos"
    ----------------------------------------------------------------------------
-   Un Worker es una función que corre en el edge de Cloudflare en CADA
-   petición HTTP. No hay servidor que mantener: subís este archivo y ya.
+   Hace 3 cosas:
+     1. Autenticación  (login por correo + PIN, sesiones en cookie, roles
+        admin / personal, alta de personal por invitación y auto-registro).
+     2. Datos del negocio: GET/POST/DELETE /api/estado  -> tabla `estado` de D1
+        (clave/valor JSON). Requiere sesión válida.
+     3. Todo lo demás  -> archivos estáticos de public/ (env.ASSETS).
 
-   El objeto que exportás por `default` tiene "handlers". El más común es
-   `fetch`, que recibe la petición y devuelve una `Response`.
+   Bindings (wrangler.jsonc):
+     env.ASSETS  -> archivos de public/
+     env.DB      -> base D1 "cdpedidos-db"   (ver schema.sql)
 
-     fetch(request, env, ctx)
-       · request : la petición entrante (Web API estándar: Request)
-       · env     : los "bindings" configurados en wrangler.jsonc
-                   (aquí: env.ASSETS = los archivos estáticos del sitio;
-                    más adelante podrías agregar KV, D1, R2, secrets…)
-       · ctx     : utilidades del ciclo de vida (ctx.waitUntil, ctx.passThroughOnException)
-
-   Recordá: gracias a "assets" en wrangler.jsonc, si la URL coincide con un
-   archivo real (index.html, /js/app.js, /assets/css/styles.css…) Cloudflare
-   lo sirve solo y este código NI se ejecuta. Acá abajo solo llegan las
-   rutas que NO son archivos.
+   Seguridad:
+     · PIN hasheado con PBKDF2-SHA256 (100k iteraciones) + salt por usuario.
+     · Sesión = token aleatorio opaco en tabla `sessions`, cookie HttpOnly.
+     · Bloqueo temporal tras 5 intentos fallidos.
    ========================================================================== */
 
-export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
+const COOKIE = "cdp_sesion";
+const SESION_MS = 30 * 24 * 3600 * 1000; // 30 días
+const PBKDF2_ITER = 100000;
 
-    // ── Ejemplo de ruta dinámica (una mini API) ──────────────────────────
-    // Probá: https://cdpedidos.<tu-subdominio>.workers.dev/api/health
-    if (url.pathname === "/api/health") {
-      return Response.json({
-        ok: true,
-        app: "cdpedidos",
-        method: request.method,
-        pais: request.cf?.country ?? null, // Cloudflare mete metadatos en request.cf
-        hora: new Date().toISOString(),
+/* ---------- helpers ---------- */
+const json = (data, init = {}) =>
+  new Response(JSON.stringify(data), {
+    ...init,
+    headers: { "content-type": "application/json; charset=utf-8", ...(init.headers || {}) },
+  });
+
+const noContent = (headers) => new Response(null, { status: 204, headers });
+
+async function leerBody(request) {
+  try { return await request.json(); } catch { return {}; }
+}
+
+function cookies(request) {
+  const out = {};
+  (request.headers.get("Cookie") || "").split(";").forEach((p) => {
+    const i = p.indexOf("=");
+    if (i > -1) out[p.slice(0, i).trim()] = p.slice(i + 1).trim();
+  });
+  return out;
+}
+const setCookie = (tok) =>
+  `${COOKIE}=${tok}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESION_MS / 1000}`;
+const delCookie = `${COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+
+function randHex(bytes) {
+  const b = new Uint8Array(bytes);
+  crypto.getRandomValues(b);
+  return [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+function hexToBuf(hex) {
+  const b = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < b.length; i++) b[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return b;
+}
+function bufToHex(buf) {
+  return [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+function iguales(a, b) {
+  if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
+  let r = 0;
+  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
+async function derivarPin(pin, saltHex) {
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(String(pin)), "PBKDF2", false, ["deriveBits"]
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt: hexToBuf(saltHex), iterations: PBKDF2_ITER, hash: "SHA-256" },
+    key, 256
+  );
+  return bufToHex(bits);
+}
+const pinValido = (pin) => /^\d{4,8}$/.test(String(pin || ""));
+const emailValido = (e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(e || ""));
+const norm = (e) => String(e || "").toLowerCase().trim();
+
+/* ---------- sesión ---------- */
+async function crearSesion(env, userId) {
+  const token = randHex(32);
+  const now = Date.now();
+  await env.DB.prepare(
+    "INSERT INTO sessions (token, user_id, creado_en, expira_en) VALUES (?, ?, ?, ?)"
+  ).bind(token, userId, now, now + SESION_MS).run();
+  return token;
+}
+async function usuarioActual(request, env) {
+  const tok = cookies(request)[COOKIE];
+  if (!tok) return null;
+  const row = await env.DB.prepare(
+    `SELECT u.id, u.email, u.nombre, u.rol, u.estado, s.expira_en
+       FROM sessions s JOIN users u ON u.id = s.user_id
+      WHERE s.token = ?`
+  ).bind(tok).first();
+  if (!row) return null;
+  if (row.expira_en < Date.now()) {
+    await env.DB.prepare("DELETE FROM sessions WHERE token = ?").bind(tok).run();
+    return null;
+  }
+  if (row.estado !== "activo") return null;
+  return row;
+}
+const publico = (u) => ({ email: u.email, nombre: u.nombre, rol: u.rol });
+
+/* ---------- API ---------- */
+async function manejarApi(path, request, env, url) {
+  const m = request.method;
+
+  /* ---- setup: define el PIN del admin sembrado. Solo funciona una vez ---- */
+  if (path === "/api/setup" && m === "POST") {
+    const { email, pin } = await leerBody(request);
+    if (!pinValido(pin)) return json({ error: "PIN inválido (4 a 8 dígitos)" }, { status: 400 });
+    const u = await env.DB.prepare(
+      "SELECT id, pin_hash FROM users WHERE email = ? AND rol = 'admin'"
+    ).bind(norm(email)).first();
+    if (!u) return json({ error: "Ese correo no es el administrador configurado" }, { status: 403 });
+    if (u.pin_hash) return json({ error: "El administrador ya tiene PIN. Iniciá sesión." }, { status: 409 });
+    const salt = randHex(16);
+    await env.DB.prepare(
+      "UPDATE users SET pin_hash=?, pin_salt=?, estado='activo', registrado_en=? WHERE id=?"
+    ).bind(await derivarPin(pin, salt), salt, Date.now(), u.id).run();
+    const tok = await crearSesion(env, u.id);
+    return json({ ok: true }, { headers: { "Set-Cookie": setCookie(tok) } });
+  }
+
+  /* ---- login ---- */
+  if (path === "/api/login" && m === "POST") {
+    const { email, pin } = await leerBody(request);
+    const generico = json({ error: "Correo o PIN incorrecto" }, { status: 401 });
+    const u = await env.DB.prepare("SELECT * FROM users WHERE email = ?").bind(norm(email)).first();
+    if (!u || !u.pin_hash) return generico;
+    if (u.estado !== "activo") return json({ error: "Usuario inactivo. Contactá al administrador." }, { status: 403 });
+    const ahora = Date.now();
+    if (u.bloqueado_hasta && u.bloqueado_hasta > ahora) {
+      const min = Math.ceil((u.bloqueado_hasta - ahora) / 60000);
+      return json({ error: `Demasiados intentos. Probá en ${min} min.` }, { status: 429 });
+    }
+    const hash = await derivarPin(pin, u.pin_salt);
+    if (!iguales(hash, u.pin_hash)) {
+      const fallos = (u.fallos || 0) + 1;
+      const bloq = fallos >= 5 ? ahora + 15 * 60 * 1000 : null;
+      await env.DB.prepare("UPDATE users SET fallos=?, bloqueado_hasta=? WHERE id=?").bind(fallos, bloq, u.id).run();
+      return generico;
+    }
+    await env.DB.prepare("UPDATE users SET fallos=0, bloqueado_hasta=NULL WHERE id=?").bind(u.id).run();
+    const tok = await crearSesion(env, u.id);
+    return json({ user: publico(u) }, { headers: { "Set-Cookie": setCookie(tok) } });
+  }
+
+  /* ---- logout ---- */
+  if (path === "/api/logout" && m === "POST") {
+    const tok = cookies(request)[COOKIE];
+    if (tok) await env.DB.prepare("DELETE FROM sessions WHERE token = ?").bind(tok).run();
+    return json({ ok: true }, { headers: { "Set-Cookie": delCookie } });
+  }
+
+  /* ---- me ---- */
+  if (path === "/api/me" && m === "GET") {
+    const u = await usuarioActual(request, env);
+    return u ? json({ user: publico(u) }) : json({ error: "no-auth" }, { status: 401 });
+  }
+
+  /* ---- registro por invitación (auto-registro del personal) ---- */
+  if (path === "/api/registro") {
+    if (m === "GET") {
+      const u = await env.DB.prepare(
+        "SELECT email, nombre FROM users WHERE invite_token = ? AND estado = 'pendiente'"
+      ).bind(url.searchParams.get("token") || "").first();
+      return u ? json(u) : json({ error: "Invitación inválida o ya usada" }, { status: 404 });
+    }
+    if (m === "POST") {
+      const { token, pin, nombre } = await leerBody(request);
+      if (!pinValido(pin)) return json({ error: "PIN inválido (4 a 8 dígitos)" }, { status: 400 });
+      const u = await env.DB.prepare(
+        "SELECT id, nombre FROM users WHERE invite_token = ? AND estado = 'pendiente'"
+      ).bind(String(token || "")).first();
+      if (!u) return json({ error: "Invitación inválida o ya usada" }, { status: 400 });
+      const salt = randHex(16);
+      await env.DB.prepare(
+        `UPDATE users SET nombre=?, pin_hash=?, pin_salt=?, estado='activo',
+                          invite_token=NULL, registrado_en=? WHERE id=?`
+      ).bind(String(nombre || "").trim() || u.nombre, await derivarPin(pin, salt), salt, Date.now(), u.id).run();
+      const tok = await crearSesion(env, u.id);
+      return json({ ok: true }, { headers: { "Set-Cookie": setCookie(tok) } });
+    }
+  }
+
+  /* ---- gestión de personal (solo admin) ---- */
+  if (path === "/api/personal" || path.startsWith("/api/personal/")) {
+    const admin = await usuarioActual(request, env);
+    if (!admin) return json({ error: "no-auth" }, { status: 401 });
+    if (admin.rol !== "admin") return json({ error: "Solo el administrador" }, { status: 403 });
+
+    if (path === "/api/personal" && m === "GET") {
+      const { results } = await env.DB.prepare(
+        "SELECT id, email, nombre, rol, estado, invite_token FROM users ORDER BY rol DESC, nombre"
+      ).all();
+      return json({
+        personal: results.map((r) => ({
+          id: r.id, email: r.email, nombre: r.nombre, rol: r.rol, estado: r.estado,
+          invite_url: r.invite_token ? `${url.origin}/?registro=${r.invite_token}` : null,
+        })),
       });
     }
 
-    // ── Todo lo demás: dejar que respondan los archivos estáticos ─────────
-    // (incluye el 404.html si la ruta no existe, por not_found_handling)
+    if (path === "/api/personal" && m === "POST") {
+      const { email, nombre } = await leerBody(request);
+      if (!emailValido(email)) return json({ error: "Correo inválido" }, { status: 400 });
+      if (!String(nombre || "").trim()) return json({ error: "Falta el nombre" }, { status: 400 });
+      if (await env.DB.prepare("SELECT 1 FROM users WHERE email = ?").bind(norm(email)).first())
+        return json({ error: "Ese correo ya está registrado" }, { status: 409 });
+      const id = crypto.randomUUID();
+      const invite = randHex(16);
+      await env.DB.prepare(
+        `INSERT INTO users (id, email, nombre, rol, estado, invite_token, creado_en)
+         VALUES (?, ?, ?, 'personal', 'pendiente', ?, ?)`
+      ).bind(id, norm(email), String(nombre).trim(), invite, Date.now()).run();
+      return json({ id, invite_url: `${url.origin}/?registro=${invite}` });
+    }
+
+    if (path === "/api/personal/reenviar" && m === "POST") {
+      const { id } = await leerBody(request);
+      const u = await env.DB.prepare("SELECT id, estado FROM users WHERE id = ?").bind(String(id || "")).first();
+      if (!u) return json({ error: "No existe" }, { status: 404 });
+      if (u.estado !== "pendiente") return json({ error: "Ese usuario ya se registró" }, { status: 409 });
+      const invite = randHex(16);
+      await env.DB.prepare("UPDATE users SET invite_token = ? WHERE id = ?").bind(invite, u.id).run();
+      return json({ invite_url: `${url.origin}/?registro=${invite}` });
+    }
+
+    if (path === "/api/personal/eliminar" && m === "POST") {
+      const { id } = await leerBody(request);
+      const u = await env.DB.prepare("SELECT id, rol FROM users WHERE id = ?").bind(String(id || "")).first();
+      if (!u) return json({ error: "No existe" }, { status: 404 });
+      if (u.rol === "admin") return json({ error: "No se puede eliminar al administrador" }, { status: 403 });
+      await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(u.id).run();
+      await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(u.id).run();
+      return json({ ok: true });
+    }
+  }
+
+  /* ---- datos del negocio: clave/valor en D1 (requiere sesión) ---- */
+  if (path === "/api/estado") {
+    const u = await usuarioActual(request, env);
+    if (!u) return json({ error: "no-auth" }, { status: 401 });
+
+    if (m === "GET") {
+      const k = url.searchParams.get("key");
+      if (!k) return json({ error: "falta key" }, { status: 400 });
+      const row = await env.DB.prepare("SELECT valor FROM estado WHERE clave = ?").bind(k).first();
+      return json({ value: row ? row.valor : null });
+    }
+    if (m === "POST") {
+      const { key, value } = await leerBody(request);
+      if (!key) return json({ error: "falta key" }, { status: 400 });
+      await env.DB.prepare(
+        `INSERT INTO estado (clave, valor, ts) VALUES (?, ?, ?)
+         ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor, ts = excluded.ts`
+      ).bind(key, String(value ?? ""), Date.now()).run();
+      return noContent();
+    }
+    if (m === "DELETE") {
+      const k = url.searchParams.get("key");
+      if (k) await env.DB.prepare("DELETE FROM estado WHERE clave = ?").bind(k).run();
+      return noContent();
+    }
+  }
+
+  return json({ error: "ruta no encontrada" }, { status: 404 });
+}
+
+/* ---------- entrypoint ---------- */
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    const path = url.pathname;
+
+    if (path === "/api/health") {
+      return json({ ok: true, app: "cdpedidos", hora: new Date().toISOString() });
+    }
+
+    if (path.startsWith("/api/")) {
+      try {
+        return await manejarApi(path, request, env, url);
+      } catch (e) {
+        return json({ error: "server", detalle: String((e && e.message) || e) }, { status: 500 });
+      }
+    }
+
+    // Todo lo demás: archivos estáticos de public/ (index.html, js/, assets/…).
+    // "/?registro=..." también cae acá y sirve index.html; el front lee el
+    // parámetro y muestra la pantalla de registro.
     return env.ASSETS.fetch(request);
   },
 };
