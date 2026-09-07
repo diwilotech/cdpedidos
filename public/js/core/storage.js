@@ -12,9 +12,10 @@
        fiados, cuentas por pagar) en un solo dispositivo.
 
    >>> MÁS ADELANTE (producción):
-       Se cambia SOLO este archivo por un cliente de Supabase / Firebase /
-       Cloudflare KV / una función serverless en /api. El resto de la app
-       (repositorios y módulos) no se toca, porque la firma es la misma.
+       Se cambia SOLO este archivo para que get/set/remove llamen a la API
+       del Worker (p. ej. GET/POST /api/estado, ver src/worker.js), que a su
+       vez guarda en Cloudflare KV o D1. El resto de la app (repositorios y
+       módulos) no se toca, porque la firma es la misma.
 
    Firma:
      await window.storage.get(key, shared)   -> { value: string } | null

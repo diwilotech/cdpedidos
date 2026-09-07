@@ -6,7 +6,7 @@
 
   "name": "cdpedidos",
 
-  // Punto de entrada del Worker (código que corre en el servidor/edge).
+  // Código del Worker (lo que corre en el servidor/edge).
   "main": "src/worker.js",
 
   // Fecha del "runtime" de Workers. Fíjala y no la muevas salvo que quieras
@@ -14,18 +14,19 @@
   "compatibility_date": "2025-09-01",
 
   // ── Archivos estáticos (Static Assets) ────────────────────────────────────
-  // "directory" es la carpeta que se publica tal cual (index.html, js/, assets/).
-  // Aquí es la raíz del repo; lo que NO debe publicarse va en .assetsignore.
+  // SOLO se publica lo que está dentro de "public/" (index.html, js/, assets/).
+  // Todo lo demás del repo (src/, wrangler.jsonc, README, node_modules…) queda
+  // fuera automáticamente: no hace falta .assetsignore.
   //
-  // Comportamiento por defecto: si la URL coincide con un archivo, Cloudflare
-  // lo sirve y el Worker NI SE EJECUTA. El Worker (src/worker.js) solo recibe
-  // las peticiones que NO son un archivo (p. ej. /api/health).
+  // Comportamiento: si la URL coincide con un archivo de public/, Cloudflare
+  // lo sirve y el Worker NI se ejecuta. src/worker.js solo recibe las
+  // peticiones que NO son un archivo (p. ej. /api/health).
   "assets": {
-    "directory": ".",
-    "binding": "ASSETS",             // así el Worker puede pedir archivos: env.ASSETS.fetch()
-    "not_found_handling": "404-page" // 404 -> muestra el archivo 404.html si existe
+    "directory": "./public",
+    "binding": "ASSETS",             // el Worker puede pedir archivos: env.ASSETS.fetch()
+    "not_found_handling": "404-page" // ruta inexistente -> public/404.html
   },
 
-  // Logs en el dashboard (Workers → cdpedidos → Logs).
+  // Logs en el dashboard (Workers → cdpedidos → Logs / Observability).
   "observability": { "enabled": true }
 }
