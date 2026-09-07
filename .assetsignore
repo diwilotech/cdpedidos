@@ -1,17 +1,34 @@
 # Archivos del repo que NO forman parte del sitio publicado.
 # Sintaxis tipo .gitignore. Todo lo que quede fuera de aquí se sube como
 # asset estático servible desde https://cdpedidos...workers.dev/<ruta>
+#
+# OJO: wrangler NO ignora node_modules por su cuenta cuando
+# assets.directory = "." — hay que excluirlo aquí, si no el build de
+# Cloudflare intenta subir binarios enormes (workerd ~147 MiB) y falla.
 
-# Código y config del Worker (no es contenido web)
-src/
-wrangler.jsonc
+# Dependencias y lockfiles (los crea el build de Cloudflare)
+node_modules/
 package.json
 package-lock.json
+bun.lock
+bun.lockb
+yarn.lock
+pnpm-lock.yaml
+
+# Código y configuración del Worker (no es contenido web)
+src/
+wrangler.jsonc
+wrangler.toml
+
+# Control de versiones / estado local
+.git/
+.gitignore
+.assetsignore
+.wrangler/
+.dev.vars
+.DS_Store
 
 # Documentación y respaldos
 README.md
 api/
 index.html.bak
-
-# Estado local de wrangler
-.wrangler/
