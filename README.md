@@ -3,10 +3,10 @@
 Sistema para **restaurantes, bares y negocios de mostrador** con:
 
 - **Acceso multiusuario** — un **único login** por correo + PIN para todos (admin y personal). El admin agrega al personal por correo y cada uno se auto-registra con un link de invitación. Todo lo que hace cada persona (ventas, inventario, fiados, proveedores, mesas) queda **registrado a su nombre**; el operador de cada sesión es quien inició sesión (no hay lista de usuarios "por dispositivo").
-- **Ventas** — plano interactivo de mesas/zonas por pisos, cuentas y comandas por mesa, liquidación y reporte por usuario.
-- **Inventario** — stock por producto, baja automática al vender, reposición y **historial de entradas/salidas**.
-- **Fiados a clientes** — cuentas por cobrar: cargos, abonos, saldo por cliente y "cargar una cuenta directo al fiado".
-- **Cuentas por pagar a proveedores** — facturas, pagos y saldo por proveedor.
+- **Ventas** — plano interactivo de mesas/zonas por pisos, cuentas y comandas por mesa, liquidar o **guardar la cuenta para pago después** (a nombre de un cliente).
+- **Inventario** — stock por producto, baja automática al vender, reposición e historial.
+- **Clientes** — cuentas por cobrar: cargos (consumos), abonos (pagos) y saldo por cliente.
+- **Dashboard (solo admin, `/dashboard.html`)** — KPIs del día, ventas del día por personal, movimientos de cada producto (quién vendió / sacó / ajuste de pérdida), gráfico de ventas de la semana y por categoría, edición del **catálogo** (precio/categoría/nombre) y **proveedores / cuentas por pagar**.
 - **Instalable (PWA)** — se agrega a la pantalla de inicio en Android e iPhone y funciona offline.
 
 ## Arquitectura

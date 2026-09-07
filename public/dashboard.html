@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Control de Pedidos</title>
+  <link rel="icon" href="/assets/img/icon.svg">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    body { background: #f6f7f9; }
+    .kpi { border: 1px solid #e6e8eb; border-radius: 14px; background: #fff; padding: 14px 16px; }
+    .kpi .lbl { font-size: .78rem; color: #6c757d; font-weight: 600; }
+    .kpi .val { font-size: 1.5rem; font-weight: 800; }
+    .card-dash { border: 1px solid #e6e8eb; border-radius: 14px; background: #fff; }
+    .card-dash > .hd { padding: 12px 16px; border-bottom: 1px solid #eef0f2; font-weight: 700; }
+    .card-dash > .bd { padding: 14px 16px; }
+    .tabla-scroll { max-height: 380px; overflow: auto; }
+    #dashToast { position: fixed; right: 16px; bottom: 16px; z-index: 3000; min-width: 220px; }
+    canvas { max-height: 260px; }
+  </style>
+</head>
+<body>
+  <nav class="navbar bg-white border-bottom sticky-top">
+    <div class="container-fluid px-3 px-md-4">
+      <span class="navbar-brand fw-bold"><i class="bi bi-speedometer2 me-2 text-primary"></i>Dashboard</span>
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge text-bg-primary"><i class="bi bi-person-fill me-1"></i><span id="dashUsuario">…</span></span>
+        <a href="/" class="btn btn-sm btn-outline-dark"><i class="bi bi-arrow-left me-1"></i>Ir a ventas</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid px-3 px-md-4 py-3">
+
+    <div id="dashCargando" class="text-center text-muted py-5">
+      <div class="spinner-border text-primary" role="status"></div>
+      <div class="mt-2 small">Cargando datos…</div>
+    </div>
+
+    <div id="dashContenido" class="d-none">
+
+      <!-- KPIs -->
+      <div class="row g-2 g-md-3 mb-3">
+        <div class="col-6 col-lg-3"><div class="kpi"><div class="lbl"><i class="bi bi-cash-stack me-1"></i>Ventas de hoy</div><div class="val text-success" id="kpiVentasHoy">$0</div></div></div>
+        <div class="col-6 col-lg-3"><div class="kpi"><div class="lbl"><i class="bi bi-receipt me-1"></i>Cuentas de hoy</div><div class="val" id="kpiCuentasHoy">0</div></div></div>
+        <div class="col-6 col-lg-3"><div class="kpi"><div class="lbl"><i class="bi bi-people me-1"></i>Por cobrar (clientes)</div><div class="val text-danger" id="kpiPorCobrar">$0</div></div></div>
+        <div class="col-6 col-lg-3"><div class="kpi"><div class="lbl"><i class="bi bi-truck me-1"></i>Por pagar (proveedores)</div><div class="val text-danger" id="kpiPorPagar">$0</div></div></div>
+      </div>
+
+      <div class="row g-3">
+
+        <!-- Ventas del día por personal -->
+        <div class="col-12 col-xl-6">
+          <div class="card-dash h-100">
+            <div class="hd"><i class="bi bi-person-badge me-2"></i>Ventas de hoy por personal</div>
+            <div class="bd">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light"><tr><th>Personal</th><th class="text-end">Ventas</th><th class="text-end">Unid.</th><th class="text-end">Total</th></tr></thead>
+                  <tbody id="tbodyPersonal"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gráfico semana -->
+        <div class="col-12 col-xl-6">
+          <div class="card-dash h-100">
+            <div class="hd"><i class="bi bi-bar-chart me-2"></i>Ventas de la semana</div>
+            <div class="bd"><canvas id="chartSemana"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Gráfico categoría -->
+        <div class="col-12 col-xl-6">
+          <div class="card-dash h-100">
+            <div class="hd"><i class="bi bi-pie-chart me-2"></i>Ventas por categoría</div>
+            <div class="bd"><canvas id="chartCategoria"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Proveedores -->
+        <div class="col-12 col-xl-6">
+          <div class="card-dash h-100">
+            <div class="hd"><i class="bi bi-truck me-2"></i>Proveedores y cuentas por pagar</div>
+            <div class="bd">
+              <div class="row g-2 mb-2">
+                <div class="col-6"><input id="nvProvNombre" class="form-control form-control-sm" placeholder="Nombre del proveedor"></div>
+                <div class="col-4"><input id="nvProvTel" class="form-control form-control-sm" placeholder="Teléfono (opcional)"></div>
+                <div class="col-2 d-grid"><button class="btn btn-sm btn-dark" onclick="provNuevo()"><i class="bi bi-plus-lg"></i></button></div>
+              </div>
+              <div id="listaProv" class="tabla-scroll"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Catálogo -->
+        <div class="col-12">
+          <div class="card-dash">
+            <div class="hd"><i class="bi bi-journal-text me-2"></i>Catálogo de productos <span class="text-muted fw-normal small">— editá precio, categoría o nombre; se guarda solo</span></div>
+            <div class="bd">
+              <div class="row g-2 mb-3">
+                <div class="col-12 col-md-4"><input id="nvProdNombre" class="form-control form-control-sm" placeholder="Nombre del producto nuevo"></div>
+                <div class="col-6 col-md-3"><select id="nvProdCat" class="form-select form-select-sm"></select></div>
+                <div class="col-6 col-md-2"><input id="nvProdPrecio" type="number" min="0" step="500" class="form-control form-control-sm" placeholder="Precio"></div>
+                <div class="col-6 col-md-2"><input id="nvProdStock" type="number" min="0" class="form-control form-control-sm" placeholder="Stock inicial"></div>
+                <div class="col-6 col-md-1 d-grid"><button class="btn btn-sm btn-success" onclick="catNuevo()"><i class="bi bi-plus-lg"></i></button></div>
+              </div>
+              <div class="table-responsive tabla-scroll">
+                <table class="table table-sm align-middle">
+                  <thead class="table-light"><tr><th>Producto</th><th style="width:170px">Categoría</th><th class="text-end" style="width:130px">Precio</th><th class="text-end" style="width:80px">Stock</th><th style="width:110px"></th></tr></thead>
+                  <tbody id="tbodyCatalogo"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Movimientos de producto -->
+        <div class="col-12">
+          <div class="card-dash">
+            <div class="hd d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <span><i class="bi bi-arrow-down-up me-2"></i>Movimientos de inventario — quién sacó / vendió / ajustó</span>
+              <select id="filtroMov" class="form-select form-select-sm" style="width:auto" onchange="renderMovimientos()">
+                <option value="todos">Todos</option>
+                <option value="salidas">Solo salidas</option>
+                <option value="entradas">Solo entradas</option>
+                <option value="perdidas">Solo pérdidas / mermas</option>
+              </select>
+            </div>
+            <div class="bd">
+              <div class="table-responsive tabla-scroll">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light"><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th class="text-end">Cant.</th><th>Motivo</th><th>Quién</th></tr></thead>
+                  <tbody id="tbodyMov"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div id="dashToast" class="toast align-items-center text-white border-0"><div class="d-flex"><div class="toast-body"></div></div></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="js/core/config.js"></script>
+  <script src="js/core/format.js"></script>
+  <script src="js/data/seed.js"></script>
+  <script src="js/core/storage.js"></script>
+  <script src="js/dashboard/dashboard.js"></script>
+  <script src="js/dashboard/gate.js"></script>
+</body>
+</html>

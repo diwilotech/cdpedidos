@@ -49,11 +49,8 @@
 
         <div class="vr mx-1 d-none d-md-block" style="height: 30px;"></div>
 
-        <button type="button" class="btn btn-outline-danger" id="btn-clientes" onclick="abrirModalClientes()" title="Clientes y fiados (cuentas por cobrar)">
-          <i class="bi bi-people me-1"></i> Clientes / Fiados
-        </button>
-        <button type="button" class="btn btn-outline-dark" id="btn-proveedores" onclick="abrirModalProveedores()" title="Proveedores y cuentas por pagar">
-          <i class="bi bi-truck me-1"></i> Proveedores
+        <button type="button" class="btn btn-outline-danger" id="btn-clientes" onclick="abrirModalClientes()" title="Clientes y cuentas por cobrar">
+          <i class="bi bi-people me-1"></i> Clientes
         </button>
       </div>
 
@@ -240,8 +237,8 @@
                 <button class="btn btn-sm btn-outline-danger" onclick="cerrarCuentaActual()">
                   <i class="bi bi-check-circle me-1"></i> Liquidar y Cerrar Cuenta
                 </button>
-                <button class="btn btn-sm btn-outline-dark" onclick="cargarCuentaActualAFiado()" title="Cerrar la cuenta cargándola al fiado de un cliente">
-                  <i class="bi bi-journal-arrow-up me-1"></i> Cargar a Fiado
+                <button class="btn btn-sm btn-outline-dark" onclick="guardarCuentaParaPagoDespues()" title="Cerrar la cuenta y guardarla en la cuenta de un cliente para que pague después">
+                  <i class="bi bi-bookmark-check me-1"></i> Guardar para pago después
                 </button>
               </div>
               <div class="text-end">
@@ -403,7 +400,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header bg-danger text-white d-flex justify-content-between align-items-center flex-nowrap">
-          <h5 class="modal-title mb-0 text-truncate me-2"><i class="bi bi-people me-2"></i> Clientes y Fiados</h5>
+          <h5 class="modal-title mb-0 text-truncate me-2"><i class="bi bi-people me-2"></i> Clientes · Cuentas por cobrar</h5>
           <div class="d-flex align-items-center gap-2 flex-shrink-0">
             <span class="badge bg-light text-danger fw-bold">Total por cobrar: <span id="fiadosTotalPorCobrar">$0</span></span>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -411,7 +408,7 @@
         </div>
         <div class="modal-body">
           <div id="fiadoSeleccionBanner" class="alert alert-warning py-2 px-3 mb-3 small d-none">
-            <i class="bi bi-hand-index-thumb me-1"></i> Elige el cliente al que cargar <strong id="fiadoSeleccionMonto">$0</strong>. Pulsa <strong>"Cargar aquí"</strong> en su ficha.
+            <i class="bi bi-hand-index-thumb me-1"></i> Elige a qué cliente guardar <strong id="fiadoSeleccionMonto">$0</strong>. Pulsa <strong>"Guardar aquí"</strong> en su ficha.
           </div>
 
           <div class="row g-2 mb-3">
@@ -436,39 +433,7 @@
     </div>
   </div>
 
-  <!-- MODAL 8: PROVEEDORES Y CUENTAS POR PAGAR -->
-  <div class="modal fade" id="modalProveedores" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header bg-dark text-white d-flex justify-content-between align-items-center flex-nowrap">
-          <h5 class="modal-title mb-0 text-truncate me-2"><i class="bi bi-truck me-2"></i> Proveedores y Cuentas por Pagar</h5>
-          <div class="d-flex align-items-center gap-2 flex-shrink-0">
-            <span class="badge bg-light text-dark fw-bold">Total por pagar: <span id="cxpTotalPorPagar">$0</span></span>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-        </div>
-        <div class="modal-body">
-          <div class="row g-2 mb-3">
-            <div class="col-12 col-md-6">
-              <input type="text" id="nuevoProveedorNombre" class="form-control form-control-sm" placeholder="Nombre del proveedor" maxlength="50">
-            </div>
-            <div class="col-8 col-md-4">
-              <input type="text" id="nuevoProveedorTelefono" class="form-control form-control-sm" placeholder="Teléfono (opcional)" maxlength="25">
-            </div>
-            <div class="col-4 col-md-2 d-grid">
-              <button class="btn btn-sm btn-dark fw-bold" onclick="agregarProveedor()">
-                <i class="bi bi-plus-circle me-1"></i> Agregar
-              </button>
-            </div>
-          </div>
-
-          <div id="listaProveedores" style="max-height: 420px; overflow-y: auto;">
-            <!-- Fichas de proveedores dinámicas -->
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- (Proveedores y Cuentas por Pagar se movieron al Dashboard, /dashboard.html) -->
 
   <!-- Menú Contextual Flotante -->
   <div id="context-menu" class="dropdown-menu shadow">
@@ -613,7 +578,6 @@
   <script src="js/modules/usuarios.js"></script>
   <script src="js/modules/ventas.js"></script>
   <script src="js/modules/clientes-fiados.js"></script>
-  <script src="js/modules/proveedores-cxp.js"></script>
   <script src="js/modules/personal-accesos.js"></script>   <!-- gestión de accesos (admin) -->
 
   <!-- 4) Arranque -->

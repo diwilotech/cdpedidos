@@ -20,20 +20,18 @@ window.__cdpArrancar = async function arrancarApp() {
     inventario = { ...inventario, ...inventarioGuardado };
   }
 
-  // 1.b) Productos personalizados: se agregan a dbJSON.products para que
-  // catálogo e inventario los traten igual que a los de ejemplo.
+  // 1.b) Catálogo: si el admin lo editó desde el Dashboard, lo guardado es
+  // la lista COMPLETA de productos (precio/categoría/nombre incluidos) y
+  // reemplaza al catálogo de ejemplo. Si no hay nada guardado, quedan los
+  // productos semilla de dbJSON.
   const productosGuardados = await cargarProductosPersonalizadosGuardados();
   if (Array.isArray(productosGuardados) && productosGuardados.length > 0) {
-    productosPersonalizados = productosGuardados;
-    productosPersonalizados.forEach(p => {
-      if (!dbJSON.products.find(existing => existing.id === p.id)) {
-        dbJSON.products.push(p);
-      }
-      if (inventario[p.id] === undefined) {
-        inventario[p.id] = p.stock || 0;
-      }
-    });
+    dbJSON.products = productosGuardados.map(p => ({ ...p }));
   }
+  dbJSON.products.forEach(p => {
+    if (inventario[p.id] === undefined) inventario[p.id] = p.stock || 0;
+  });
+  productosPersonalizados = dbJSON.products; // misma referencia: guardar = guardar el catálogo entero
 
   // 1.c) Ventas y movimientos de inventario.
   // (El operador ya no se carga acá: es quien inició sesión, ver auth-gate.js.)
@@ -60,18 +58,7 @@ window.__cdpArrancar = async function arrancarApp() {
     movimientosFiado = fiadosGuardados;
   }
 
-  // 1.e) Proveedores + cuentas por pagar.
-  const proveedoresGuardados = await cargarProveedoresGuardados();
-  if (proveedoresGuardados && Array.isArray(proveedoresGuardados.proveedores)) {
-    proveedoresData = proveedoresGuardados.proveedores;
-    if (typeof proveedoresGuardados.contadorProveedores === 'number') {
-      contadorProveedores = proveedoresGuardados.contadorProveedores;
-    }
-  }
-  const cxpGuardadas = await cargarCxpGuardadas();
-  if (Array.isArray(cxpGuardadas)) {
-    movimientosCxp = cxpGuardadas;
-  }
+  // (Proveedores / cuentas por pagar viven ahora en el Dashboard, no acá.)
 
   // 2) Plano: pisos + mesas.
   const estadoGuardado = await cargarEstadoGuardado();

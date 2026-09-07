@@ -22,7 +22,15 @@ function registrarVenta(mesaId, cuenta) {
     // se imputa a quien la está liquidando ahora.
     usuarioNombre: cuenta.usuarioNombre || obtenerNombreUsuarioActivo(),
     total,
-    productos: cuenta.productos.map(p => ({ nombre: p.nombre, cant: p.cant, precio: p.precio }))
+    // productId + categoryId para poder agrupar por producto / categoría en el Dashboard
+    productos: cuenta.productos.map(p => {
+      const prod = dbJSON.products.find(x => x.id === p.productId);
+      return {
+        productId: p.productId || null,
+        categoryId: prod ? prod.categoryId : null,
+        nombre: p.nombre, cant: p.cant, precio: p.precio
+      };
+    })
   };
 
   ventasData.push(venta);

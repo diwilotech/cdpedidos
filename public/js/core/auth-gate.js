@@ -164,6 +164,7 @@
       <span class="badge ${admin ? 'text-bg-primary' : 'text-bg-secondary'}">
         <i class="bi bi-person-fill me-1"></i>${user.nombre}${admin ? ' · admin' : ''}
       </span>
+      ${admin ? `<a class="btn btn-sm btn-outline-dark" href="/dashboard.html" title="Panel de administración"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>` : ''}
       ${admin ? `<button class="btn btn-sm btn-outline-primary" onclick="abrirModalPersonal()" title="Gestionar accesos del personal"><i class="bi bi-people-fill me-1"></i>Personal</button>` : ''}
       <button class="btn btn-sm btn-outline-danger" onclick="cdpCerrarSesion()" title="Cerrar sesión"><i class="bi bi-box-arrow-right"></i></button>
     `;

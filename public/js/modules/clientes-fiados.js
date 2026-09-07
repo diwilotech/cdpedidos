@@ -1,18 +1,18 @@
 /* ============================================================================
-   js/modules/clientes-fiados.js — Clientes y Fiados (Cuentas por Cobrar)
+   js/modules/clientes-fiados.js — Clientes y cuentas por cobrar
    ----------------------------------------------------------------------------
-   - clientesData        : ficha del cliente { id, nombre, telefono }
-   - movimientosFiado    : { id, fecha, clienteId, tipo:'cargo'|'abono',
-                             monto, concepto, usuarioNombre }
+   - clientesData     : ficha del cliente { id, nombre, telefono }
+   - movimientosFiado : { id, fecha, clienteId, tipo:'cargo'|'abono',
+                          monto, concepto, usuarioNombre }
    Saldo del cliente = Σ cargos − Σ abonos  (lo que el cliente DEBE al local).
+   ("cargo" = consumo que se le anota; "abono" = pago que hace).
    ========================================================================== */
 
 const modalFiadosBS = new bootstrap.Modal(document.getElementById('modalFiados'));
 
-// Cuando se entra desde "Cargar cuenta a fiado", se guarda aquí el monto y
-// el concepto pendientes, y la lista de clientes muestra un botón grande
-// "Cargar aquí" en cada ficha.
-let fiadoModoSeleccion = null; // { monto, concepto } | null
+// Al entrar desde "Guardar para pago después" se deja aquí el monto y el
+// concepto pendientes; cada ficha de cliente muestra un botón "Guardar aquí".
+let fiadoModoSeleccion = null;
 
 /* --- CÁLCULOS --- */
 function saldoCliente(clienteId) {
@@ -55,7 +55,6 @@ function renderListaClientes() {
     return;
   }
 
-  // Mayor deuda primero
   const ordenados = [...clientesData].sort((a, b) => saldoCliente(b.id) - saldoCliente(a.id));
 
   ordenados.forEach(c => {
@@ -63,7 +62,7 @@ function renderListaClientes() {
     const debe = saldo > 0;
     const aFavor = saldo < 0;
     const saldoClase = debe ? 'text-danger' : aFavor ? 'text-success' : 'text-muted';
-    const saldoTxt = debe ? formatMoney(saldo) + ' debe'
+    const saldoTxt = debe ? formatMoney(saldo) + ' por cobrar'
                     : aFavor ? formatMoney(-saldo) + ' a favor'
                     : 'Al día';
 
@@ -77,10 +76,10 @@ function renderListaClientes() {
         </div>
         <div class="d-flex gap-1 flex-wrap">
           ${fiadoModoSeleccion
-            ? `<button class="btn btn-sm btn-danger fw-bold" onclick="confirmarCargoDesdeSeleccion(${c.id})"><i class="bi bi-arrow-down-circle me-1"></i>Cargar aquí</button>`
+            ? `<button class="btn btn-sm btn-danger fw-bold" onclick="confirmarCargoDesdeSeleccion(${c.id})"><i class="bi bi-arrow-down-circle me-1"></i>Guardar aquí</button>`
             : `
-              <button class="btn btn-sm btn-outline-danger" onclick="registrarCargoFiado(${c.id})" title="Registrar un fiado (cargo)"><i class="bi bi-cart-plus"></i> Fiar</button>
-              <button class="btn btn-sm btn-outline-success" onclick="registrarAbonoFiado(${c.id})" title="Registrar un abono / pago"><i class="bi bi-cash-coin"></i> Abono</button>
+              <button class="btn btn-sm btn-outline-danger" onclick="registrarCargoFiado(${c.id})" title="Anotar un consumo a la cuenta del cliente"><i class="bi bi-cart-plus"></i> Cargar</button>
+              <button class="btn btn-sm btn-outline-success" onclick="registrarAbonoFiado(${c.id})" title="Registrar un pago / abono del cliente"><i class="bi bi-cash-coin"></i> Abono</button>
               <button class="btn btn-sm btn-outline-secondary" onclick="verHistorialFiado(${c.id})" title="Ver historial"><i class="bi bi-clock-history"></i></button>
               <button class="btn btn-sm btn-outline-secondary" onclick="renombrarCliente(${c.id})" title="Editar cliente"><i class="bi bi-pencil"></i></button>
               <button class="btn btn-sm btn-outline-danger" onclick="eliminarCliente(${c.id})" title="Eliminar cliente"><i class="bi bi-trash3"></i></button>
@@ -122,7 +121,7 @@ function renombrarCliente(id) {
 function eliminarCliente(id) {
   const c = clientesData.find(x => x.id === id);
   if (!c) return;
-  pedirConfirmacion(`¿Eliminar a "${c.nombre}"? Se borrará también su historial de fiados.`, () => {
+  pedirConfirmacion(`¿Eliminar a "${c.nombre}"? Se borrará también su historial de cuenta.`, () => {
     clientesData = clientesData.filter(x => x.id !== id);
     movimientosFiado = movimientosFiado.filter(m => m.clienteId !== id);
     guardarClientes();
@@ -139,7 +138,7 @@ function registrarMovimientoFiado(clienteId, tipo, monto, concepto) {
     clienteId,
     tipo,
     monto: Math.abs(Number(monto) || 0),
-    concepto: concepto || (tipo === 'cargo' ? 'Fiado' : 'Abono'),
+    concepto: concepto || (tipo === 'cargo' ? 'Consumo' : 'Abono'),
     usuarioNombre: obtenerNombreUsuarioActivo()
   });
   if (movimientosFiado.length > MAX_MOV_FIADOS_GUARDADOS) {
@@ -149,15 +148,15 @@ function registrarMovimientoFiado(clienteId, tipo, monto, concepto) {
 }
 
 function registrarCargoFiado(clienteId) {
-  pedirTexto('Monto a fiar (COP):', '', (valor) => {
+  pedirTexto('Monto a cargar a la cuenta (COP):', '', (valor) => {
     const monto = parseFloat(String(valor).replace(/[^\d.-]/g, ''));
     if (isNaN(monto) || monto <= 0) {
       mostrarNotificacion('Ingresa un monto válido.', 'danger', 'bi-exclamation-triangle-fill');
       return;
     }
-    registrarMovimientoFiado(clienteId, 'cargo', monto, 'Fiado manual');
+    registrarMovimientoFiado(clienteId, 'cargo', monto, 'Cargo manual');
     renderListaClientes();
-    mostrarNotificacion('Fiado registrado', 'success', 'bi-cart-plus');
+    mostrarNotificacion('Cargo registrado', 'success', 'bi-cart-plus');
   });
 }
 
@@ -197,9 +196,10 @@ function verHistorialFiado(clienteId) {
 }
 
 /* --- PUENTE CON EL MODAL DE CUENTAS ---
-   "Cargar cuenta a fiado": registra la venta (es ingreso, pero a crédito)
-   y crea un cargo en el fiado del cliente elegido; luego cierra la cuenta. */
-function cargarCuentaActualAFiado() {
+   "Guardar para pago después": registra la venta (es ingreso, pero a
+   crédito) y anota el consumo en la cuenta del cliente elegido; cierra la
+   cuenta de la mesa. */
+function guardarCuentaParaPagoDespues() {
   const cuentas = mesasData[mesaActivaId];
   const cuenta = cuentas ? cuentas[cuentaActivaIndex] : null;
   if (!cuenta) return;
@@ -209,7 +209,7 @@ function cargarCuentaActualAFiado() {
     return;
   }
   if (clientesData.length === 0) {
-    mostrarNotificacion('Primero registra un cliente en "Clientes / Fiados".', 'warning', 'bi-info-circle');
+    mostrarNotificacion('Primero registra un cliente en "Clientes".', 'warning', 'bi-info-circle');
     abrirModalClientes();
     return;
   }
@@ -226,6 +226,8 @@ function cargarCuentaActualAFiado() {
   renderListaClientes();
   modalFiadosBS.show();
 }
+// Alias antiguo, por si quedó alguna referencia:
+const cargarCuentaActualAFiado = guardarCuentaParaPagoDespues;
 
 function confirmarCargoDesdeSeleccion(clienteId) {
   if (!fiadoModoSeleccion) return;
@@ -237,7 +239,7 @@ function confirmarCargoDesdeSeleccion(clienteId) {
 
   // 1) Es una venta (ingreso), solo que a crédito.
   registrarVenta(mesaId, cuenta);
-  // 2) Queda como deuda del cliente.
+  // 2) Queda como saldo por cobrar del cliente.
   registrarMovimientoFiado(clienteId, 'cargo', monto, concepto);
 
   // 3) Se cierra la cuenta de la mesa.
@@ -251,5 +253,5 @@ function confirmarCargoDesdeSeleccion(clienteId) {
   fiadoModoSeleccion = null;
   renderListaClientes();
   const cli = clientesData.find(c => c.id === clienteId);
-  mostrarNotificacion(`${formatMoney(monto)} cargados al fiado de ${cli ? cli.nombre : 'cliente'}`, 'success', 'bi-journal-check');
+  mostrarNotificacion(`${formatMoney(monto)} guardados en la cuenta de ${cli ? cli.nombre : 'cliente'}`, 'success', 'bi-journal-check');
 }

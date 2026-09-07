@@ -162,8 +162,9 @@ function guardarNuevoProducto() {
     stock: (!isNaN(stockInicial) && stockInicial > 0) ? stockInicial : 0
   };
 
+  // productosPersonalizados y dbJSON.products son la MISMA lista (ver app.js):
+  // basta con agregar el producto una vez.
   dbJSON.products.push(nuevoProducto);
-  productosPersonalizados.push(nuevoProducto);
   inventario[nuevoProducto.id] = nuevoProducto.stock;
   if (nuevoProducto.stock > 0) {
     registrarMovimientoInventario(nuevoProducto.id, nuevoProducto.stock, 'Alta de producto');
