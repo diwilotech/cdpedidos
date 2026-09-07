@@ -152,7 +152,7 @@ function renderVentasPorPersonal() {
 /* ---------- movimientos de producto ---------- */
 function motivoBadge(m) {
   const mot = (m.motivo || '').toLowerCase();
-  if (mot.includes('baja de producto')) return '<span class="badge text-bg-secondary">Baja</span>';
+  if (mot.includes('salida de producto')) return '<span class="badge text-bg-secondary">Salida de producto</span>';
   if (m.tipo === 'entrada') return '<span class="badge text-bg-success">Entrada</span>';
   if (mot.includes('pérdida') || mot.includes('perdida') || mot.includes('merma')) return '<span class="badge text-bg-dark">Pérdida</span>';
   if (mot.includes('devol')) return '<span class="badge text-bg-warning">Devolución</span>';
@@ -309,7 +309,6 @@ function renderCatalogo() {
         </div>
       </td>
       <td class="text-nowrap">
-        <button class="btn btn-sm btn-outline-dark" title="Registrar pérdida / merma" onclick="catPerdida(${i})"><i class="bi bi-dash-circle"></i></button>
         <button class="btn btn-sm btn-outline-danger" title="Eliminar del catálogo" onclick="catBorrar(${i})"><i class="bi bi-trash3"></i></button>
       </td>
     </tr>`;
@@ -366,8 +365,8 @@ async function catBorrar(i) {
   const p = D.catalogo[i];
   if (!p || !confirm(`¿Eliminar "${p.name}" del catálogo? No borra las ventas ya hechas.`)) return;
   const stock = D.inventario[p.id] ?? 0;
-  // Deja constancia en el historial de movimientos de que el producto se dio de baja.
-  registrarMov(p.id, p.name, -Math.max(0, stock), `Baja de producto: "${p.name}" eliminado del catálogo`);
+  // Deja constancia en el historial de movimientos.
+  registrarMov(p.id, p.name, -Math.max(0, stock), 'Salida de producto (eliminado del catálogo)');
   D.catalogo.splice(i, 1);
   delete D.inventario[p.id];
   await guardarCatalogo();
@@ -394,18 +393,8 @@ async function catNuevo() {
   toast(`"${name}" agregado`);
 }
 
-async function catPerdida(i) {
-  const p = D.catalogo[i];
-  if (!p) return;
-  const n = parseInt(prompt(`Unidades de "${p.name}" a descontar por pérdida / merma:`, ''), 10);
-  if (isNaN(n) || n <= 0) return;
-  D.inventario[p.id] = Math.max(0, (D.inventario[p.id] ?? 0) - n);
-  registrarMov(p.id, p.name, -n, 'Ajuste de pérdida');
-  await guardarCatalogo();
-  await escribir(STORAGE_KEY_MOVIMIENTOS, D.movimientos);
-  renderCatalogo(); renderMovimientos();
-  toast(`Pérdida registrada: ${n} × ${p.name}`, 'warning');
-}
+// (La pérdida / merma se registra desde "Guardar total": si el total nuevo
+//  es menor, el movimiento queda como "Ajuste de pérdida".)
 
 function registrarMov(productId, productName, delta, motivo) {
   D.movimientos.push({
