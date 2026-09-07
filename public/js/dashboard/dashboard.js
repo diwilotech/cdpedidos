@@ -167,8 +167,10 @@ function renderMovimientos() {
 function renderCatalogo() {
   const tb = document.getElementById('tbodyCatalogo');
   const cats = dbJSON.categories.filter(c => c.id !== 'cat-all');
-  tb.innerHTML = D.catalogo.map((p, i) => `
-    <tr>
+  tb.innerHTML = D.catalogo.map((p, i) => {
+    const stock = D.inventario[p.id] ?? 0;
+    return `
+    <tr data-catrow="${i}" data-stockactual="${stock}">
       <td><input class="form-control form-control-sm" value="${(p.name || '').replace(/"/g, '&quot;')}" onchange="catEditar(${i},'name',this.value)"></td>
       <td>
         <select class="form-select form-select-sm" onchange="catEditar(${i},'categoryId',this.value)">
@@ -176,12 +178,53 @@ function renderCatalogo() {
         </select>
       </td>
       <td style="width:120px"><input type="number" min="0" step="500" class="form-control form-control-sm text-end" value="${p.price || 0}" onchange="catEditar(${i},'price',this.value)"></td>
-      <td class="text-end">${D.inventario[p.id] ?? 0}</td>
+      <td>
+        <div class="d-flex align-items-center gap-1">
+          <div class="input-group input-group-sm" style="width:118px">
+            <button class="btn btn-outline-secondary" type="button" onclick="catAjustarCampo(this,-1)">−</button>
+            <input type="number" min="0" class="form-control text-center cat-stock" value="${stock}" oninput="catDifStock(this)">
+            <button class="btn btn-outline-secondary" type="button" onclick="catAjustarCampo(this,1)">+</button>
+          </div>
+          <span class="cat-dif fw-bold text-muted" style="min-width:30px;text-align:center">0</span>
+          <button class="btn btn-sm btn-success" title="Fijar el total y registrar la diferencia" onclick="catGuardarStock(${i},this)"><i class="bi bi-check-lg"></i></button>
+        </div>
+      </td>
       <td class="text-nowrap">
         <button class="btn btn-sm btn-outline-dark" title="Registrar pérdida / merma" onclick="catPerdida(${i})"><i class="bi bi-dash-circle"></i></button>
         <button class="btn btn-sm btn-outline-danger" title="Eliminar del catálogo" onclick="catBorrar(${i})"><i class="bi bi-trash3"></i></button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
+}
+
+// - / + solo mueven el número; "✓" fija el total y registra la diferencia.
+function catAjustarCampo(btn, delta) {
+  const row = btn.closest('[data-catrow]');
+  const input = row.querySelector('.cat-stock');
+  input.value = Math.max(0, (parseInt(input.value, 10) || 0) + delta);
+  catDifStock(input);
+}
+function catDifStock(input) {
+  const row = input.closest('[data-catrow]');
+  const dif = (parseInt(input.value, 10) || 0) - (parseInt(row.dataset.stockactual, 10) || 0);
+  const el = row.querySelector('.cat-dif');
+  el.textContent = (dif > 0 ? '+' : '') + dif;
+  el.className = 'cat-dif fw-bold ' + (dif > 0 ? 'text-success' : dif < 0 ? 'text-danger' : 'text-muted');
+}
+async function catGuardarStock(i, btn) {
+  const p = D.catalogo[i];
+  if (!p) return;
+  const row = btn.closest('[data-catrow]');
+  const nuevo = Math.max(0, parseInt(row.querySelector('.cat-stock').value, 10) || 0);
+  const actual = D.inventario[p.id] ?? 0;
+  const dif = nuevo - actual;
+  if (dif === 0) { toast('Sin cambios.', 'warning'); return; }
+  D.inventario[p.id] = nuevo;
+  registrarMov(p.id, p.name, dif, dif > 0 ? 'Reposición / ajuste' : 'Ajuste de inventario');
+  await guardarCatalogo();
+  await escribir(STORAGE_KEY_MOVIMIENTOS, D.movimientos);
+  renderCatalogo(); renderMovimientos();
+  toast(`${p.name}: ${dif > 0 ? '+' : ''}${dif} · total ${nuevo}`);
 }
 
 async function guardarCatalogo() {

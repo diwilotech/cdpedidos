@@ -224,19 +224,26 @@ function renderListaInventario() {
 
     const row = document.createElement('div');
     row.className = 'd-flex justify-content-between align-items-center flex-wrap gap-2 border rounded-3 p-2 mb-2';
+    row.dataset.prodrow = '';
+    row.dataset.stockactual = stock;
+    // Se escribe el TOTAL que debe quedar (los botones - / + solo mueven ese
+    // número, no guardan). "dif" muestra el cambio contra el stock actual.
+    // "Guardar total" fija ese número y registra el movimiento por la diferencia.
     row.innerHTML = `
       <div>
         <div class="fw-bold">${prod.name} ${esPersonalizado ? '<span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size:.65rem;">Nuevo</span>' : ''}</div>
         <div class="small text-muted font-monospace">${prod.code} · ${formatMoney(prod.price)}</div>
       </div>
-      <div class="d-flex align-items-center gap-2">
-        <span class="badge ${badgeClase} fs-6" id="stock-badge-${prod.id}">${stock} und.</span>
-        <div class="btn-group btn-group-sm">
-          <button class="btn btn-outline-secondary" onclick="ajustarStockDesdeModal('${prod.id}', -1)" title="Quitar 1 unidad">-</button>
-          <button class="btn btn-outline-secondary" onclick="ajustarStockDesdeModal('${prod.id}', 1)" title="Agregar 1 unidad">+</button>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="badge ${badgeClase}" title="Stock actual">${stock} und.</span>
+        <div class="input-group input-group-sm" style="width:132px;">
+          <button class="btn btn-outline-secondary" type="button" onclick="ajustarCampoStock(this,-1)">−</button>
+          <input type="number" min="0" class="form-control text-center stock-input" value="${stock}" oninput="actualizarDifStock(this)">
+          <button class="btn btn-outline-secondary" type="button" onclick="ajustarCampoStock(this,1)">+</button>
         </div>
-        <button class="btn btn-sm btn-outline-success fw-bold" onclick="reponerStock('${prod.id}')" title="Registrar una reposición de stock">
-          <i class="bi bi-box-arrow-in-down me-1"></i>Reponer
+        <span class="stock-dif fw-bold text-muted" style="min-width:34px;text-align:center;">0</span>
+        <button class="btn btn-sm btn-success fw-bold" onclick="guardarStockTotalDesdeFila(this,'${prod.id}')" title="Fijar el total y registrar la diferencia">
+          <i class="bi bi-check-lg me-1"></i>Guardar total
         </button>
       </div>
     `;
@@ -244,22 +251,47 @@ function renderListaInventario() {
   });
 }
 
-function ajustarStockDesdeModal(productId, delta) {
-  ajustarStock(productId, delta, 'Ajuste manual');
-  renderListaInventario();
-  refrescarVistasInventarioSiEstanAbiertas();
+// Los botones - / + solo cambian el número del campo (no guardan).
+function ajustarCampoStock(btn, delta) {
+  const row = btn.closest('[data-prodrow]');
+  const input = row.querySelector('.stock-input');
+  input.value = Math.max(0, (parseInt(input.value, 10) || 0) + delta);
+  actualizarDifStock(input);
 }
 
-function reponerStock(productId) {
+// Muestra la diferencia (nuevo total − stock actual) al lado del campo.
+function actualizarDifStock(input) {
+  const row = input.closest('[data-prodrow]');
+  const actual = parseInt(row.dataset.stockactual, 10) || 0;
+  const dif = (parseInt(input.value, 10) || 0) - actual;
+  const el = row.querySelector('.stock-dif');
+  el.textContent = (dif > 0 ? '+' : '') + dif;
+  el.className = 'stock-dif fw-bold ' + (dif > 0 ? 'text-success' : dif < 0 ? 'text-danger' : 'text-muted');
+}
+
+function guardarStockTotalDesdeFila(btn, productId) {
+  const row = btn.closest('[data-prodrow]');
+  guardarStockTotal(productId, row.querySelector('.stock-input').value);
+}
+
+// Fija el stock al total indicado y registra UN movimiento por la diferencia.
+function guardarStockTotal(productId, nuevoTotal) {
+  nuevoTotal = Math.max(0, parseInt(nuevoTotal, 10) || 0);
+  const actual = obtenerStock(productId);
+  const dif = nuevoTotal - actual;
+  if (dif === 0) {
+    mostrarNotificacion('Sin cambios: el total es igual al stock actual.', 'warning', 'bi-info-circle');
+    return;
+  }
+  inventario[productId] = nuevoTotal;
+  guardarInventario();
+  registrarMovimientoInventario(productId, dif, dif > 0 ? 'Reposición / ajuste' : 'Ajuste de inventario');
+
   const prod = dbJSON.products.find(p => p.id === productId);
-  if (!prod) return;
-  pedirTexto(`¿Cuántas unidades de "${prod.name}" quieres agregar al inventario?`, '', (valor) => {
-    const cantidad = parseInt(valor, 10);
-    if (!isNaN(cantidad) && cantidad > 0) {
-      ajustarStock(productId, cantidad, 'Reposición');
-      renderListaInventario();
-      refrescarVistasInventarioSiEstanAbiertas();
-      mostrarNotificacion(`Se agregaron ${cantidad} und. de "${prod.name}" al inventario`, 'success', 'bi-box-arrow-in-down');
-    }
-  });
+  mostrarNotificacion(
+    `${prod ? prod.name : 'Producto'}: ${dif > 0 ? '+' : ''}${dif} und. · total ${nuevoTotal}`,
+    'success', 'bi-check-circle-fill'
+  );
+  renderListaInventario();
+  refrescarVistasInventarioSiEstanAbiertas();
 }
