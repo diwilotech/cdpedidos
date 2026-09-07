@@ -71,12 +71,17 @@ function renderListaMovimientos() {
   const cont = document.getElementById('listaMovimientos');
   cont.innerHTML = '';
 
-  if (movimientosInventario.length === 0) {
-    cont.innerHTML = `<div class="text-center text-muted py-4 small">Todavía no hay movimientos registrados.</div>`;
+  // Solo los movimientos hechos por el usuario en sesión (el panorama
+  // completo de todo el personal está en el Dashboard).
+  const mio = obtenerNombreUsuarioActivo();
+  const mios = movimientosInventario.filter(m => (m.usuarioNombre || 'Sin asignar') === mio);
+
+  if (mios.length === 0) {
+    cont.innerHTML = `<div class="text-center text-muted py-4 small">Todavía no registraste movimientos de inventario.</div>`;
     return;
   }
 
-  const ordenados = [...movimientosInventario].reverse(); // más recientes primero
+  const ordenados = [...mios].reverse(); // más recientes primero
 
   ordenados.forEach(m => {
     const esEntrada = m.tipo === 'entrada';

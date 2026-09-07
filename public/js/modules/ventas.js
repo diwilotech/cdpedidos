@@ -1,9 +1,19 @@
 /* ============================================================================
-   js/modules/ventas.js — Registro y reporte de ventas
+   js/modules/ventas.js — "Mis ventas"
    ----------------------------------------------------------------------------
-   `registrarVenta()` se llama al liquidar una cuenta. El modal de Ventas
-   muestra el acumulado por usuario y las cuentas liquidadas recientes.
+   `registrarVenta()` se llama al liquidar una cuenta. El modal muestra SOLO
+   las ventas del usuario que tiene la sesión: su resumen y su lista, donde
+   cada venta se puede desplegar para ver qué vendió y editarla (agregar
+   productos, cambiar cantidades) — el stock se ajusta en consecuencia.
+   El panorama completo (todos los usuarios) está en el Dashboard.
    ========================================================================== */
+
+const ventasExpandidas = new Set();
+
+function esMismoDiaVenta(iso) {
+  const d = new Date(iso), h = new Date();
+  return d.getFullYear() === h.getFullYear() && d.getMonth() === h.getMonth() && d.getDate() === h.getDate();
+}
 
 function registrarVenta(mesaId, cuenta) {
   if (!cuenta) return;
@@ -18,11 +28,8 @@ function registrarVenta(mesaId, cuenta) {
     fecha: new Date().toISOString(),
     mesaId, mesaNombre,
     cuentaNombre: cuenta.nombreCuenta,
-    // A nombre de quien abrió la cuenta; si no tiene (cuenta vieja/importada),
-    // se imputa a quien la está liquidando ahora.
     usuarioNombre: cuenta.usuarioNombre || obtenerNombreUsuarioActivo(),
     total,
-    // productId + categoryId para poder agrupar por producto / categoría en el Dashboard
     productos: cuenta.productos.map(p => {
       const prod = dbJSON.products.find(x => x.id === p.productId);
       return {
@@ -46,59 +53,147 @@ function abrirModalVentas() {
   modalVentasBS.show();
 }
 
+// Solo MIS números.
 function renderResumenVentasPorUsuario() {
   const cont = document.getElementById('resumenVentasPorUsuario');
-  cont.innerHTML = '';
+  const mio = obtenerNombreUsuarioActivo();
+  const mias = ventasData.filter(v => (v.usuarioNombre || 'Sin asignar') === mio);
+  const hoy = mias.filter(v => esMismoDiaVenta(v.fecha));
+  const totalHoy = hoy.reduce((s, v) => s + v.total, 0);
+  const totalTodo = mias.reduce((s, v) => s + v.total, 0);
 
-  if (ventasData.length === 0) {
-    cont.innerHTML = `<div class="text-muted small">Todavía no hay ventas registradas.</div>`;
-    return;
-  }
-
-  const totales = {}; // nombre -> {total, cuentas}
-  ventasData.forEach(v => {
-    const nombre = v.usuarioNombre || 'Sin asignar';
-    if (!totales[nombre]) totales[nombre] = { total: 0, cuentas: 0 };
-    totales[nombre].total += v.total;
-    totales[nombre].cuentas += 1;
-  });
-
-  const nombresOrdenados = Object.keys(totales).sort((a, b) => totales[b].total - totales[a].total);
-
-  nombresOrdenados.forEach(nombre => {
-    const info = totales[nombre];
-    const card = document.createElement('div');
-    card.className = 'border rounded-3 p-2 px-3 bg-light';
-    card.innerHTML = `
-      <div class="small text-muted"><i class="bi bi-person-fill me-1"></i>${nombre}</div>
-      <div class="fw-bold text-success">${formatMoney(info.total)}</div>
-      <div class="small text-muted">${info.cuentas} ${info.cuentas === 1 ? 'cuenta' : 'cuentas'}</div>
-    `;
-    cont.appendChild(card);
-  });
+  cont.innerHTML = `
+    <div class="border rounded-3 p-2 px-3 bg-light">
+      <div class="small text-muted"><i class="bi bi-person-fill me-1"></i>${mio} · hoy</div>
+      <div class="fw-bold text-success fs-5">${formatMoney(totalHoy)}</div>
+      <div class="small text-muted">${hoy.length} ${hoy.length === 1 ? 'venta' : 'ventas'}</div>
+    </div>
+    <div class="border rounded-3 p-2 px-3 bg-light">
+      <div class="small text-muted">Acumulado</div>
+      <div class="fw-bold text-secondary fs-6">${formatMoney(totalTodo)}</div>
+      <div class="small text-muted">${mias.length} ${mias.length === 1 ? 'venta' : 'ventas'}</div>
+    </div>`;
 }
 
 function renderListaVentas() {
   const cont = document.getElementById('listaVentas');
-  cont.innerHTML = '';
+  const mio = obtenerNombreUsuarioActivo();
+  const mias = [...ventasData].reverse()
+    .filter(v => (v.usuarioNombre || 'Sin asignar') === mio)
+    .slice(0, 100);
 
-  if (ventasData.length === 0) {
-    cont.innerHTML = `<div class="text-center text-muted py-4 small">Todavía no hay cuentas liquidadas.</div>`;
+  if (mias.length === 0) {
+    cont.innerHTML = `<div class="text-center text-muted py-4 small">Todavía no tenés ventas registradas.</div>`;
     return;
   }
 
-  const recientes = [...ventasData].reverse().slice(0, 100);
+  cont.innerHTML = mias.map(v => {
+    const abierta = ventasExpandidas.has(v.id);
+    const unidades = v.productos.reduce((s, p) => s + p.cant, 0);
+    return `
+      <div class="border rounded-3 mb-2">
+        <div class="d-flex justify-content-between align-items-center p-2" style="cursor:pointer" onclick="toggleVentaDetalle('${v.id}')">
+          <div>
+            <div class="fw-bold"><i class="bi ${abierta ? 'bi-chevron-down' : 'bi-chevron-right'} me-1"></i>${v.mesaNombre} · ${v.cuentaNombre}</div>
+            <div class="small text-muted">${formatFecha(v.fecha)} · ${unidades} und.</div>
+          </div>
+          <span class="fs-6 fw-bold text-success">${formatMoney(v.total)}</span>
+        </div>
+        ${abierta ? renderVentaDetalle(v) : ''}
+      </div>`;
+  }).join('');
+}
 
-  recientes.forEach(v => {
-    const row = document.createElement('div');
-    row.className = 'd-flex justify-content-between align-items-center border rounded-3 p-2 mb-2';
-    row.innerHTML = `
-      <div>
-        <div class="fw-bold">${v.mesaNombre} · ${v.cuentaNombre}</div>
-        <div class="small text-muted">${formatFecha(v.fecha)} · <i class="bi bi-person-fill"></i> ${v.usuarioNombre}</div>
+function toggleVentaDetalle(ventaId) {
+  if (ventasExpandidas.has(ventaId)) ventasExpandidas.delete(ventaId);
+  else ventasExpandidas.add(ventaId);
+  renderListaVentas();
+}
+
+function renderVentaDetalle(v) {
+  const filas = v.productos.length === 0
+    ? `<tr><td colspan="5" class="text-center text-muted small py-2">Venta sin productos.</td></tr>`
+    : v.productos.map((p, i) => `
+      <tr>
+        <td class="fw-bold">${p.nombre}</td>
+        <td class="text-center">
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary py-0 px-1" onclick="modificarLineaVenta('${v.id}',${i},-1)">-</button>
+            <span class="btn btn-light disabled py-0 px-2 fw-bold text-dark">${p.cant}</span>
+            <button class="btn btn-outline-secondary py-0 px-1" onclick="modificarLineaVenta('${v.id}',${i},1)">+</button>
+          </div>
+        </td>
+        <td class="text-end">${formatMoney(p.precio)}</td>
+        <td class="text-end fw-bold">${formatMoney(p.cant * p.precio)}</td>
+        <td class="text-center"><button class="btn btn-sm btn-link text-danger p-0" onclick="eliminarLineaVenta('${v.id}',${i})" title="Quitar de la venta"><i class="bi bi-trash"></i></button></td>
+      </tr>`).join('');
+
+  const opciones = [...dbJSON.products]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(p => `<option value="${p.id}">${p.name} — ${formatMoney(p.price)}</option>`).join('');
+
+  return `
+    <div class="border-top p-2 bg-light">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-2"><tbody>${filas}</tbody></table>
       </div>
-      <span class="fs-6 fw-bold text-success">${formatMoney(v.total)}</span>
-    `;
-    cont.appendChild(row);
-  });
+      <div class="d-flex gap-1 align-items-center flex-wrap">
+        <span class="small text-muted fw-bold">Agregar:</span>
+        <select id="addProdSel-${v.id}" class="form-select form-select-sm" style="max-width:230px">${opciones}</select>
+        <input id="addProdQty-${v.id}" type="number" min="1" value="1" class="form-control form-control-sm" style="width:64px">
+        <button class="btn btn-sm btn-success fw-bold" onclick="agregarProductoAVenta('${v.id}')"><i class="bi bi-plus-lg me-1"></i>Agregar producto</button>
+      </div>
+    </div>`;
+}
+
+function agregarProductoAVenta(ventaId) {
+  const v = ventasData.find(x => x.id === ventaId);
+  if (!v) return;
+  const productId = document.getElementById('addProdSel-' + ventaId).value;
+  const qty = Math.max(1, parseInt(document.getElementById('addProdQty-' + ventaId).value, 10) || 1);
+  const prod = dbJSON.products.find(p => p.id === productId);
+  if (!prod) return;
+  if (obtenerStock(productId) < qty) { notificarSinStock(prod.name); return; }
+
+  const linea = v.productos.find(p => p.productId === productId);
+  if (linea) linea.cant += qty;
+  else v.productos.push({ productId, categoryId: prod.categoryId, nombre: prod.name, cant: qty, precio: prod.price });
+
+  ajustarStock(productId, -qty, 'Venta (agregado a venta)');
+  v.total = v.productos.reduce((s, p) => s + p.cant * p.precio, 0);
+  guardarVentas();
+  refrescarVistasInventarioSiEstanAbiertas();
+  renderResumenVentasPorUsuario();
+  renderListaVentas();
+  mostrarNotificacion(`${prod.name} x${qty} agregado a la venta`, 'success', 'bi-check-circle-fill');
+}
+
+function modificarLineaVenta(ventaId, idx, delta) {
+  const v = ventasData.find(x => x.id === ventaId);
+  if (!v) return;
+  const p = v.productos[idx];
+  if (!p) return;
+  if (delta > 0 && p.productId && obtenerStock(p.productId) <= 0) { notificarSinStock(p.nombre); return; }
+  if (p.productId) ajustarStock(p.productId, -delta, delta > 0 ? 'Venta (editada)' : 'Devolución (venta editada)');
+  p.cant += delta;
+  if (p.cant <= 0) v.productos.splice(idx, 1);
+  v.total = v.productos.reduce((s, x) => s + x.cant * x.precio, 0);
+  guardarVentas();
+  refrescarVistasInventarioSiEstanAbiertas();
+  renderResumenVentasPorUsuario();
+  renderListaVentas();
+}
+
+function eliminarLineaVenta(ventaId, idx) {
+  const v = ventasData.find(x => x.id === ventaId);
+  if (!v) return;
+  const p = v.productos[idx];
+  if (!p) return;
+  if (p.productId) ajustarStock(p.productId, p.cant, 'Devolución (venta editada)');
+  v.productos.splice(idx, 1);
+  v.total = v.productos.reduce((s, x) => s + x.cant * x.precio, 0);
+  guardarVentas();
+  refrescarVistasInventarioSiEstanAbiertas();
+  renderResumenVentasPorUsuario();
+  renderListaVentas();
 }
