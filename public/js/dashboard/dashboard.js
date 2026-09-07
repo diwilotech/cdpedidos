@@ -152,8 +152,9 @@ function renderVentasPorPersonal() {
 /* ---------- movimientos de producto ---------- */
 function motivoBadge(m) {
   const mot = (m.motivo || '').toLowerCase();
+  if (mot.includes('baja de producto')) return '<span class="badge text-bg-secondary">Baja</span>';
   if (m.tipo === 'entrada') return '<span class="badge text-bg-success">Entrada</span>';
-  if (mot.includes('pérdida') || mot.includes('perdida')) return '<span class="badge text-bg-dark">Pérdida</span>';
+  if (mot.includes('pérdida') || mot.includes('perdida') || mot.includes('merma')) return '<span class="badge text-bg-dark">Pérdida</span>';
   if (mot.includes('devol')) return '<span class="badge text-bg-warning">Devolución</span>';
   if (mot.includes('venta')) return '<span class="badge text-bg-danger">Venta</span>';
   return '<span class="badge text-bg-secondary">Salida</span>';
@@ -174,7 +175,7 @@ function renderMovimientos() {
         <td class="small text-muted text-nowrap">${formatFecha(m.fecha)}</td>
         <td class="fw-bold">${m.productName || m.productId || '—'}</td>
         <td>${motivoBadge(m)}</td>
-        <td class="text-end fw-bold ${m.tipo === 'entrada' ? 'text-success' : 'text-danger'}">${m.tipo === 'entrada' ? '+' : '−'}${m.cantidad}</td>
+        <td class="text-end fw-bold ${m.tipo === 'entrada' ? 'text-success' : 'text-danger'}">${m.cantidad ? (m.tipo === 'entrada' ? '+' : '−') + m.cantidad : '—'}</td>
         <td class="small">${m.motivo || ''}</td>
         <td class="small"><i class="bi bi-person-fill me-1"></i>${m.usuarioNombre || 'Sin asignar'}</td>
       </tr>`).join('');
@@ -338,7 +339,8 @@ async function catGuardarStock(i, btn) {
   const dif = nuevo - actual;
   if (dif === 0) { toast('Sin cambios.', 'warning'); return; }
   D.inventario[p.id] = nuevo;
-  registrarMov(p.id, p.name, dif, dif > 0 ? 'Reposición / ajuste' : 'Ajuste de inventario');
+  // Bajar stock a mano NO es una venta: queda como pérdida / merma.
+  registrarMov(p.id, p.name, dif, dif > 0 ? 'Reposición / ajuste' : 'Ajuste de pérdida');
   await guardarCatalogo();
   await escribir(STORAGE_KEY_MOVIMIENTOS, D.movimientos);
   renderCatalogo(); renderMovimientos();
@@ -363,11 +365,15 @@ async function catEditar(i, campo, valor) {
 async function catBorrar(i) {
   const p = D.catalogo[i];
   if (!p || !confirm(`¿Eliminar "${p.name}" del catálogo? No borra las ventas ya hechas.`)) return;
+  const stock = D.inventario[p.id] ?? 0;
+  // Deja constancia en el historial de movimientos de que el producto se dio de baja.
+  registrarMov(p.id, p.name, -Math.max(0, stock), `Baja de producto: "${p.name}" eliminado del catálogo`);
   D.catalogo.splice(i, 1);
   delete D.inventario[p.id];
   await guardarCatalogo();
-  renderCatalogo();
-  toast('Producto eliminado');
+  await escribir(STORAGE_KEY_MOVIMIENTOS, D.movimientos);
+  renderCatalogo(); renderMovimientos();
+  toast(`"${p.name}" eliminado (queda registrado en movimientos)`);
 }
 
 async function catNuevo() {

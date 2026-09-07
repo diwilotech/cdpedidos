@@ -88,7 +88,7 @@ function renderListaMovimientos() {
         <div class="small text-muted">${m.motivo} · ${formatFecha(m.fecha)} · <i class="bi bi-person-fill"></i> ${m.usuarioNombre}</div>
       </div>
       <span class="badge ${esEntrada ? 'bg-success' : 'bg-danger'} fs-6">
-        <i class="bi ${esEntrada ? 'bi-arrow-down-circle' : 'bi-arrow-up-circle'} me-1"></i>${esEntrada ? '+' : '-'}${m.cantidad}
+        <i class="bi ${esEntrada ? 'bi-arrow-down-circle' : 'bi-arrow-up-circle'} me-1"></i>${m.cantidad ? (esEntrada ? '+' : '-') + m.cantidad : '—'}
       </span>
     `;
     cont.appendChild(row);
@@ -285,7 +285,8 @@ function guardarStockTotal(productId, nuevoTotal) {
   }
   inventario[productId] = nuevoTotal;
   guardarInventario();
-  registrarMovimientoInventario(productId, dif, dif > 0 ? 'Reposición / ajuste' : 'Ajuste de inventario');
+  // Bajar stock a mano desde inventario NO es una venta: queda como pérdida / merma.
+  registrarMovimientoInventario(productId, dif, dif > 0 ? 'Reposición / ajuste' : 'Ajuste de pérdida');
 
   const prod = dbJSON.products.find(p => p.id === productId);
   mostrarNotificacion(
