@@ -33,6 +33,12 @@ const gridOptions = {
   disableResize: false,
   staticGrid: true,            /* Bloqueado hasta pulsar Editar */
   autoFit: false,
+  // El plano SIEMPRE usa las 20 columnas, también en celular: que nunca se
+  // colapse a "una columna" por ancho de pantalla, así se ve igual en PC y
+  // móvil. (Opciones heredadas; si esta versión de GridStack las ignora, no
+  // pasa nada: el layout "de confianza" ya evita que la deriva se guarde.)
+  disableOneColumnMode: true,
+  oneColumnSize: 0,
   resizable: {
     handles: 'all'
   }
@@ -224,7 +230,21 @@ function crearPisoDOM(piso) {
   panelsContainer.appendChild(panel);
 
   grids[piso.id] = GridStack.init(gridOptions, '#grid-piso' + piso.id);
-  grids[piso.id].on('change added removed', () => actualizarSidebar());
+
+  // 'change' solo se dispara cuando el grid NO es estático, o sea SOLO en
+  // modo edición cuando el usuario arrastra/redimensiona: ahí sí guardamos
+  // la nueva posición como "de confianza".
+  grids[piso.id].on('change', (event, items) => {
+    if (verificarModoEdicion() && Array.isArray(items)) {
+      items.forEach(n => {
+        const c = n.el ? n.el.querySelector('[data-mesaid]') : null;
+        const L = c && mesasLayout[c.dataset.mesaid];
+        if (L) { L.x = n.x; L.y = n.y; L.w = n.w; L.h = n.h; }
+      });
+    }
+    actualizarSidebar();
+  });
+  grids[piso.id].on('added removed', () => actualizarSidebar());
   new ResizeObserver(sincronizarFondoCuadricula).observe(document.getElementById('grid-piso' + piso.id));
 }
 
@@ -265,7 +285,7 @@ function eliminarPiso(pisoId) {
     if (grid) {
       grid.engine.nodes.forEach(node => {
         const content = node.el ? node.el.querySelector('[data-mesaid]') : null;
-        if (content) delete mesasData[content.dataset.mesaid];
+        if (content) { delete mesasData[content.dataset.mesaid]; delete mesasLayout[content.dataset.mesaid]; }
       });
       grid.destroy(false);
     }
@@ -317,6 +337,17 @@ function crearElemento({ id, nombre, cuentas = [], colorHex, w, h, x = undefined
 
   // En GridStack 9.x, addWidget() devuelve directamente el elemento del DOM.
   const el = widget.el || widget;
+
+  // Posición "de confianza": la que pedimos (si venía guardada) o la que
+  // GridStack le asignó a una mesa nueva. No se vuelve a tocar salvo que el
+  // usuario la mueva en modo edición (ver crearPisoDOM -> evento 'change').
+  const nodo = el.gridstackNode || {};
+  mesasLayout[mesaId] = {
+    x: (x !== undefined ? x : nodo.x) || 0,
+    y: (y !== undefined ? y : nodo.y) || 0,
+    w: w || nodo.w || 2,
+    h: h || nodo.h || 2
+  };
 
   el.addEventListener('click', (e) => {
     if (e.target.closest('.badge-cuentas-btn') || e.target.closest('.btn-close-custom')) return;
@@ -557,6 +588,7 @@ function accionEliminar() {
     if (!mesaContent) return;
     const mesaId = mesaContent.dataset.mesaid;
     delete mesasData[mesaId];
+    delete mesasLayout[mesaId];
     grids[pisoActual].removeWidget(item);
   });
   elementosSeleccionados.clear();
@@ -618,6 +650,7 @@ function eliminarElementoEspecifico(btn, piso) {
   if (!mesaContent) return;
   const mesaId = mesaContent.dataset.mesaid;
   delete mesasData[mesaId];
+  delete mesasLayout[mesaId];
   grids[piso].removeWidget(item);
   elementosSeleccionados.delete(item);
   actualizarSidebar();

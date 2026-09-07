@@ -19,7 +19,14 @@ let contadorPisos = 2; // último id de piso usado, para no repetir ids
 
 let pisoActual = 1;
 const grids = {};
-const mesasData = {}; // Estructura idMesa -> array de cuentas único por mesa
+const mesasData = {};   // idMesa -> array de cuentas (comandas) de esa mesa
+
+// idMesa -> { x, y, w, h }  ·  posición/tamaño "de confianza" de cada mesa.
+// Se siembra al cargar y SOLO se actualiza cuando el usuario mueve/redimensiona
+// una mesa en modo edición. Así, si GridStack re-acomoda visualmente al
+// renderizar en una pantalla distinta (PC vs. celular), esa deriva NO se
+// guarda y el plano se ve igual en todos los dispositivos.
+const mesasLayout = {};
 
 // --- INVENTARIO ---
 // Mapa productId -> unidades disponibles. Se inicializa con el stock

@@ -22,11 +22,14 @@ function construirListaMesasParaGuardar() {
       if (!content) return;
       const mesaId = content.dataset.mesaid;
       const labelEl = node.el.querySelector('.nombre-label');
+      // Posición: la "de confianza" (mesasLayout), NO la que GridStack tenga
+      // ahora mismo en pantalla (que puede haber derivado en otro dispositivo).
+      const L = mesasLayout[mesaId] || { x: node.x, y: node.y, w: node.w, h: node.h };
       lista.push({
         id: mesaId,
         nombre: labelEl ? labelEl.innerText : 'Mesa',
         colorHex: content.dataset.colorhex || '#0d6efd',
-        w: node.w, h: node.h, x: node.x, y: node.y,
+        w: L.w, h: L.h, x: L.x, y: L.y,
         piso: piso.id,
         cuentas: mesasData[mesaId] || []
       });
