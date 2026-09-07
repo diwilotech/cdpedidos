@@ -14,6 +14,13 @@ let __cdpArrancado = false;
 window.__cdpArrancar = async function arrancarApp() {
   if (__cdpArrancado) return;
   __cdpArrancado = true;
+  // 1.0) Categorías del catálogo (si el admin las editó/ordenó en el Dashboard).
+  // "cat-all" (Todos) siempre va primero y no se guarda.
+  const categoriasGuardadas = await cargarCategoriasGuardadas();
+  if (Array.isArray(categoriasGuardadas) && categoriasGuardadas.length) {
+    dbJSON.categories = [{ id: 'cat-all', name: 'Todos', icon: 'bi-grid-fill' }, ...categoriasGuardadas];
+  }
+
   // 1) Inventario: se combina lo guardado con los valores de ejemplo.
   const inventarioGuardado = await cargarInventarioGuardado();
   if (inventarioGuardado) {

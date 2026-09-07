@@ -27,6 +27,7 @@ const STORAGE_KEY_PRODUCTOS = 'plano-restaurante-productos-v1';
 const STORAGE_KEY_VENTAS = 'plano-restaurante-ventas-v1';
 const STORAGE_KEY_MOVIMIENTOS = 'plano-restaurante-movimientos-v1';
 /* Nuevos dominios */
+const STORAGE_KEY_CATEGORIAS = 'cdp-categorias-v1';   // categorías del catálogo (orden incluido)
 const STORAGE_KEY_CLIENTES = 'cdp-clientes-v1';
 const STORAGE_KEY_FIADOS = 'cdp-fiados-v1';           // cuentas por cobrar (fiados a clientes)
 const STORAGE_KEY_PROVEEDORES = 'cdp-proveedores-v1';

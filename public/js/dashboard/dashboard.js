@@ -18,6 +18,8 @@ const D = {
   movimientos: [],
   inventario: {},
   catalogo: [],          // lista completa de productos {id,name,price,code,categoryId,stock}
+  categorias: [],        // categorías reales (sin "Todos"), en el orden elegido
+  filtroCat: 'cat-all',  // filtro activo de la tabla de catálogo
   clientes: [],
   fiados: [],
   proveedores: [],
@@ -37,8 +39,13 @@ async function escribir(key, valor) {
   await window.storage.set(key, JSON.stringify(valor), true);
 }
 
-const catById = {};
-dbJSON.categories.forEach(c => { catById[c.id] = c.name; });
+let catById = {};
+// Reconstruye dbJSON.categories = [Todos, ...D.categorias] y el índice catById.
+function sincronizarCategorias() {
+  dbJSON.categories = [{ id: 'cat-all', name: 'Todos', icon: 'bi-grid-fill' }, ...D.categorias];
+  catById = {};
+  dbJSON.categories.forEach(c => { catById[c.id] = c.name; });
+}
 const nombreCategoria = (id) => catById[id] || 'Sin categoría';
 
 function esHoy(iso) {
@@ -51,11 +58,16 @@ const uid = (p) => p + '-' + Date.now() + '-' + Math.random().toString(36).slice
 window.__dashInit = async function (user) {
   D.usuario = user;
 
-  const [ventas, movs, inv, cat, cli, fdo, prov, cxp] = await Promise.all([
+  const [ventas, movs, inv, cat, cats, cli, fdo, prov, cxp] = await Promise.all([
     leer(STORAGE_KEY_VENTAS), leer(STORAGE_KEY_MOVIMIENTOS), leer(STORAGE_KEY_INVENTARIO),
-    leer(STORAGE_KEY_PRODUCTOS), leer(STORAGE_KEY_CLIENTES), leer(STORAGE_KEY_FIADOS),
+    leer(STORAGE_KEY_PRODUCTOS), leer(STORAGE_KEY_CATEGORIAS), leer(STORAGE_KEY_CLIENTES), leer(STORAGE_KEY_FIADOS),
     leer(STORAGE_KEY_PROVEEDORES), leer(STORAGE_KEY_CXP)
   ]);
+
+  D.categorias = (Array.isArray(cats) && cats.length)
+    ? cats
+    : dbJSON.categories.filter(c => c.id !== 'cat-all').map(c => ({ ...c }));
+  sincronizarCategorias();
 
   D.ventas = Array.isArray(ventas) ? ventas : [];
   D.movimientos = Array.isArray(movs) ? movs : [];
@@ -73,19 +85,24 @@ window.__dashInit = async function (user) {
   document.getElementById('dashCargando').classList.add('d-none');
   document.getElementById('dashContenido').classList.remove('d-none');
 
-  // select de categoría del formulario "nuevo producto"
-  document.getElementById('nvProdCat').innerHTML = dbJSON.categories
-    .filter(c => c.id !== 'cat-all')
-    .map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-
+  poblarSelectCatNuevo();
   renderKPIs();
   renderVentasPorPersonal();
   renderMovimientos();
+  renderFiltroCats();
+  renderGestionCats();
   renderCatalogo();
   renderProveedores();
   renderGraficoSemana();
   renderGraficoCategoria();
 };
+
+function poblarSelectCatNuevo() {
+  const sel = document.getElementById('nvProdCat');
+  const actual = sel.value;
+  sel.innerHTML = D.categorias.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  if (actual) sel.value = actual;
+}
 
 /* ---------- KPIs ---------- */
 function renderKPIs() {
@@ -163,11 +180,112 @@ function renderMovimientos() {
       </tr>`).join('');
 }
 
+/* ---------- categorías: filtro + gestión ---------- */
+function renderFiltroCats() {
+  const cont = document.getElementById('catalogoFiltroCats');
+  if (!cont) return;
+  const items = [{ id: 'cat-all', name: 'Todos', icon: 'bi-grid-fill' }].concat(D.categorias);
+  cont.innerHTML = items.map(c => `
+    <li class="nav-item">
+      <button class="nav-link btn-sm py-1 px-2 ${D.filtroCat === c.id ? 'active' : 'bg-light text-dark'}" onclick="catFiltrar('${c.id}')">
+        <i class="bi ${c.icon || 'bi-tag-fill'} me-1"></i>${c.name}
+      </button>
+    </li>`).join('');
+}
+function catFiltrar(id) {
+  D.filtroCat = id;
+  renderFiltroCats();
+  renderCatalogo();
+}
+
+async function guardarCategorias() {
+  await escribir(STORAGE_KEY_CATEGORIAS, D.categorias);
+}
+
+function renderGestionCats() {
+  const cont = document.getElementById('gestionCats');
+  if (!cont) return;
+  cont.innerHTML = D.categorias.map((c, i) => `
+    <div class="d-flex align-items-center gap-1 border rounded-2 px-2 py-1">
+      <i class="bi bi-grip-vertical text-muted"></i>
+      <input class="form-control form-control-sm border-0 px-1" style="width:150px" value="${(c.name || '').replace(/"/g, '&quot;')}" onchange="catCatRename(${i}, this.value)">
+      <button class="btn btn-sm btn-link p-0 px-1 ${i === 0 ? 'disabled text-muted' : ''}" title="Subir" onclick="catCatMover(${i},-1)"><i class="bi bi-arrow-up"></i></button>
+      <button class="btn btn-sm btn-link p-0 px-1 ${i === D.categorias.length - 1 ? 'disabled text-muted' : ''}" title="Bajar" onclick="catCatMover(${i},1)"><i class="bi bi-arrow-down"></i></button>
+      <button class="btn btn-sm btn-link p-0 px-1 ${i === 0 ? 'disabled text-muted' : ''}" title="Poner primero" onclick="catCatPrimero(${i})"><i class="bi bi-chevron-bar-up"></i></button>
+      <button class="btn btn-sm btn-link p-0 px-1 text-danger" title="Eliminar categoría" onclick="catCatBorrar(${i})"><i class="bi bi-trash3"></i></button>
+    </div>`).join('');
+}
+
+async function catAddCategoria() {
+  const inp = document.getElementById('nvCatNombre');
+  const name = inp.value.trim();
+  if (!name) { alert('Escribí el nombre de la categoría.'); return; }
+  const id = 'cat-' + Date.now().toString(36);
+  D.categorias.push({ id, name, icon: 'bi-tag-fill' });
+  sincronizarCategorias();
+  await guardarCategorias();
+  inp.value = '';
+  refrescarTodoCategorias();
+  toast(`Categoría "${name}" agregada`);
+}
+async function catCatRename(i, valor) {
+  const c = D.categorias[i]; if (!c) return;
+  c.name = valor.trim() || c.name;
+  sincronizarCategorias();
+  await guardarCategorias();
+  refrescarTodoCategorias();
+}
+async function catCatMover(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= D.categorias.length) return;
+  const t = D.categorias[i]; D.categorias[i] = D.categorias[j]; D.categorias[j] = t;
+  sincronizarCategorias();
+  await guardarCategorias();
+  refrescarTodoCategorias();
+}
+async function catCatPrimero(i) {
+  if (i === 0) return;
+  const [c] = D.categorias.splice(i, 1);
+  D.categorias.unshift(c);
+  sincronizarCategorias();
+  await guardarCategorias();
+  refrescarTodoCategorias();
+}
+async function catCatBorrar(i) {
+  const c = D.categorias[i]; if (!c) return;
+  if (D.categorias.length <= 1) { alert('Tiene que quedar al menos una categoría.'); return; }
+  const usados = D.catalogo.filter(p => p.categoryId === c.id).length;
+  const destino = D.categorias.find((_, idx) => idx !== i);
+  if (!confirm(`¿Eliminar "${c.name}"?` + (usados ? ` Sus ${usados} producto(s) pasan a "${destino.name}".` : ''))) return;
+  D.catalogo.forEach(p => { if (p.categoryId === c.id) p.categoryId = destino.id; });
+  D.categorias.splice(i, 1);
+  if (D.filtroCat === c.id) D.filtroCat = 'cat-all';
+  sincronizarCategorias();
+  await guardarCategorias();
+  await guardarCatalogo();
+  refrescarTodoCategorias();
+  toast('Categoría eliminada');
+}
+function refrescarTodoCategorias() {
+  poblarSelectCatNuevo();
+  renderFiltroCats();
+  renderGestionCats();
+  renderCatalogo();
+  renderGraficoCategoria();
+}
+
 /* ---------- catálogo ---------- */
 function renderCatalogo() {
   const tb = document.getElementById('tbodyCatalogo');
-  const cats = dbJSON.categories.filter(c => c.id !== 'cat-all');
-  tb.innerHTML = D.catalogo.map((p, i) => {
+  const cats = D.categorias;
+  const visibles = D.catalogo
+    .map((p, i) => ({ p, i }))
+    .filter(x => D.filtroCat === 'cat-all' || x.p.categoryId === D.filtroCat);
+  if (visibles.length === 0) {
+    tb.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3 small">Sin productos en esta categoría.</td></tr>`;
+    return;
+  }
+  tb.innerHTML = visibles.map(({ p, i }) => {
     const stock = D.inventario[p.id] ?? 0;
     return `
     <tr data-catrow="${i}" data-stockactual="${stock}">
@@ -238,6 +356,7 @@ async function catEditar(i, campo, valor) {
   if (campo === 'price') p.price = Math.max(0, parseFloat(valor) || 0);
   else p[campo] = valor;
   await guardarCatalogo();
+  if (campo === 'categoryId') { renderCatalogo(); renderGraficoCategoria(); }
   toast(`"${p.name}" actualizado`);
 }
 
@@ -264,7 +383,8 @@ async function catNuevo() {
   await guardarCatalogo();
   await escribir(STORAGE_KEY_MOVIMIENTOS, D.movimientos);
   ['nvProdNombre', 'nvProdPrecio', 'nvProdStock'].forEach(x => document.getElementById(x).value = '');
-  renderCatalogo(); renderMovimientos();
+  D.filtroCat = categoryId;               // mostrar la categoría donde cayó
+  renderFiltroCats(); renderCatalogo(); renderMovimientos();
   toast(`"${name}" agregado`);
 }
 

@@ -127,6 +127,17 @@ async function cargarProductosPersonalizadosGuardados() {
    (tablas users/sessions en D1) y el operador es quien inició sesión. */
 
 /* ---------------------------------------------------------------------------
+   CATEGORÍAS DEL CATÁLOGO — dato COMPARTIDO (se editan desde el Dashboard)
+   --------------------------------------------------------------------------- */
+async function cargarCategoriasGuardadas() {
+  try {
+    const resultado = await window.storage.get(STORAGE_KEY_CATEGORIAS, true);
+    if (resultado && resultado.value) return JSON.parse(resultado.value);
+  } catch (e) { /* primera vez */ }
+  return null;
+}
+
+/* ---------------------------------------------------------------------------
    VENTAS (cuentas liquidadas) — dato COMPARTIDO
    --------------------------------------------------------------------------- */
 let guardarVentasTimeout = null;

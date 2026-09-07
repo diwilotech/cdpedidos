@@ -101,6 +101,20 @@
           <div class="card-dash">
             <div class="hd"><i class="bi bi-journal-text me-2"></i>Catálogo de productos <span class="text-muted fw-normal small">— editá precio, categoría o nombre; se guarda solo</span></div>
             <div class="bd">
+
+              <!-- Gestión de categorías: agregar, renombrar, ordenar -->
+              <details class="mb-2 border rounded-3 p-2 bg-light">
+                <summary class="fw-bold small"><i class="bi bi-tags me-1"></i>Categorías (agregar, renombrar, elegir orden)</summary>
+                <div class="d-flex flex-wrap gap-2 mt-2" id="gestionCats"></div>
+                <div class="input-group input-group-sm mt-2" style="max-width:340px">
+                  <input id="nvCatNombre" class="form-control" placeholder="Nueva categoría" maxlength="30">
+                  <button class="btn btn-primary" onclick="catAddCategoria()"><i class="bi bi-plus-lg me-1"></i>Añadir categoría</button>
+                </div>
+              </details>
+
+              <!-- Filtro por categoría (igual que en Inventario) -->
+              <ul class="nav nav-pills gap-1 mb-2 flex-wrap" id="catalogoFiltroCats"></ul>
+
               <div class="row g-2 mb-3">
                 <div class="col-12 col-md-4"><input id="nvProdNombre" class="form-control form-control-sm" placeholder="Nombre del producto nuevo"></div>
                 <div class="col-6 col-md-3"><select id="nvProdCat" class="form-select form-select-sm"></select></div>
