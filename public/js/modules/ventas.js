@@ -52,6 +52,21 @@ function registrarVenta(mesaId, cuenta) {
     ventasData.splice(0, ventasData.length - MAX_VENTAS_GUARDADAS);
   }
   guardarVentas();
+  return venta;
+}
+
+// Si esta venta está asociada a la cuenta por cobrar de un cliente, mantiene
+// el cargo del cliente igual al total de la venta (cuando se edita la venta).
+function sincronizarCargoFiado(v) {
+  if (!v || !v.clienteId || typeof movimientosFiado === 'undefined') return;
+  const cargo = movimientosFiado.find(m => m.ventaId === v.id && m.tipo === 'cargo');
+  if (!cargo) return;
+  cargo.monto = v.total;
+  guardarFiados();
+  const modalFi = document.getElementById('modalFiados');
+  if (modalFi && modalFi.classList.contains('show') && typeof renderListaClientes === 'function') {
+    renderListaClientes();
+  }
 }
 
 function abrirModalVentas() {
@@ -97,11 +112,14 @@ function renderListaVentas() {
   cont.innerHTML = mias.map(v => {
     const abierta = ventasExpandidas.has(v.id);
     const unidades = v.productos.reduce((s, p) => s + p.cant, 0);
+    const chipCliente = v.clienteNombre
+      ? `<span class="badge text-bg-warning ms-1" title="Esta venta está en la cuenta por cobrar del cliente: al editarla cambia lo que debe"><i class="bi bi-person-vcard me-1"></i>${v.clienteNombre} · por cobrar</span>`
+      : '';
     return `
-      <div class="border rounded-3 mb-2">
+      <div class="border rounded-3 mb-2 ${v.clienteNombre ? 'border-warning' : ''}">
         <div class="d-flex justify-content-between align-items-center p-2" style="cursor:pointer" onclick="toggleVentaDetalle('${v.id}')">
           <div>
-            <div class="fw-bold"><i class="bi ${abierta ? 'bi-chevron-down' : 'bi-chevron-right'} me-1"></i>${v.mesaNombre} · ${v.cuentaNombre}</div>
+            <div class="fw-bold"><i class="bi ${abierta ? 'bi-chevron-down' : 'bi-chevron-right'} me-1"></i>${v.mesaNombre} · ${v.cuentaNombre}${chipCliente}</div>
             <div class="small text-muted">${formatFecha(v.fecha)} · ${unidades} und.</div>
           </div>
           <span class="fs-6 fw-bold text-success">${formatMoney(v.total)}</span>
@@ -169,6 +187,7 @@ function agregarProductoAVenta(ventaId) {
   ajustarStock(productId, -qty, 'Venta (agregado a venta)');
   v.total = v.productos.reduce((s, p) => s + p.cant * p.precio, 0);
   guardarVentas();
+  sincronizarCargoFiado(v);
   refrescarVistasInventarioSiEstanAbiertas();
   renderResumenVentasPorUsuario();
   renderListaVentas();
@@ -186,6 +205,7 @@ function modificarLineaVenta(ventaId, idx, delta) {
   if (p.cant <= 0) v.productos.splice(idx, 1);
   v.total = v.productos.reduce((s, x) => s + x.cant * x.precio, 0);
   guardarVentas();
+  sincronizarCargoFiado(v);
   refrescarVistasInventarioSiEstanAbiertas();
   renderResumenVentasPorUsuario();
   renderListaVentas();
@@ -200,6 +220,7 @@ function eliminarLineaVenta(ventaId, idx) {
   v.productos.splice(idx, 1);
   v.total = v.productos.reduce((s, x) => s + x.cant * x.precio, 0);
   guardarVentas();
+  sincronizarCargoFiado(v);
   refrescarVistasInventarioSiEstanAbiertas();
   renderResumenVentasPorUsuario();
   renderListaVentas();

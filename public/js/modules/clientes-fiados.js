@@ -130,8 +130,11 @@ function eliminarCliente(id) {
   });
 }
 
-/* --- MOVIMIENTOS --- */
-function registrarMovimientoFiado(clienteId, tipo, monto, concepto) {
+/* --- MOVIMIENTOS ---
+   `ventaId` (opcional): liga este cargo a una venta. Si esa venta se edita
+   después (modal "Mis Ventas"), su total vuelve a sincronizar este `monto`
+   (ver sincronizarCargoFiado en ventas.js). */
+function registrarMovimientoFiado(clienteId, tipo, monto, concepto, ventaId) {
   movimientosFiado.push({
     id: 'fdo-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
     fecha: new Date().toISOString(),
@@ -139,6 +142,7 @@ function registrarMovimientoFiado(clienteId, tipo, monto, concepto) {
     tipo,
     monto: Math.abs(Number(monto) || 0),
     concepto: concepto || (tipo === 'cargo' ? 'Consumo' : 'Abono'),
+    ventaId: ventaId || null,
     usuarioNombre: obtenerNombreUsuarioActivo()
   });
   if (movimientosFiado.length > MAX_MOV_FIADOS_GUARDADOS) {
@@ -231,16 +235,25 @@ const cargarCuentaActualAFiado = guardarCuentaParaPagoDespues;
 
 function confirmarCargoDesdeSeleccion(clienteId) {
   if (!fiadoModoSeleccion) return;
-  const { monto, concepto, mesaId, cuentaIndex } = fiadoModoSeleccion;
+  const { concepto, mesaId, cuentaIndex } = fiadoModoSeleccion;
 
   const cuentas = mesasData[mesaId];
   const cuenta = cuentas ? cuentas[cuentaIndex] : null;
   if (!cuenta) { fiadoModoSeleccion = null; renderListaClientes(); return; }
 
-  // 1) Es una venta (ingreso), solo que a crédito.
-  registrarVenta(mesaId, cuenta);
-  // 2) Queda como saldo por cobrar del cliente.
-  registrarMovimientoFiado(clienteId, 'cargo', monto, concepto);
+  const cli = clientesData.find(c => c.id === clienteId);
+
+  // 1) Es una venta (ingreso), solo que a crédito. Queda LIGADA al cliente:
+  //    editar esta venta después actualiza lo que el cliente debe.
+  const venta = registrarVenta(mesaId, cuenta);
+  const monto = venta ? venta.total : 0;
+  if (venta) {
+    venta.clienteId = clienteId;
+    venta.clienteNombre = cli ? cli.nombre : null;
+    guardarVentas();
+  }
+  // 2) Cargo en la cuenta por cobrar del cliente, ligado a esa venta.
+  registrarMovimientoFiado(clienteId, 'cargo', monto, concepto, venta ? venta.id : null);
 
   // 3) Se cierra la cuenta de la mesa.
   cuentas.splice(cuentaIndex, 1);
@@ -252,6 +265,5 @@ function confirmarCargoDesdeSeleccion(clienteId) {
 
   fiadoModoSeleccion = null;
   renderListaClientes();
-  const cli = clientesData.find(c => c.id === clienteId);
   mostrarNotificacion(`${formatMoney(monto)} guardados en la cuenta de ${cli ? cli.nombre : 'cliente'}`, 'success', 'bi-journal-check');
 }
