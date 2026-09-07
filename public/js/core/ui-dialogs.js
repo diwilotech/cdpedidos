@@ -60,21 +60,35 @@ function pedirColor(colorInicial, onConfirmar) {
   picker.click();
 }
 
-// Apilado correcto de modales (p.ej. Cuentas + Catálogo abierto encima).
-// Bootstrap no soporta modales anidados "de fábrica"; sin esto, el fondo
-// oscuro (backdrop) del segundo modal puede quedar con un z-index más alto
-// que el propio modal y tapar todo en gris.
-document.addEventListener('shown.bs.modal', function () {
-  const modalesAbiertos = document.querySelectorAll('.modal.show');
-  const backdrops = document.querySelectorAll('.modal-backdrop');
+// Apilado correcto de modales anidados (p.ej. Cuentas + Catálogo, o el
+// diálogo de confirmación abierto desde otro modal). Bootstrap no lo maneja
+// bien "de fábrica": sin esto el segundo modal (y/o su fondo oscuro) queda
+// por detrás y todo se ve gris e inutilizable.
+//
+// Enfoque: al ABRIR un modal, si ya hay otro(s) abierto(s), a ESTE se le
+// sube el z-index por encima; a su backdrop (el último agregado) también.
+// Los modales de más abajo se dejan como están.
+document.addEventListener('show.bs.modal', function (e) {
+  const yaAbiertos = document.querySelectorAll('.modal.show').length;
+  if (yaAbiertos === 0) return; // modal simple: valores por defecto de Bootstrap
 
-  backdrops.forEach((bd, i) => {
-    bd.style.zIndex = 1050 + (i * 20);
-  });
+  const z = 1055 + yaAbiertos * 20;
+  e.target.style.zIndex = z + 5;
 
-  modalesAbiertos.forEach((modalEl, i) => {
-    modalEl.style.zIndex = 1055 + (i * 20) + 10;
-  });
+  // El backdrop de este modal se inserta justo después de este evento.
+  setTimeout(function () {
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    const ultimo = backdrops[backdrops.length - 1];
+    if (ultimo) ultimo.style.zIndex = z;
+  }, 0);
+});
+
+// Bootstrap quita "modal-open" del <body> al cerrar CUALQUIER modal; si
+// todavía queda otro abierto, se repone para no perder el bloqueo de scroll.
+document.addEventListener('hidden.bs.modal', function () {
+  if (document.querySelectorAll('.modal.show').length > 0) {
+    document.body.classList.add('modal-open');
+  }
 });
 
 // Notificación flotante genérica y reutilizable (éxito, error, aviso).
