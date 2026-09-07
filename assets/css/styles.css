@@ -1,0 +1,356 @@
+/* ============================================================================
+   Control de Pedidos — estilos propios
+   Extraído del <style> embebido de index.html (sin cambios de reglas).
+   Depende de Bootstrap 5 + Bootstrap Icons + Gridstack (cargados por CDN).
+   ========================================================================== */
+
+body {
+  background-color: #f8f9fa;
+}
+
+.grid-container {
+  background-color: #ffffff;
+  border-radius: 8px;
+  border: 2px dashed #cbd5e1;
+  background-image: linear-gradient(#cbd5e1 1px, transparent 1px),
+                    linear-gradient(90deg, #cbd5e1 1px, transparent 1px);
+  background-size: 60px 60px;
+
+  /* CUADRÍCULA FLUIDA: ocupa todo el ancho disponible y crece hacia
+     abajo automáticamente a medida que se agregan más mesas */
+  width: 100%;
+  min-width: 1600px;     /* ancho mínimo: permite 10 mesas de 2x2 por fila sin aplastarse */
+  min-height: 640px;     /* alto mínimo aunque esté vacía */
+
+  margin: 0;
+}
+
+.piso-panel.d-none {
+  display: none !important;
+}
+
+.grid-stack-item-content {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 10px;
+  padding: 8px 8px !important;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 4px;
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  user-select: none;
+  backdrop-filter: blur(4px);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  overflow: hidden;
+}
+
+/* El nombre siempre tiene su propia fila a todo lo ancho, así nunca
+   queda tapado por la barra de edición (que solo aparece en modo edición) */
+.mesa-nombre-row {
+  width: 100%;
+  min-width: 0;
+}
+.mesa-nombre-row .nombre-label {
+  display: block;
+  width: 100%;
+  line-height: 1.15;
+}
+.mesa-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.grid-stack-item.selected .grid-stack-item-content {
+  border: 3px solid #ffcc00 !important;
+  box-shadow: 0 0 14px rgba(255, 204, 0, 0.9) !important;
+}
+
+.table-actions-container {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  padding: 4px 8px;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.badge-cuentas-btn {
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 5px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  transition: transform 0.15s, filter 0.15s;
+}
+
+.badge-cuentas-btn:hover {
+  transform: scale(1.05);
+  filter: brightness(1.1);
+}
+
+/* Íconos de "persona" en cada mesa: uno por cuenta abierta, para dar
+   una idea visual rápida de cuánta gente/cuentas hay en esa mesa.
+   Ícono arriba y total de esa cuenta abajo, en letra chiquita, todo
+   dentro del mismo círculo. Se resetean padding/border-radius
+   heredados de .badge-cuentas-btn (comparten esa clase solo para el
+   click-through del selector de mesa). */
+.persona-badge {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.28);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  flex-shrink: 0;
+  line-height: 1;
+  gap: 1px;
+}
+.persona-badge:hover {
+  transform: scale(1.15);
+  background: rgba(255, 255, 255, 0.45);
+}
+.persona-badge i {
+  font-size: 1.05rem;
+  color: #fff;
+  line-height: 1;
+}
+.persona-badge .persona-total {
+  font-size: 0.52rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+  max-width: 40px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.persona-badge.persona-add {
+  background: rgba(255, 255, 255, 0.14);
+  border-style: dashed;
+}
+.persona-badge.persona-add:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.text-shadow {
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+}
+
+.sidebar-list {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.cuenta-chip {
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition: background-color 0.15s;
+}
+
+.cuenta-chip:hover {
+  background-color: #e2e8f0 !important;
+}
+
+#context-menu {
+  position: absolute;
+  display: none;
+  z-index: 10000;
+  width: 180px;
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+#context-menu .dropdown-item {
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+/* El apilado correcto de los modales (Cuentas + Catálogo) se maneja
+   dinámicamente por JS (evento shown.bs.modal), no aquí. Un z-index
+   fijo por CSS se descuadraba fácilmente y dejaba el fondo oscuro
+   tapando el modal (pantalla en gris). */
+
+.product-card {
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.product-card:hover {
+  transform: translateY(-2px);
+  border-color: #0d6efd !important;
+}
+
+/* --- MODO EDICIÓN --- */
+.edit-toolbar{position:absolute;top:4px;right:4px;display:none;align-items:center;gap:2px;padding:3px;border-radius:8px;background:rgba(15,23,42,.35);border:1px solid rgba(255,255,255,.25);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:20}
+.edit-mode .edit-toolbar{display:flex}
+.edit-toolbar .edit-mini-btn{width:22px;height:22px;padding:0;font-size:.72rem;border:1px solid rgba(255,255,255,.32);border-radius:6px;color:#fff;background:rgba(255,255,255,.14);display:inline-flex;align-items:center;justify-content:center;transition:.15s ease}
+.edit-toolbar .edit-mini-btn:hover{background:rgba(255,255,255,.28);transform:translateY(-1px)}
+.edit-toolbar .edit-mini-btn.danger:hover{background:rgba(220,53,69,.55)}
+.edit-toolbar .edit-mini-btn.duplicate:hover{background:rgba(13,110,253,.45)}
+.edit-toolbar .edit-mini-btn.color:hover{background:rgba(255,193,7,.38)}
+.edit-toggle{border-radius:10px!important;font-weight:700;transition:.2s ease}.edit-toggle.active{box-shadow:0 0 0 3px rgba(13,110,253,.12)}
+.edit-status{font-size:.72rem;font-weight:600;padding:5px 9px;border-radius:999px;background:rgba(108,117,125,.10);color:#6c757d;border:1px solid rgba(108,117,125,.15)}
+.edit-status.active{background:rgba(13,110,253,.10);color:#0d6efd;border-color:rgba(13,110,253,.20)}
+.color-palette{display:none;position:absolute;top:30px;right:0;padding:7px;gap:5px;border-radius:10px;background:rgba(15,23,42,.72);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(10px);z-index:30}
+.color-palette.show{display:flex}.color-dot{width:19px;height:19px;border-radius:50%;border:2px solid rgba(255,255,255,.65);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:transform .15s ease}.color-dot:hover{transform:scale(1.18)}
+/* Puntos de color del formulario "Crear nueva mesa/zona" (fuera del edit-toolbar, por eso necesitan su propio estilo de "seleccionado") */
+#paletaColorNuevo .color-dot{width:24px;height:24px;border:2px solid rgba(0,0,0,.12)}
+#paletaColorNuevo .color-dot.selected{border-color:#0d6efd;box-shadow:0 0 0 2px rgba(13,110,253,.35)}
+.grid-container:not(.edit-mode) .grid-stack-item{cursor:default!important}.grid-container.edit-mode .grid-stack-item{cursor:move}.grid-stack-item-content{position:relative!important}
+.add-controls{display:none!important}body.edit-mode-active .add-controls{display:block!important}
+.edit-only{display:none!important}body.edit-mode-active .edit-only{display:inline-flex!important}
+.piso-titulo-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.stock-badge-min{font-size:.72rem;padding:3px 7px}
+.edit-panel{background:#eef4ff;border:1px solid #cfe0fb;border-radius:10px;padding:12px 14px}
+.edit-panel-title{font-size:.82rem;font-weight:700;color:#0d6efd;margin-bottom:8px}
+.edit-panel-hint{font-size:.75rem;color:#6c757d}
+@media (max-width:767px){.edit-panel-hint{display:none}}
+
+/* --- ZOOM DEL PLANO --- */
+.zoom-toolbar{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #dee2e6;border-radius:10px;padding:4px 6px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.zoom-toolbar .btn{width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:8px}
+.zoom-toolbar .zoom-pct{font-size:.8rem;font-weight:700;color:#495057;min-width:44px;text-align:center;user-select:none}
+
+/* Barra de zoom flotante, fija en el borde izquierdo de la pantalla,
+   en columna vertical, centrada verticalmente */
+.zoom-toolbar-flotante{
+  position:fixed;
+  left:14px;
+  top:50%;
+  transform:translateY(-50%);
+  flex-direction:column;
+  z-index:900;
+  padding:8px 6px;
+}
+.zoom-toolbar-flotante .zoom-pct{min-width:auto;padding:2px 0;}
+
+/* Botón flotante (FAB) para abrir/cerrar el panel de Cuentas Activas */
+.btn-fab-cuentas{
+  position:fixed;
+  right:20px;
+  bottom:20px;
+  z-index:900;
+  width:56px;
+  height:56px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:1.3rem;
+  box-shadow:0 4px 14px rgba(0,0,0,.28);
+  padding:0;
+}
+.btn-fab-cuentas .fab-badge{
+  position:absolute;
+  top:-4px;
+  right:-4px;
+  font-size:.65rem;
+  padding:3px 6px;
+}
+
+/* Panel flotante de Cuentas Activas, oculto por defecto y
+   solo visible cuando el usuario pulsa el botón flotante.
+   Se anima con opacidad + escala en vez de aparecer/desaparecer
+   de golpe (mejor sensación de "desplegable"). */
+.panel-cuentas-flotante{
+  position:fixed;
+  right:20px;
+  bottom:88px;
+  z-index:895;
+  width:360px;
+  max-width:calc(100vw - 40px);
+  max-height:70vh;
+  display:flex;
+  flex-direction:column;
+  background:#fff;
+  border-radius:16px;
+  overflow:hidden;
+  box-shadow:0 14px 42px rgba(15,23,42,.24), 0 3px 10px rgba(15,23,42,.10);
+  border:1px solid rgba(15,23,42,.06);
+  transform-origin:bottom right;
+  transition:opacity .18s ease, transform .18s ease;
+}
+.panel-cuentas-flotante.oculto{
+  opacity:0;
+  transform:translateY(10px) scale(.95);
+  visibility:hidden;
+  pointer-events:none;
+}
+
+/* Encabezado con degradado, a juego con el resto de la UI */
+.panel-cuentas-flotante .panel-header{
+  background:linear-gradient(135deg,#0d6efd 0%,#0a58ca 100%);
+  color:#fff;
+  padding:14px 16px 12px;
+  flex-shrink:0;
+}
+.panel-cuentas-flotante .panel-header .badge{
+  background:rgba(255,255,255,.22)!important;
+  color:#fff;
+  border:1px solid rgba(255,255,255,.35);
+  font-weight:600;
+}
+.panel-cuentas-flotante .btn-close-panel-cuentas{
+  background:rgba(255,255,255,.16);
+  border:1px solid rgba(255,255,255,.32);
+  color:#fff;
+  width:28px;height:28px;padding:0;
+  display:inline-flex;align-items:center;justify-content:center;
+  border-radius:8px;
+  cursor:pointer;
+  transition:.15s ease;
+}
+.panel-cuentas-flotante .btn-close-panel-cuentas:hover{
+  background:rgba(255,255,255,.32);
+}
+.panel-cuentas-flotante select#filtroSidebar{
+  border:1px solid rgba(255,255,255,.35);
+  background-color:rgba(255,255,255,.14);
+  color:#fff;
+  border-radius:9px;
+  font-weight:500;
+}
+.panel-cuentas-flotante select#filtroSidebar:focus{
+  box-shadow:0 0 0 .2rem rgba(255,255,255,.25);
+  border-color:rgba(255,255,255,.6);
+}
+.panel-cuentas-flotante select#filtroSidebar option{ color:#212529; }
+
+/* Lista de mesas/cuentas dentro del panel */
+.panel-cuentas-flotante .sidebar-list{
+  background:#f8f9fb;
+  max-height:none; /* el límite ya lo da .panel-cuentas-flotante */
+  flex:1;
+}
+.panel-cuentas-flotante .list-group-item{
+  border:none;
+  border-bottom:1px solid #eef1f4;
+  background:transparent;
+}
+.panel-cuentas-flotante .list-group-item:last-child{ border-bottom:none; }
+
+@media (max-width:576px){
+  .zoom-toolbar-flotante{left:8px;}
+  .btn-fab-cuentas{right:12px;bottom:12px;}
+  .panel-cuentas-flotante{right:8px;left:8px;width:auto;bottom:80px;}
+}
+
+/* Contenedor con scroll propio: así el plano nunca queda "cortado"
+   en la parte de abajo, sin importar cuántas mesas tenga.
+   Se usa un min-height moderado (no gigante) para no dejar espacio
+   vacío cuando hay pocas mesas, y un max-height con scroll interno
+   propio (barra de scroll normal del navegador, con su "thumb" para
+   subir/bajar) para que el plano nunca se convierta en una página
+   infinita hacia abajo cuando hay muchas mesas. */
+.zoom-scroll-area{width:100%;overflow:auto;min-height:420px;max-height:70vh;border-radius:8px;}
+
+/* El zoom se aplica aquí (no en .grid-container) para no interferir
+   con los cálculos internos de posición/porcentaje de GridStack */
+.zoom-wrapper{transform-origin: top left;}

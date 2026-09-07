@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control de Pedidos — Ventas, Inventario, Fiados y Cuentas por Pagar</title>
+
+  <!-- Bootstrap 5 CSS & Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <!-- Gridstack CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@9.2.0/dist/gridstack.min.css" />
+
+  <!-- Estilos propios (extraídos del <style> embebido) -->
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body class="p-3 p-md-4">
+
+  <div class="container-fluid">
+
+    <!-- Barra Superior -->
+    <div class="row mb-2 align-items-center g-3">
+      <div class="col-12 col-md-auto d-flex align-items-center flex-wrap gap-2">
+        <div class="btn-group" role="group" id="pisoTabsGroup">
+          <!-- Botones de piso generados dinámicamente (ver crearPisoDOM) -->
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary edit-only" onclick="agregarPiso()" title="Agregar un nuevo piso al plano">
+          <i class="bi bi-plus-lg"></i> Piso
+        </button>
+
+        <div class="vr mx-1 d-none d-md-block" style="height: 30px;"></div>
+
+        <button type="button" class="btn btn-outline-success" id="btn-inventario" onclick="abrirModalInventario()" title="Ver y ajustar el inventario de productos">
+          <i class="bi bi-box-seam me-1"></i> Inventario
+        </button>
+        <button type="button" class="btn btn-outline-primary" id="btn-ventas" onclick="abrirModalVentas()" title="Ver reporte de ventas por usuario">
+          <i class="bi bi-graph-up-arrow me-1"></i> Ventas
+        </button>
+
+        <div class="vr mx-1 d-none d-md-block" style="height: 30px;"></div>
+
+        <button type="button" class="btn btn-outline-danger" id="btn-clientes" onclick="abrirModalClientes()" title="Clientes y fiados (cuentas por cobrar)">
+          <i class="bi bi-people me-1"></i> Clientes / Fiados
+        </button>
+        <button type="button" class="btn btn-outline-dark" id="btn-proveedores" onclick="abrirModalProveedores()" title="Proveedores y cuentas por pagar">
+          <i class="bi bi-truck me-1"></i> Proveedores
+        </button>
+
+        <div class="vr mx-1 d-none d-md-block" style="height: 30px;"></div>
+
+        <button type="button" class="btn btn-outline-dark" id="btn-usuario-activo" onclick="abrirModalUsuarios()" title="Elegir quién está usando el sistema en este dispositivo">
+          <i class="bi bi-person-circle me-1"></i> <span id="usuarioActivoTexto">Sin usuario</span>
+        </button>
+      </div>
+
+      <div class="col-12 col-md d-flex justify-content-md-end">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <button class="btn btn-sm btn-outline-primary edit-toggle" id="btn-editar" onclick="toggleModoEdicion()" title="Activar edición del plano">
+            <i class="bi bi-pencil-square me-1"></i> Editar
+          </button>
+          <span class="edit-status" id="edit-status"><i class="bi bi-lock me-1"></i> Edición desactivada</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel de Edición: solo visible con "Editar" activo -->
+    <div class="edit-panel add-controls mb-3">
+      <div class="edit-panel-title">
+        <i class="bi bi-plus-square-dotted me-1"></i> Crear nueva mesa / zona
+      </div>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <input type="text" id="nombreItem" class="form-control form-control-sm" placeholder="Nombre (ej. Mesa 1, Bar)" style="width: 190px;">
+
+        <select id="tipoItem" class="form-select form-select-sm" style="width: 190px;">
+          <option value="mesa">Mesa Estándar (2x2)</option>
+          <option value="bar">Bar (6x2)</option>
+          <option value="mesa_grande">Mesa Grande (4x2)</option>
+          <option value="zona_vip">Zona VIP (8x4)</option>
+        </select>
+
+        <div class="d-flex align-items-center gap-1">
+          <label class="small fw-bold mb-0">Color:</label>
+          <div class="d-flex gap-1" id="paletaColorNuevo"></div>
+        </div>
+
+        <button class="btn btn-sm btn-success fw-bold" onclick="agregarElementoDesdeFormulario()">
+          <i class="bi bi-plus-circle me-1"></i> Añadir Mesa
+        </button>
+
+        <span class="edit-panel-hint ms-auto">
+          <i class="bi bi-info-circle me-1"></i> Arrastra para mover, clic derecho para más opciones
+        </span>
+      </div>
+    </div>
+
+    <!-- Contenido Principal -->
+    <div class="row g-3">
+
+      <!-- Plano Grid -->
+      <div class="col-12">
+
+        <div class="alert alert-light border py-1 px-3 mb-2 small text-muted d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span>💡 <strong>Gestión Cuentas:</strong> Haz clic en el botón de cuentas (abajo a la derecha) o en el badge de cada mesa para administrar sus comandas.</span>
+          <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+            <i class="bi bi-database-check me-1"></i> Base de Datos JSON Lista
+          </span>
+        </div>
+
+        <!-- Contenedor con scroll propio (horizontal y vertical) para que
+             el plano nunca se corte, sin importar cuántas mesas tenga -->
+        <div class="zoom-scroll-area">
+          <div id="zoomWrapper" class="zoom-wrapper">
+
+            <div id="pisosPanelsContainer">
+              <!-- Paneles de piso (título + grid) generados dinámicamente, ver crearPisoDOM -->
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Barra de Zoom Flotante (izquierda) -->
+  <div class="zoom-toolbar zoom-toolbar-flotante">
+    <button type="button" class="btn btn-outline-primary" onclick="ajustarZoomAjustar()" title="Ajustar el plano al ancho de la pantalla">
+      <i class="bi bi-arrows-angle-contract"></i>
+    </button>
+    <button type="button" class="btn btn-outline-secondary" onclick="ajustarZoom(0.1)" title="Acercar">
+      <i class="bi bi-plus-lg"></i>
+    </button>
+    <span class="zoom-pct" id="zoomPct">55%</span>
+    <button type="button" class="btn btn-outline-secondary" onclick="ajustarZoom(-0.1)" title="Alejar">
+      <i class="bi bi-dash-lg"></i>
+    </button>
+    <button type="button" class="btn btn-outline-secondary" onclick="ajustarZoom(0, true)" title="Restablecer zoom">
+      <i class="bi bi-arrow-counterclockwise"></i>
+    </button>
+  </div>
+
+  <!-- Botón Flotante para abrir/cerrar el panel de Cuentas Activas (derecha, abajo) -->
+  <button type="button" class="btn btn-primary btn-fab-cuentas" id="btnToggleCuentas" onclick="toggleCuentasFlotante()" title="Ver cuentas activas">
+    <i class="bi bi-receipt-cutoff"></i>
+    <span class="badge bg-danger rounded-pill fab-badge" id="fabCuentasBadge">0</span>
+  </button>
+
+  <!-- Panel Flotante de Cuentas Activas (derecha, abajo) — oculto hasta que se pulse el botón -->
+  <div class="panel-cuentas-flotante oculto" id="panelCuentasFlotante">
+    <div class="panel-header">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="fw-bold"><i class="bi bi-receipt-cutoff me-2"></i> Cuentas Activas</span>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge rounded-pill" id="total-cuentas-count">0 cuentas</span>
+          <button type="button" class="btn-close-panel-cuentas" onclick="toggleCuentasFlotante()" title="Cerrar">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+      </div>
+      <select class="form-select form-select-sm" id="filtroSidebar" onchange="actualizarSidebar()">
+        <option value="todas">Mostrar todas las mesas</option>
+        <option value="ocupadas">Mostrar solo mesas con cuentas</option>
+      </select>
+    </div>
+    <div class="card-body p-0 sidebar-list">
+      <ul class="list-group list-group-flush" id="lista-mesas-sidebar">
+        <!-- Cuentas generadas dinámicamente -->
+      </ul>
+    </div>
+  </div>
+
+  <!-- MODAL 1: GESTIÓN DE CUENTAS DE LA MESA -->
+  <div class="modal fade" id="modalCuentas" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title" id="modalTitle"><i class="bi bi-receipt me-2"></i> Gestión de Cuentas</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+
+          <!-- Pestañas de Cuentas -->
+          <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+            <ul class="nav nav-pills" id="cuentasTabs" role="tablist">
+              <!-- Tabs dinámicos -->
+            </ul>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-outline-secondary" onclick="renombrarCuentaActiva()" title="Ponerle nombre a esta cuenta">
+                <i class="bi bi-pencil me-1"></i> Nombrar Cuenta
+              </button>
+              <button class="btn btn-sm btn-outline-success fw-bold" onclick="crearNuevaCuentaEnModal()">
+                <i class="bi bi-plus-lg me-1"></i> Nueva Cuenta
+              </button>
+            </div>
+          </div>
+
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <label class="small text-muted mb-0 fw-bold"><i class="bi bi-person-badge me-1"></i>Atendido por:</label>
+            <select id="selectMeseroCuenta" class="form-select form-select-sm" style="width: auto;" onchange="cambiarMeseroCuentaActiva(this.value)">
+              <!-- Opciones dinámicas -->
+            </select>
+          </div>
+
+          <!-- Contenido de la Cuenta Seleccionada -->
+          <div id="cuentaDetalleContainer">
+
+            <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded mb-3 border">
+              <span class="small fw-bold text-secondary"><i class="bi bi-bag-plus me-1"></i> Comanda de la Cuenta</span>
+              <button class="btn btn-primary btn-sm fw-bold" onclick="abrirCatalogoProductos()">
+                <i class="bi bi-grid-3x3-gap-fill me-1"></i> Catálogo de Productos
+              </button>
+            </div>
+
+            <!-- Tabla de Productos de la Cuenta -->
+            <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+              <table class="table table-hover table-sm align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>Producto</th>
+                    <th class="text-center" style="width: 80px;">Cant.</th>
+                    <th class="text-end" style="width: 110px;">P. Unit</th>
+                    <th class="text-end" style="width: 110px;">Total</th>
+                    <th class="text-center" style="width: 80px;">Stock</th>
+                    <th class="text-center" style="width: 50px;"></th>
+                  </tr>
+                </thead>
+                <tbody id="tablaProductosBody">
+                  <!-- Productos dinámicos -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Resumen Total -->
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-danger" onclick="cerrarCuentaActual()">
+                  <i class="bi bi-check-circle me-1"></i> Liquidar y Cerrar Cuenta
+                </button>
+                <button class="btn btn-sm btn-outline-dark" onclick="cargarCuentaActualAFiado()" title="Cerrar la cuenta cargándola al fiado de un cliente">
+                  <i class="bi bi-journal-arrow-up me-1"></i> Cargar a Fiado
+                </button>
+              </div>
+              <div class="text-end">
+                <span class="text-muted small me-2">Total Cuenta:</span>
+                <span class="fs-4 fw-bold text-success" id="totalCuentaTexto">$0.00</span>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: CATÁLOGO DE PRODUCTOS POR CATEGORÍAS (ABRE POR ENCIMA) -->
+  <div class="modal fade" id="modalCatalogoProductos" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title"><i class="bi bi-journal-album me-2"></i> Seleccionar Producto para la Cuenta</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Cuenta activa + saldo en tiempo real, siempre visible mientras se agrega -->
+          <div class="d-flex justify-content-between align-items-center bg-light border rounded-3 p-2 mb-3">
+            <span class="small fw-bold text-secondary" id="catalogoCuentaNombre"><i class="bi bi-receipt me-1"></i> Cuenta</span>
+            <span class="fs-5 fw-bold text-success" id="catalogoSaldoTexto">$0.00</span>
+          </div>
+
+          <!-- Filtro por Categorías -->
+          <ul class="nav nav-pills gap-2 mb-3 pb-2 border-bottom flex-nowrap overflow-x-auto" id="categoriasTabs">
+            <!-- Categorías dinámicas -->
+          </ul>
+
+          <!-- Grilla de Productos -->
+          <div id="gridCatalogoProductos" class="row g-2" style="max-height: 340px; overflow-y: auto;">
+            <!-- Productos dinámicos -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Volver a la Cuenta</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: INVENTARIO DE PRODUCTOS -->
+  <div class="modal fade" id="modalInventario" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white d-flex justify-content-between align-items-center flex-nowrap">
+          <h5 class="modal-title mb-0 text-truncate me-2"><i class="bi bi-box-seam me-2"></i>Inventario de Productos</h5>
+          <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            <button type="button" class="btn btn-sm btn-light fw-bold text-nowrap" onclick="abrirModalMovimientos()" title="Ver historial de entradas y salidas">
+              <i class="bi bi-clock-history me-1"></i> Historial
+            </button>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-light border py-2 px-3 mb-3 small text-muted">
+            <i class="bi bi-info-circle me-1"></i> El stock baja automáticamente cuando se agrega un producto a una cuenta, y sube si se elimina o se reduce la cantidad. Usa "Reponer" cuando llegue mercadería nueva.
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center gap-2 mb-2 flex-wrap">
+            <ul class="nav nav-pills gap-2 pb-2 flex-nowrap overflow-x-auto flex-grow-1 mb-0" id="categoriasInventarioTabs">
+              <!-- Categorías dinámicas -->
+            </ul>
+            <button class="btn btn-sm btn-success fw-bold flex-shrink-0" onclick="toggleFormNuevoProducto()">
+              <i class="bi bi-plus-circle me-1"></i> Nuevo Producto
+            </button>
+          </div>
+
+          <div id="formNuevoProducto" class="border rounded-3 p-3 mb-3 bg-light" style="display:none;">
+            <div class="row g-2 align-items-end">
+              <div class="col-12 col-md-4">
+                <label class="form-label small fw-bold mb-1">Nombre</label>
+                <input type="text" id="nuevoProductoNombre" class="form-control form-control-sm" placeholder="Ej. Limonada de Coco" maxlength="60">
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold mb-1">Categoría</label>
+                <select id="nuevoProductoCategoria" class="form-select form-select-sm"></select>
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold mb-1">Código</label>
+                <input type="text" id="nuevoProductoCodigo" class="form-control form-control-sm" placeholder="Opcional" maxlength="15">
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold mb-1">Precio (COP)</label>
+                <input type="number" id="nuevoProductoPrecio" class="form-control form-control-sm" min="0" step="500" placeholder="Ej. 15000">
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold mb-1">Stock inicial</label>
+                <input type="number" id="nuevoProductoStock" class="form-control form-control-sm" min="0" step="1" placeholder="0">
+              </div>
+            </div>
+            <div class="d-flex justify-content-end gap-2 mt-3">
+              <button class="btn btn-sm btn-outline-secondary" onclick="toggleFormNuevoProducto(false)">Cancelar</button>
+              <button class="btn btn-sm btn-success fw-bold" onclick="guardarNuevoProducto()">
+                <i class="bi bi-check-lg me-1"></i> Guardar Producto
+              </button>
+            </div>
+          </div>
+
+          <div id="listaInventario" style="max-height: 380px; overflow-y: auto;">
+            <!-- Filas de inventario dinámicas -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: USUARIOS / PERSONAL -->
+  <div class="modal fade" id="modalUsuarios" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title"><i class="bi bi-person-badge me-2"></i> Usuarios / Personal</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-light border py-2 px-3 mb-3 small text-muted">
+            <i class="bi bi-info-circle me-1"></i> El usuario activo es con quien quedan registradas las ventas que se hagan desde este dispositivo. Tócalo para activarlo.
+          </div>
+
+          <div class="d-flex gap-2 mb-3">
+            <input type="text" id="nuevoUsuarioNombre" class="form-control form-control-sm" placeholder="Nombre del mesero/a" maxlength="40">
+            <button class="btn btn-sm btn-success fw-bold text-nowrap" onclick="agregarUsuario()">
+              <i class="bi bi-person-plus-fill me-1"></i> Agregar
+            </button>
+          </div>
+
+          <div id="listaUsuarios" style="max-height: 340px; overflow-y: auto;">
+            <!-- Filas de usuarios dinámicas -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 5: REPORTE DE VENTAS -->
+  <div class="modal fade" id="modalVentas" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title"><i class="bi bi-graph-up-arrow me-2"></i> Reporte de Ventas</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="small fw-bold text-muted mb-2"><i class="bi bi-people me-1"></i> Ventas por usuario</div>
+          <div id="resumenVentasPorUsuario" class="d-flex flex-wrap gap-2 mb-3">
+            <!-- Tarjetas dinámicas por usuario -->
+          </div>
+
+          <div class="small fw-bold text-muted mb-2"><i class="bi bi-receipt me-1"></i> Cuentas liquidadas recientes</div>
+          <div id="listaVentas" style="max-height: 340px; overflow-y: auto;">
+            <!-- Filas de ventas dinámicas -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 6: HISTORIAL DE MOVIMIENTOS DE INVENTARIO -->
+  <div class="modal fade" id="modalMovimientos" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-secondary text-white">
+          <h5 class="modal-title"><i class="bi bi-clock-history me-2"></i> Entradas y Salidas de Inventario</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="listaMovimientos" style="max-height: 420px; overflow-y: auto;">
+            <!-- Filas de movimientos dinámicas -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 7: CLIENTES Y FIADOS (CUENTAS POR COBRAR) -->
+  <div class="modal fade" id="modalFiados" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white d-flex justify-content-between align-items-center flex-nowrap">
+          <h5 class="modal-title mb-0 text-truncate me-2"><i class="bi bi-people me-2"></i> Clientes y Fiados</h5>
+          <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            <span class="badge bg-light text-danger fw-bold">Total por cobrar: <span id="fiadosTotalPorCobrar">$0</span></span>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+        </div>
+        <div class="modal-body">
+          <div id="fiadoSeleccionBanner" class="alert alert-warning py-2 px-3 mb-3 small d-none">
+            <i class="bi bi-hand-index-thumb me-1"></i> Elige el cliente al que cargar <strong id="fiadoSeleccionMonto">$0</strong>. Pulsa <strong>"Cargar aquí"</strong> en su ficha.
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-12 col-md-6">
+              <input type="text" id="nuevoClienteNombre" class="form-control form-control-sm" placeholder="Nombre del cliente" maxlength="50">
+            </div>
+            <div class="col-8 col-md-4">
+              <input type="text" id="nuevoClienteTelefono" class="form-control form-control-sm" placeholder="Teléfono (opcional)" maxlength="25">
+            </div>
+            <div class="col-4 col-md-2 d-grid">
+              <button class="btn btn-sm btn-danger fw-bold" onclick="agregarCliente()">
+                <i class="bi bi-person-plus-fill me-1"></i> Agregar
+              </button>
+            </div>
+          </div>
+
+          <div id="listaClientes" style="max-height: 420px; overflow-y: auto;">
+            <!-- Fichas de clientes dinámicas -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 8: PROVEEDORES Y CUENTAS POR PAGAR -->
+  <div class="modal fade" id="modalProveedores" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-dark text-white d-flex justify-content-between align-items-center flex-nowrap">
+          <h5 class="modal-title mb-0 text-truncate me-2"><i class="bi bi-truck me-2"></i> Proveedores y Cuentas por Pagar</h5>
+          <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            <span class="badge bg-light text-dark fw-bold">Total por pagar: <span id="cxpTotalPorPagar">$0</span></span>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+        </div>
+        <div class="modal-body">
+          <div class="row g-2 mb-3">
+            <div class="col-12 col-md-6">
+              <input type="text" id="nuevoProveedorNombre" class="form-control form-control-sm" placeholder="Nombre del proveedor" maxlength="50">
+            </div>
+            <div class="col-8 col-md-4">
+              <input type="text" id="nuevoProveedorTelefono" class="form-control form-control-sm" placeholder="Teléfono (opcional)" maxlength="25">
+            </div>
+            <div class="col-4 col-md-2 d-grid">
+              <button class="btn btn-sm btn-dark fw-bold" onclick="agregarProveedor()">
+                <i class="bi bi-plus-circle me-1"></i> Agregar
+              </button>
+            </div>
+          </div>
+
+          <div id="listaProveedores" style="max-height: 420px; overflow-y: auto;">
+            <!-- Fichas de proveedores dinámicas -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menú Contextual Flotante -->
+  <div id="context-menu" class="dropdown-menu shadow">
+    <a class="dropdown-item" onclick="accionRenombrar()"><i class="bi bi-pencil me-2"></i> Cambiar Nombre</a>
+    <a class="dropdown-item" onclick="accionDuplicar()"><i class="bi bi-files me-2"></i> Duplicar</a>
+    <a class="dropdown-item" onclick="accionCambiarColor()"><i class="bi bi-palette me-2"></i> Cambiar Color</a>
+    <div class="dropdown-divider"></div>
+    <a class="dropdown-item text-danger" onclick="accionEliminar()"><i class="bi bi-trash me-2"></i> Eliminar Mesa</a>
+  </div>
+
+  <!-- Notificación flotante genérica (producto agregado, sin stock, avisos varios) -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1090;">
+    <div id="toastNotificacion" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body fw-bold" id="toastNotificacionTexto"></div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo propio para pedir un texto (reemplaza prompt(), que en varios
+       navegadores/entornos con vistas previas queda bloqueado) -->
+  <div class="modal fade" id="modalPromptTexto" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <div class="modal-header py-2">
+          <h6 class="modal-title mb-0" id="modalPromptTitulo">Título</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="text" id="modalPromptInput" class="form-control" maxlength="60">
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary btn-sm fw-bold" id="modalPromptConfirmarBtn">Aceptar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo propio de confirmación (reemplaza confirm()) -->
+  <div class="modal fade" id="modalConfirmarAccion" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <div class="modal-header py-2">
+          <h6 class="modal-title mb-0"><i class="bi bi-question-circle me-1 text-warning"></i> Confirmar</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="modalConfirmarTexto">¿Estás seguro?</div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-danger btn-sm fw-bold" id="modalConfirmarAceptarBtn">Sí, confirmar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Selector de color oculto (usa el picker nativo del sistema, que sí
+       funciona en cualquier entorno, sin depender de prompt()) -->
+  <input type="color" id="colorPickerOculto" style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;">
+
+  <!-- ======================= DEPENDENCIAS (CDN) ======================= -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gridstack@9.2.0/dist/gridstack-all.min.js"></script>
+
+  <!-- ======================= APLICACIÓN =======================
+       Scripts clásicos (no módulos) cargados en orden de dependencia.
+       Comparten un único ámbito global, por lo que los onclick="" del
+       HTML siguen funcionando sin cambios. Ver README.md. -->
+
+  <!-- 1) Núcleo -->
+  <script src="js/core/storage.js"></script>       <!-- window.storage (localStorage; BaaS-ready) -->
+  <script src="js/core/config.js"></script>        <!-- APP_CONFIG, claves y límites -->
+  <script src="js/core/format.js"></script>        <!-- moneda, fecha, color -->
+
+  <!-- 2) Datos -->
+  <script src="js/data/seed.js"></script>          <!-- dbJSON (datos de ejemplo) -->
+  <script src="js/core/state.js"></script>         <!-- estado en memoria + modales bootstrap -->
+  <script src="js/core/ui-dialogs.js"></script>    <!-- pedirTexto / pedirConfirmacion / toast -->
+  <script src="js/data/repositories.js"></script>  <!-- guardar*/cargar* vía window.storage -->
+
+  <!-- 3) Módulos de funcionalidad -->
+  <script src="js/modules/plano.js"></script>
+  <script src="js/modules/cuentas.js"></script>
+  <script src="js/modules/catalogo.js"></script>
+  <script src="js/modules/inventario.js"></script>
+  <script src="js/modules/usuarios.js"></script>
+  <script src="js/modules/ventas.js"></script>
+  <script src="js/modules/clientes-fiados.js"></script>
+  <script src="js/modules/proveedores-cxp.js"></script>
+
+  <!-- 4) Arranque -->
+  <script src="js/app.js"></script>
+
+</body>
+</html>

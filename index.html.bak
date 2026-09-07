@@ -1,0 +1,2925 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plano Interactivo con Gestión de Cuentas, Comandas y Catálogo</title>
+
+  <!-- Bootstrap 5 CSS & Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <!-- Gridstack CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@9.2.0/dist/gridstack.min.css" />
+
+  <style>
+    body {
+      background-color: #f8f9fa;
+    }
+
+    .grid-container {
+      background-color: #ffffff;
+      border-radius: 8px;
+      border: 2px dashed #cbd5e1;
+      background-image: linear-gradient(#cbd5e1 1px, transparent 1px),
+                        linear-gradient(90deg, #cbd5e1 1px, transparent 1px);
+      background-size: 60px 60px;
+
+      /* CUADRÍCULA FLUIDA: ocupa todo el ancho disponible y crece hacia
+         abajo automáticamente a medida que se agregan más mesas */
+      width: 100%;
+      min-width: 1600px;     /* ancho mínimo: permite 10 mesas de 2x2 por fila sin aplastarse */
+      min-height: 640px;     /* alto mínimo aunque esté vacía */
+
+      margin: 0;
+    }
+
+    .piso-panel.d-none {
+      display: none !important;
+    }
+
+    .grid-stack-item-content {
+      width: 100% !important;
+      height: 100% !important;
+      border-radius: 10px;
+      padding: 8px 8px !important;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 4px;
+      color: #ffffff;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+      user-select: none;
+      backdrop-filter: blur(4px);
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      overflow: hidden;
+    }
+
+    /* El nombre siempre tiene su propia fila a todo lo ancho, así nunca
+       queda tapado por la barra de edición (que solo aparece en modo edición) */
+    .mesa-nombre-row {
+      width: 100%;
+      min-width: 0;
+    }
+    .mesa-nombre-row .nombre-label {
+      display: block;
+      width: 100%;
+      line-height: 1.15;
+    }
+    .mesa-badge-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .grid-stack-item.selected .grid-stack-item-content {
+      border: 3px solid #ffcc00 !important;
+      box-shadow: 0 0 14px rgba(255, 204, 0, 0.9) !important;
+    }
+
+    .table-actions-container {
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 12px;
+      padding: 4px 8px;
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .badge-cuentas-btn {
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 5px 10px;
+      border-radius: 12px;
+      font-weight: 600;
+      transition: transform 0.15s, filter 0.15s;
+    }
+
+    .badge-cuentas-btn:hover {
+      transform: scale(1.05);
+      filter: brightness(1.1);
+    }
+
+    /* Íconos de "persona" en cada mesa: uno por cuenta abierta, para dar
+       una idea visual rápida de cuánta gente/cuentas hay en esa mesa.
+       Se resetean padding/border-radius heredados de .badge-cuentas-btn
+       (comparten esa clase solo para el click-through del selector de
+       mesa) porque aquí se quiere un círculo tipo avatar. */
+    /* Íconos de "persona" en cada mesa: uno por cuenta abierta, para dar
+       una idea visual rápida de cuánta gente/cuentas hay en esa mesa.
+       Ícono arriba y total de esa cuenta abajo, en letra chiquita, todo
+       dentro del mismo círculo. Se resetean padding/border-radius
+       heredados de .badge-cuentas-btn (comparten esa clase solo para el
+       click-through del selector de mesa). */
+    .persona-badge {
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.28);
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid rgba(255, 255, 255, 0.55);
+      flex-shrink: 0;
+      line-height: 1;
+      gap: 1px;
+    }
+    .persona-badge:hover {
+      transform: scale(1.15);
+      background: rgba(255, 255, 255, 0.45);
+    }
+    .persona-badge i {
+      font-size: 1.05rem;
+      color: #fff;
+      line-height: 1;
+    }
+    .persona-badge .persona-total {
+      font-size: 0.52rem;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1;
+      max-width: 40px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .persona-badge.persona-add {
+      background: rgba(255, 255, 255, 0.14);
+      border-style: dashed;
+    }
+    .persona-badge.persona-add:hover {
+      background: rgba(255, 255, 255, 0.32);
+    }
+
+    .text-shadow {
+      text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    }
+
+    .sidebar-list {
+      max-height: 600px;
+      overflow-y: auto;
+    }
+
+    .cuenta-chip {
+      cursor: pointer;
+      font-size: 0.78rem;
+      transition: background-color 0.15s;
+    }
+
+    .cuenta-chip:hover {
+      background-color: #e2e8f0 !important;
+    }
+
+    #context-menu {
+      position: absolute;
+      display: none;
+      z-index: 10000;
+      width: 180px;
+      background: white;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    #context-menu .dropdown-item {
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    /* El apilado correcto de los modales (Cuentas + Catálogo) se maneja
+       dinámicamente por JS (evento shown.bs.modal), no aquí. Un z-index
+       fijo por CSS se descuadraba fácilmente y dejaba el fondo oscuro
+       tapando el modal (pantalla en gris). */
+
+    .product-card {
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    .product-card:hover {
+      transform: translateY(-2px);
+      border-color: #0d6efd !important;
+    }
+
+    /* --- MODO EDICIÓN --- */
+    .edit-toolbar{position:absolute;top:4px;right:4px;display:none;align-items:center;gap:2px;padding:3px;border-radius:8px;background:rgba(15,23,42,.35);border:1px solid rgba(255,255,255,.25);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:20}
+    .edit-mode .edit-toolbar{display:flex}
+    .edit-toolbar .edit-mini-btn{width:22px;height:22px;padding:0;font-size:.72rem;border:1px solid rgba(255,255,255,.32);border-radius:6px;color:#fff;background:rgba(255,255,255,.14);display:inline-flex;align-items:center;justify-content:center;transition:.15s ease}
+    .edit-toolbar .edit-mini-btn:hover{background:rgba(255,255,255,.28);transform:translateY(-1px)}
+    .edit-toolbar .edit-mini-btn.danger:hover{background:rgba(220,53,69,.55)}
+    .edit-toolbar .edit-mini-btn.duplicate:hover{background:rgba(13,110,253,.45)}
+    .edit-toolbar .edit-mini-btn.color:hover{background:rgba(255,193,7,.38)}
+    .edit-toggle{border-radius:10px!important;font-weight:700;transition:.2s ease}.edit-toggle.active{box-shadow:0 0 0 3px rgba(13,110,253,.12)}
+    .edit-status{font-size:.72rem;font-weight:600;padding:5px 9px;border-radius:999px;background:rgba(108,117,125,.10);color:#6c757d;border:1px solid rgba(108,117,125,.15)}
+    .edit-status.active{background:rgba(13,110,253,.10);color:#0d6efd;border-color:rgba(13,110,253,.20)}
+    .color-palette{display:none;position:absolute;top:30px;right:0;padding:7px;gap:5px;border-radius:10px;background:rgba(15,23,42,.72);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(10px);z-index:30}
+    .color-palette.show{display:flex}.color-dot{width:19px;height:19px;border-radius:50%;border:2px solid rgba(255,255,255,.65);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:transform .15s ease}.color-dot:hover{transform:scale(1.18)}
+    /* Puntos de color del formulario "Crear nueva mesa/zona" (fuera del edit-toolbar, por eso necesitan su propio estilo de "seleccionado") */
+    #paletaColorNuevo .color-dot{width:24px;height:24px;border:2px solid rgba(0,0,0,.12)}
+    #paletaColorNuevo .color-dot.selected{border-color:#0d6efd;box-shadow:0 0 0 2px rgba(13,110,253,.35)}
+    .grid-container:not(.edit-mode) .grid-stack-item{cursor:default!important}.grid-container.edit-mode .grid-stack-item{cursor:move}.grid-stack-item-content{position:relative!important}
+.add-controls{display:none!important}body.edit-mode-active .add-controls{display:block!important}
+.edit-only{display:none!important}body.edit-mode-active .edit-only{display:inline-flex!important}
+.piso-titulo-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.stock-badge-min{font-size:.72rem;padding:3px 7px}
+.edit-panel{background:#eef4ff;border:1px solid #cfe0fb;border-radius:10px;padding:12px 14px}
+.edit-panel-title{font-size:.82rem;font-weight:700;color:#0d6efd;margin-bottom:8px}
+.edit-panel-hint{font-size:.75rem;color:#6c757d}
+@media (max-width:767px){.edit-panel-hint{display:none}}
+
+    /* --- ZOOM DEL PLANO --- */
+    .zoom-toolbar{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #dee2e6;border-radius:10px;padding:4px 6px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .zoom-toolbar .btn{width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:8px}
+    .zoom-toolbar .zoom-pct{font-size:.8rem;font-weight:700;color:#495057;min-width:44px;text-align:center;user-select:none}
+
+    /* Barra de zoom flotante, fija en el borde izquierdo de la pantalla,
+       en columna vertical, centrada verticalmente */
+    .zoom-toolbar-flotante{
+      position:fixed;
+      left:14px;
+      top:50%;
+      transform:translateY(-50%);
+      flex-direction:column;
+      z-index:900;
+      padding:8px 6px;
+    }
+    .zoom-toolbar-flotante .zoom-pct{min-width:auto;padding:2px 0;}
+
+    /* Botón flotante (FAB) para abrir/cerrar el panel de Cuentas Activas */
+    .btn-fab-cuentas{
+      position:fixed;
+      right:20px;
+      bottom:20px;
+      z-index:900;
+      width:56px;
+      height:56px;
+      border-radius:50%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:1.3rem;
+      box-shadow:0 4px 14px rgba(0,0,0,.28);
+      padding:0;
+    }
+    .btn-fab-cuentas .fab-badge{
+      position:absolute;
+      top:-4px;
+      right:-4px;
+      font-size:.65rem;
+      padding:3px 6px;
+    }
+
+    /* Panel flotante de Cuentas Activas, oculto por defecto y
+       solo visible cuando el usuario pulsa el botón flotante.
+       Se anima con opacidad + escala en vez de aparecer/desaparecer
+       de golpe (mejor sensación de "desplegable"). */
+    .panel-cuentas-flotante{
+      position:fixed;
+      right:20px;
+      bottom:88px;
+      z-index:895;
+      width:360px;
+      max-width:calc(100vw - 40px);
+      max-height:70vh;
+      display:flex;
+      flex-direction:column;
+      background:#fff;
+      border-radius:16px;
+      overflow:hidden;
+      box-shadow:0 14px 42px rgba(15,23,42,.24), 0 3px 10px rgba(15,23,42,.10);
+      border:1px solid rgba(15,23,42,.06);
+      transform-origin:bottom right;
+      transition:opacity .18s ease, transform .18s ease;
+    }
+    .panel-cuentas-flotante.oculto{
+      opacity:0;
+      transform:translateY(10px) scale(.95);
+      visibility:hidden;
+      pointer-events:none;
+    }
+
+    /* Encabezado con degradado, a juego con el resto de la UI */
+    .panel-cuentas-flotante .panel-header{
+      background:linear-gradient(135deg,#0d6efd 0%,#0a58ca 100%);
+      color:#fff;
+      padding:14px 16px 12px;
+      flex-shrink:0;
+    }
+    .panel-cuentas-flotante .panel-header .badge{
+      background:rgba(255,255,255,.22)!important;
+      color:#fff;
+      border:1px solid rgba(255,255,255,.35);
+      font-weight:600;
+    }
+    .panel-cuentas-flotante .btn-close-panel-cuentas{
+      background:rgba(255,255,255,.16);
+      border:1px solid rgba(255,255,255,.32);
+      color:#fff;
+      width:28px;height:28px;padding:0;
+      display:inline-flex;align-items:center;justify-content:center;
+      border-radius:8px;
+      cursor:pointer;
+      transition:.15s ease;
+    }
+    .panel-cuentas-flotante .btn-close-panel-cuentas:hover{
+      background:rgba(255,255,255,.32);
+    }
+    .panel-cuentas-flotante select#filtroSidebar{
+      border:1px solid rgba(255,255,255,.35);
+      background-color:rgba(255,255,255,.14);
+      color:#fff;
+      border-radius:9px;
+      font-weight:500;
+    }
+    .panel-cuentas-flotante select#filtroSidebar:focus{
+      box-shadow:0 0 0 .2rem rgba(255,255,255,.25);
+      border-color:rgba(255,255,255,.6);
+    }
+    .panel-cuentas-flotante select#filtroSidebar option{ color:#212529; }
+
+    /* Lista de mesas/cuentas dentro del panel */
+    .panel-cuentas-flotante .sidebar-list{
+      background:#f8f9fb;
+      max-height:none; /* el límite ya lo da .panel-cuentas-flotante */
+      flex:1;
+    }
+    .panel-cuentas-flotante .list-group-item{
+      border:none;
+      border-bottom:1px solid #eef1f4;
+      background:transparent;
+    }
+    .panel-cuentas-flotante .list-group-item:last-child{ border-bottom:none; }
+
+    @media (max-width:576px){
+      .zoom-toolbar-flotante{left:8px;}
+      .btn-fab-cuentas{right:12px;bottom:12px;}
+      .panel-cuentas-flotante{right:8px;left:8px;width:auto;bottom:80px;}
+    }
+
+    /* Contenedor con scroll propio: así el plano nunca queda "cortado"
+       en la parte de abajo, sin importar cuántas mesas tenga.
+       Se usa un min-height moderado (no gigante) para no dejar espacio
+       vacío cuando hay pocas mesas, y un max-height con scroll interno
+       propio (barra de scroll normal del navegador, con su "thumb" para
+       subir/bajar) para que el plano nunca se convierta en una página
+       infinita hacia abajo cuando hay muchas mesas. */
+    .zoom-scroll-area{width:100%;overflow:auto;min-height:420px;max-height:70vh;border-radius:8px;}
+
+    /* El zoom se aplica aquí (no en .grid-container) para no interferir
+       con los cálculos internos de posición/porcentaje de GridStack */
+    .zoom-wrapper{transform-origin: top left;}
+  </style>
+</head>
+<body class="p-3 p-md-4">
+
+  <div class="container-fluid">
+    
+    <!-- Barra Superior -->
+    <div class="row mb-2 align-items-center g-3">
+      <div class="col-12 col-md-auto d-flex align-items-center flex-wrap gap-2">
+        <div class="btn-group" role="group" id="pisoTabsGroup">
+          <!-- Botones de piso generados dinámicamente (ver crearPisoDOM) -->
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary edit-only" onclick="agregarPiso()" title="Agregar un nuevo piso al plano">
+          <i class="bi bi-plus-lg"></i> Piso
+        </button>
+
+        <div class="vr mx-1 d-none d-md-block" style="height: 30px;"></div>
+
+        <button type="button" class="btn btn-outline-success" id="btn-inventario" onclick="abrirModalInventario()" title="Ver y ajustar el inventario de productos">
+          <i class="bi bi-box-seam me-1"></i> Inventario
+        </button>
+        <button type="button" class="btn btn-outline-primary" id="btn-ventas" onclick="abrirModalVentas()" title="Ver reporte de ventas por usuario">
+          <i class="bi bi-graph-up-arrow me-1"></i> Ventas
+        </button>
+
+        <div class="vr mx-1 d-none d-md-block" style="height: 30px;"></div>
+
+        <button type="button" class="btn btn-outline-dark" id="btn-usuario-activo" onclick="abrirModalUsuarios()" title="Elegir quién está usando el sistema en este dispositivo">
+          <i class="bi bi-person-circle me-1"></i> <span id="usuarioActivoTexto">Sin usuario</span>
+        </button>
+      </div>
+
+      <div class="col-12 col-md d-flex justify-content-md-end">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <button class="btn btn-sm btn-outline-primary edit-toggle" id="btn-editar" onclick="toggleModoEdicion()" title="Activar edición del plano">
+            <i class="bi bi-pencil-square me-1"></i> Editar
+          </button>
+          <span class="edit-status" id="edit-status"><i class="bi bi-lock me-1"></i> Edición desactivada</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel de Edición: solo visible con "Editar" activo -->
+    <div class="edit-panel add-controls mb-3">
+      <div class="edit-panel-title">
+        <i class="bi bi-plus-square-dotted me-1"></i> Crear nueva mesa / zona
+      </div>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <input type="text" id="nombreItem" class="form-control form-control-sm" placeholder="Nombre (ej. Mesa 1, Bar)" style="width: 190px;">
+
+        <select id="tipoItem" class="form-select form-select-sm" style="width: 190px;">
+          <option value="mesa">Mesa Estándar (2x2)</option>
+          <option value="bar">Bar (6x2)</option>
+          <option value="mesa_grande">Mesa Grande (4x2)</option>
+          <option value="zona_vip">Zona VIP (8x4)</option>
+        </select>
+
+        <div class="d-flex align-items-center gap-1">
+          <label class="small fw-bold mb-0">Color:</label>
+          <div class="d-flex gap-1" id="paletaColorNuevo"></div>
+        </div>
+
+        <button class="btn btn-sm btn-success fw-bold" onclick="agregarElementoDesdeFormulario()">
+          <i class="bi bi-plus-circle me-1"></i> Añadir Mesa
+        </button>
+
+        <span class="edit-panel-hint ms-auto">
+          <i class="bi bi-info-circle me-1"></i> Arrastra para mover, clic derecho para más opciones
+        </span>
+      </div>
+    </div>
+
+    <!-- Contenido Principal -->
+    <div class="row g-3">
+      
+      <!-- Plano Grid -->
+      <div class="col-12">
+        
+        <div class="alert alert-light border py-1 px-3 mb-2 small text-muted d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span>💡 <strong>Gestión Cuentas:</strong> Haz clic en el botón de cuentas (abajo a la derecha) o en el badge de cada mesa para administrar sus comandas.</span>
+          <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+            <i class="bi bi-database-check me-1"></i> Base de Datos JSON Lista
+          </span>
+        </div>
+
+        <!-- Contenedor con scroll propio (horizontal y vertical) para que
+             el plano nunca se corte, sin importar cuántas mesas tenga -->
+        <div class="zoom-scroll-area">
+          <div id="zoomWrapper" class="zoom-wrapper">
+
+            <div id="pisosPanelsContainer">
+              <!-- Paneles de piso (título + grid) generados dinámicamente, ver crearPisoDOM -->
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Barra de Zoom Flotante (izquierda) -->
+  <div class="zoom-toolbar zoom-toolbar-flotante">
+    <button type="button" class="btn btn-outline-primary" onclick="ajustarZoomAjustar()" title="Ajustar el plano al ancho de la pantalla">
+      <i class="bi bi-arrows-angle-contract"></i>
+    </button>
+    <button type="button" class="btn btn-outline-secondary" onclick="ajustarZoom(0.1)" title="Acercar">
+      <i class="bi bi-plus-lg"></i>
+    </button>
+    <span class="zoom-pct" id="zoomPct">100%</span>
+    <button type="button" class="btn btn-outline-secondary" onclick="ajustarZoom(-0.1)" title="Alejar">
+      <i class="bi bi-dash-lg"></i>
+    </button>
+    <button type="button" class="btn btn-outline-secondary" onclick="ajustarZoom(0, true)" title="Restablecer zoom">
+      <i class="bi bi-arrow-counterclockwise"></i>
+    </button>
+  </div>
+
+  <!-- Botón Flotante para abrir/cerrar el panel de Cuentas Activas (derecha, abajo) -->
+  <button type="button" class="btn btn-primary btn-fab-cuentas" id="btnToggleCuentas" onclick="toggleCuentasFlotante()" title="Ver cuentas activas">
+    <i class="bi bi-receipt-cutoff"></i>
+    <span class="badge bg-danger rounded-pill fab-badge" id="fabCuentasBadge">0</span>
+  </button>
+
+  <!-- Panel Flotante de Cuentas Activas (derecha, abajo) — oculto hasta que se pulse el botón -->
+  <div class="panel-cuentas-flotante oculto" id="panelCuentasFlotante">
+    <div class="panel-header">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="fw-bold"><i class="bi bi-receipt-cutoff me-2"></i> Cuentas Activas</span>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge rounded-pill" id="total-cuentas-count">0 cuentas</span>
+          <button type="button" class="btn-close-panel-cuentas" onclick="toggleCuentasFlotante()" title="Cerrar">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+      </div>
+      <select class="form-select form-select-sm" id="filtroSidebar" onchange="actualizarSidebar()">
+        <option value="todas">Mostrar todas las mesas</option>
+        <option value="ocupadas">Mostrar solo mesas con cuentas</option>
+      </select>
+    </div>
+    <div class="card-body p-0 sidebar-list">
+      <ul class="list-group list-group-flush" id="lista-mesas-sidebar">
+        <!-- Cuentas generadas dinámicamente -->
+      </ul>
+    </div>
+  </div>
+
+  <!-- MODAL 1: GESTIÓN DE CUENTAS DE LA MESA -->
+  <div class="modal fade" id="modalCuentas" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title" id="modalTitle"><i class="bi bi-receipt me-2"></i> Gestión de Cuentas</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          
+          <!-- Pestañas de Cuentas -->
+          <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+            <ul class="nav nav-pills" id="cuentasTabs" role="tablist">
+              <!-- Tabs dinámicos -->
+            </ul>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-outline-secondary" onclick="renombrarCuentaActiva()" title="Ponerle nombre a esta cuenta">
+                <i class="bi bi-pencil me-1"></i> Nombrar Cuenta
+              </button>
+              <button class="btn btn-sm btn-outline-success fw-bold" onclick="crearNuevaCuentaEnModal()">
+                <i class="bi bi-plus-lg me-1"></i> Nueva Cuenta
+              </button>
+            </div>
+          </div>
+
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <label class="small text-muted mb-0 fw-bold"><i class="bi bi-person-badge me-1"></i>Atendido por:</label>
+            <select id="selectMeseroCuenta" class="form-select form-select-sm" style="width: auto;" onchange="cambiarMeseroCuentaActiva(this.value)">
+              <!-- Opciones dinámicas -->
+            </select>
+          </div>
+
+          <!-- Contenido de la Cuenta Seleccionada -->
+          <div id="cuentaDetalleContainer">
+            
+            <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded mb-3 border">
+              <span class="small fw-bold text-secondary"><i class="bi bi-bag-plus me-1"></i> Comanda de la Cuenta</span>
+              <button class="btn btn-primary btn-sm fw-bold" onclick="abrirCatalogoProductos()">
+                <i class="bi bi-grid-3x3-gap-fill me-1"></i> Catálogo de Productos
+              </button>
+            </div>
+
+            <!-- Tabla de Productos de la Cuenta -->
+            <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+              <table class="table table-hover table-sm align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>Producto</th>
+                    <th class="text-center" style="width: 80px;">Cant.</th>
+                    <th class="text-end" style="width: 110px;">P. Unit</th>
+                    <th class="text-end" style="width: 110px;">Total</th>
+                    <th class="text-center" style="width: 80px;">Stock</th>
+                    <th class="text-center" style="width: 50px;"></th>
+                  </tr>
+                </thead>
+                <tbody id="tablaProductosBody">
+                  <!-- Productos dinámicos -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Resumen Total -->
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+              <div>
+                <button class="btn btn-sm btn-outline-danger" onclick="cerrarCuentaActual()">
+                  <i class="bi bi-check-circle me-1"></i> Liquidar y Cerrar Cuenta
+                </button>
+              </div>
+              <div class="text-end">
+                <span class="text-muted small me-2">Total Cuenta:</span>
+                <span class="fs-4 fw-bold text-success" id="totalCuentaTexto">$0.00</span>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: CATÁLOGO DE PRODUCTOS POR CATEGORÍAS (ABRE POR ENCIMA) -->
+  <div class="modal fade" id="modalCatalogoProductos" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title"><i class="bi bi-journal-album me-2"></i> Seleccionar Producto para la Cuenta</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Cuenta activa + saldo en tiempo real, siempre visible mientras se agrega -->
+          <div class="d-flex justify-content-between align-items-center bg-light border rounded-3 p-2 mb-3">
+            <span class="small fw-bold text-secondary" id="catalogoCuentaNombre"><i class="bi bi-receipt me-1"></i> Cuenta</span>
+            <span class="fs-5 fw-bold text-success" id="catalogoSaldoTexto">$0.00</span>
+          </div>
+
+          <!-- Filtro por Categorías -->
+          <ul class="nav nav-pills gap-2 mb-3 pb-2 border-bottom flex-nowrap overflow-x-auto" id="categoriasTabs">
+            <!-- Categorías dinámicas -->
+          </ul>
+
+          <!-- Grilla de Productos -->
+          <div id="gridCatalogoProductos" class="row g-2" style="max-height: 340px; overflow-y: auto;">
+            <!-- Productos dinámicos -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Volver a la Cuenta</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: INVENTARIO DE PRODUCTOS -->
+  <div class="modal fade" id="modalInventario" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white d-flex justify-content-between align-items-center flex-nowrap">
+          <h5 class="modal-title mb-0 text-truncate me-2"><i class="bi bi-box-seam me-2"></i>Inventario de Productos</h5>
+          <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            <button type="button" class="btn btn-sm btn-light fw-bold text-nowrap" onclick="abrirModalMovimientos()" title="Ver historial de entradas y salidas">
+              <i class="bi bi-clock-history me-1"></i> Historial
+            </button>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-light border py-2 px-3 mb-3 small text-muted">
+            <i class="bi bi-info-circle me-1"></i> El stock baja automáticamente cuando se agrega un producto a una cuenta, y sube si se elimina o se reduce la cantidad. Usa "Reponer" cuando llegue mercadería nueva.
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center gap-2 mb-2 flex-wrap">
+            <ul class="nav nav-pills gap-2 pb-2 flex-nowrap overflow-x-auto flex-grow-1 mb-0" id="categoriasInventarioTabs">
+              <!-- Categorías dinámicas -->
+            </ul>
+            <button class="btn btn-sm btn-success fw-bold flex-shrink-0" onclick="toggleFormNuevoProducto()">
+              <i class="bi bi-plus-circle me-1"></i> Nuevo Producto
+            </button>
+          </div>
+
+          <div id="formNuevoProducto" class="border rounded-3 p-3 mb-3 bg-light" style="display:none;">
+            <div class="row g-2 align-items-end">
+              <div class="col-12 col-md-4">
+                <label class="form-label small fw-bold mb-1">Nombre</label>
+                <input type="text" id="nuevoProductoNombre" class="form-control form-control-sm" placeholder="Ej. Limonada de Coco" maxlength="60">
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold mb-1">Categoría</label>
+                <select id="nuevoProductoCategoria" class="form-select form-select-sm"></select>
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold mb-1">Código</label>
+                <input type="text" id="nuevoProductoCodigo" class="form-control form-control-sm" placeholder="Opcional" maxlength="15">
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold mb-1">Precio (COP)</label>
+                <input type="number" id="nuevoProductoPrecio" class="form-control form-control-sm" min="0" step="500" placeholder="Ej. 15000">
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label small fw-bold mb-1">Stock inicial</label>
+                <input type="number" id="nuevoProductoStock" class="form-control form-control-sm" min="0" step="1" placeholder="0">
+              </div>
+            </div>
+            <div class="d-flex justify-content-end gap-2 mt-3">
+              <button class="btn btn-sm btn-outline-secondary" onclick="toggleFormNuevoProducto(false)">Cancelar</button>
+              <button class="btn btn-sm btn-success fw-bold" onclick="guardarNuevoProducto()">
+                <i class="bi bi-check-lg me-1"></i> Guardar Producto
+              </button>
+            </div>
+          </div>
+
+          <div id="listaInventario" style="max-height: 380px; overflow-y: auto;">
+            <!-- Filas de inventario dinámicas -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: USUARIOS / PERSONAL -->
+  <div class="modal fade" id="modalUsuarios" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title"><i class="bi bi-person-badge me-2"></i> Usuarios / Personal</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-light border py-2 px-3 mb-3 small text-muted">
+            <i class="bi bi-info-circle me-1"></i> El usuario activo es con quien quedan registradas las ventas que se hagan desde este dispositivo. Tócalo para activarlo.
+          </div>
+
+          <div class="d-flex gap-2 mb-3">
+            <input type="text" id="nuevoUsuarioNombre" class="form-control form-control-sm" placeholder="Nombre del mesero/a" maxlength="40">
+            <button class="btn btn-sm btn-success fw-bold text-nowrap" onclick="agregarUsuario()">
+              <i class="bi bi-person-plus-fill me-1"></i> Agregar
+            </button>
+          </div>
+
+          <div id="listaUsuarios" style="max-height: 340px; overflow-y: auto;">
+            <!-- Filas de usuarios dinámicas -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 5: REPORTE DE VENTAS -->
+  <div class="modal fade" id="modalVentas" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title"><i class="bi bi-graph-up-arrow me-2"></i> Reporte de Ventas</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="small fw-bold text-muted mb-2"><i class="bi bi-people me-1"></i> Ventas por usuario</div>
+          <div id="resumenVentasPorUsuario" class="d-flex flex-wrap gap-2 mb-3">
+            <!-- Tarjetas dinámicas por usuario -->
+          </div>
+
+          <div class="small fw-bold text-muted mb-2"><i class="bi bi-receipt me-1"></i> Cuentas liquidadas recientes</div>
+          <div id="listaVentas" style="max-height: 340px; overflow-y: auto;">
+            <!-- Filas de ventas dinámicas -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 6: HISTORIAL DE MOVIMIENTOS DE INVENTARIO -->
+  <div class="modal fade" id="modalMovimientos" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-secondary text-white">
+          <h5 class="modal-title"><i class="bi bi-clock-history me-2"></i> Entradas y Salidas de Inventario</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="listaMovimientos" style="max-height: 420px; overflow-y: auto;">
+            <!-- Filas de movimientos dinámicas -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menú Contextual Flotante -->
+  <div id="context-menu" class="dropdown-menu shadow">
+    <a class="dropdown-item" onclick="accionRenombrar()"><i class="bi bi-pencil me-2"></i> Cambiar Nombre</a>
+    <a class="dropdown-item" onclick="accionDuplicar()"><i class="bi bi-files me-2"></i> Duplicar</a>
+    <a class="dropdown-item" onclick="accionCambiarColor()"><i class="bi bi-palette me-2"></i> Cambiar Color</a>
+    <div class="dropdown-divider"></div>
+    <a class="dropdown-item text-danger" onclick="accionEliminar()"><i class="bi bi-trash me-2"></i> Eliminar Mesa</a>
+  </div>
+
+  <!-- Notificación flotante genérica (producto agregado, sin stock, avisos varios) -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1090;">
+    <div id="toastNotificacion" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body fw-bold" id="toastNotificacionTexto"></div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo propio para pedir un texto (reemplaza prompt(), que en varios
+       navegadores/entornos con vistas previas queda bloqueado) -->
+  <div class="modal fade" id="modalPromptTexto" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <div class="modal-header py-2">
+          <h6 class="modal-title mb-0" id="modalPromptTitulo">Título</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="text" id="modalPromptInput" class="form-control" maxlength="60">
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary btn-sm fw-bold" id="modalPromptConfirmarBtn">Aceptar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo propio de confirmación (reemplaza confirm()) -->
+  <div class="modal fade" id="modalConfirmarAccion" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <div class="modal-header py-2">
+          <h6 class="modal-title mb-0"><i class="bi bi-question-circle me-1 text-warning"></i> Confirmar</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="modalConfirmarTexto">¿Estás seguro?</div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-danger btn-sm fw-bold" id="modalConfirmarAceptarBtn">Sí, confirmar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Selector de color oculto (usa el picker nativo del sistema, que sí
+       funciona en cualquier entorno, sin depender de prompt()) -->
+  <input type="color" id="colorPickerOculto" style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;">
+
+  <!-- JS Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gridstack@9.2.0/dist/gridstack-all.min.js"></script>
+
+<script>
+  // --- BASE DE DATOS JSON INICIAL ---
+  const dbJSON = {
+    "categories": [
+      { "id": "cat-all", "name": "Todos", "icon": "bi-grid-fill" },
+      { "id": "cat-bebidas", "name": "Bebidas", "icon": "bi-cup-straw" },
+      { "id": "cat-entradas", "name": "Entradas", "icon": "bi-egg-fried" },
+      { "id": "cat-fuertes", "name": "Platos Fuertes", "icon": "bi-funnel-fill" },
+      { "id": "cat-postres", "name": "Postres", "icon": "bi-cake2-fill" }
+    ],
+    "products": [
+      { "id": "p-101", "categoryId": "cat-bebidas", "name": "Cerveza IPA 500ml", "price": 15000, "code": "BEB-01", "stock": 48 },
+      { "id": "p-102", "categoryId": "cat-bebidas", "name": "Cocktail Mojito", "price": 22000, "code": "BEB-02", "stock": 30 },
+      { "id": "p-103", "categoryId": "cat-bebidas", "name": "Gaseosa 350ml", "price": 6000, "code": "BEB-03", "stock": 60 },
+      { "id": "p-104", "categoryId": "cat-bebidas", "name": "Jugo Natural", "price": 9000, "code": "BEB-04", "stock": 40 },
+      { "id": "p-201", "categoryId": "cat-entradas", "name": "Nachos con Queso & Guacamole", "price": 25000, "code": "ENT-01", "stock": 25 },
+      { "id": "p-202", "categoryId": "cat-entradas", "name": "Papas Rústicas BBQ", "price": 18000, "code": "ENT-02", "stock": 35 },
+      { "id": "p-203", "categoryId": "cat-entradas", "name": "Alitas Cruncy (6 und)", "price": 32000, "code": "ENT-03", "stock": 20 },
+      { "id": "p-301", "categoryId": "cat-fuertes", "name": "Burger Doble Carne", "price": 38000, "code": "PF-01", "stock": 18 },
+      { "id": "p-302", "categoryId": "cat-fuertes", "name": "Pizza Artesanal 4 Quesos", "price": 45000, "code": "PF-02", "stock": 15 },
+      { "id": "p-303", "categoryId": "cat-fuertes", "name": "Costillas Ahumadas BBQ", "price": 62000, "code": "PF-03", "stock": 12 },
+      { "id": "p-401", "categoryId": "cat-postres", "name": "Volcán de Chocolate", "price": 18000, "code": "POS-01", "stock": 22 },
+      { "id": "p-402", "categoryId": "cat-postres", "name": "Cheesecake de Frutos Rojos", "price": 20000, "code": "POS-02", "stock": 20 }
+    ],
+    "initialMesas": [
+      { "id": "mesa_bar_01", "nombre": "Bar Principal", "colorHex": "#6f42c1", "w": 6, "h": 2, "x": 0, "y": 0, "piso": 1,
+        "cuentas": [
+          { "idCuenta": 101, "nombreCuenta": "Cuenta #1", "productos": [
+            { "productId": "p-101", "nombre": "Cerveza IPA 500ml", "cant": 2, "precio": 15000 },
+            { "productId": "p-201", "nombre": "Nachos con Queso & Guacamole", "cant": 1, "precio": 25000 }
+          ]},
+          { "idCuenta": 102, "nombreCuenta": "Cuenta #2", "productos": [
+            { "productId": "p-102", "nombre": "Cocktail Mojito", "cant": 3, "precio": 22000 }
+          ]}
+        ]
+      },
+      { "id": "mesa_01", "nombre": "Mesa 1", "colorHex": "#198754", "w": 2, "h": 2, "x": 6, "y": 0, "piso": 1,
+        "cuentas": [
+          { "idCuenta": 103, "nombreCuenta": "Cuenta #1", "productos": [
+            { "productId": "p-301", "nombre": "Burger Doble Carne", "cant": 1, "precio": 38000 },
+            { "productId": "p-103", "nombre": "Gaseosa 350ml", "cant": 1, "precio": 6000 }
+          ]}
+        ]
+      },
+      { "id": "mesa_02", "nombre": "Mesa 2", "colorHex": "#198754", "w": 2, "h": 2, "x": 8, "y": 0, "piso": 1, "cuentas": [] },
+      { "id": "mesa_03", "nombre": "Mesa 3", "colorHex": "#198754", "w": 2, "h": 2, "x": 10, "y": 0, "piso": 1, "cuentas": [] },
+      { "id": "mesa_04", "nombre": "Mesa 4", "colorHex": "#0d6efd", "w": 2, "h": 2, "x": 12, "y": 0, "piso": 1, "cuentas": [] },
+      { "id": "mesa_grande_01", "nombre": "Mesa Grande 1", "colorHex": "#fd7e14", "w": 4, "h": 2, "x": 14, "y": 0, "piso": 1,
+        "cuentas": [
+          { "idCuenta": 105, "nombreCuenta": "Cuenta #1", "productos": [
+            { "productId": "p-302", "nombre": "Pizza Artesanal 4 Quesos", "cant": 1, "precio": 45000 },
+            { "productId": "p-104", "nombre": "Jugo Natural", "cant": 2, "precio": 9000 }
+          ]}
+        ]
+      },
+      { "id": "mesa_05", "nombre": "Mesa 5", "colorHex": "#198754", "w": 2, "h": 2, "x": 0, "y": 2, "piso": 1, "cuentas": [] },
+      { "id": "mesa_06", "nombre": "Mesa 6", "colorHex": "#198754", "w": 2, "h": 2, "x": 2, "y": 2, "piso": 1, "cuentas": [] },
+      { "id": "mesa_07", "nombre": "Mesa 7", "colorHex": "#198754", "w": 2, "h": 2, "x": 4, "y": 2, "piso": 1,
+        "cuentas": [
+          { "idCuenta": 106, "nombreCuenta": "Cuenta #1", "productos": [
+            { "productId": "p-203", "nombre": "Alitas Cruncy (6 und)", "cant": 1, "precio": 32000 },
+            { "productId": "p-101", "nombre": "Cerveza IPA 500ml", "cant": 2, "precio": 15000 }
+          ]}
+        ]
+      },
+      { "id": "mesa_08", "nombre": "Mesa 8", "colorHex": "#0d6efd", "w": 2, "h": 2, "x": 6, "y": 2, "piso": 1, "cuentas": [] },
+      { "id": "mesa_grande_02", "nombre": "Mesa Grande 2", "colorHex": "#fd7e14", "w": 4, "h": 2, "x": 8, "y": 2, "piso": 1, "cuentas": [] },
+      { "id": "mesa_09", "nombre": "Mesa 9", "colorHex": "#d63384", "w": 2, "h": 2, "x": 12, "y": 2, "piso": 1, "cuentas": [] },
+      { "id": "mesa_10", "nombre": "Mesa 10", "colorHex": "#d63384", "w": 2, "h": 2, "x": 14, "y": 2, "piso": 1, "cuentas": [] },
+      { "id": "mesa_11", "nombre": "Mesa 11", "colorHex": "#20c997", "w": 2, "h": 2, "x": 16, "y": 2, "piso": 1, "cuentas": [] },
+      { "id": "zona_vip_salon", "nombre": "Zona VIP Salón", "colorHex": "#fd7e14", "w": 8, "h": 4, "x": 0, "y": 4, "piso": 1,
+        "cuentas": [
+          { "idCuenta": 107, "nombreCuenta": "Cuenta Cumpleaños", "productos": [
+            { "productId": "p-303", "nombre": "Costillas Ahumadas BBQ", "cant": 3, "precio": 62000 },
+            { "productId": "p-401", "nombre": "Volcán de Chocolate", "cant": 3, "precio": 18000 },
+            { "productId": "p-102", "nombre": "Cocktail Mojito", "cant": 4, "precio": 22000 }
+          ]}
+        ]
+      },
+      { "id": "mesa_vip_01", "nombre": "Zona VIP Terraza", "colorHex": "#fd7e14", "w": 8, "h": 4, "x": 0, "y": 0, "piso": 2,
+        "cuentas": [
+          { "idCuenta": 104, "nombreCuenta": "Cuenta Reserva VIP", "productos": [
+            { "productId": "p-303", "nombre": "Costillas Ahumadas BBQ", "cant": 2, "precio": 62000 },
+            { "productId": "p-402", "nombre": "Cheesecake de Frutos Rojos", "cant": 2, "precio": 20000 }
+          ]}
+        ]
+      },
+      { "id": "mesa_12", "nombre": "Mesa 12", "colorHex": "#0d6efd", "w": 2, "h": 2, "x": 8, "y": 0, "piso": 2, "cuentas": [] },
+      { "id": "mesa_13", "nombre": "Mesa 13", "colorHex": "#0d6efd", "w": 2, "h": 2, "x": 10, "y": 0, "piso": 2, "cuentas": [] },
+      { "id": "mesa_14", "nombre": "Mesa 14", "colorHex": "#0dcaf0", "w": 2, "h": 2, "x": 12, "y": 0, "piso": 2, "cuentas": [] },
+      { "id": "mesa_15", "nombre": "Mesa 15", "colorHex": "#0dcaf0", "w": 2, "h": 2, "x": 14, "y": 0, "piso": 2, "cuentas": [] },
+      { "id": "bar_terraza", "nombre": "Bar Terraza", "colorHex": "#6f42c1", "w": 6, "h": 2, "x": 0, "y": 4, "piso": 2,
+        "cuentas": [
+          { "idCuenta": 108, "nombreCuenta": "Cuenta #1", "productos": [
+            { "productId": "p-102", "nombre": "Cocktail Mojito", "cant": 2, "precio": 22000 }
+          ]}
+        ]
+      },
+      { "id": "mesa_16", "nombre": "Mesa 16", "colorHex": "#198754", "w": 2, "h": 2, "x": 6, "y": 4, "piso": 2, "cuentas": [] },
+      { "id": "mesa_17", "nombre": "Mesa 17", "colorHex": "#198754", "w": 2, "h": 2, "x": 8, "y": 4, "piso": 2, "cuentas": [] },
+      { "id": "mesa_18", "nombre": "Mesa 18", "colorHex": "#d63384", "w": 2, "h": 2, "x": 10, "y": 4, "piso": 2, "cuentas": [] },
+      { "id": "mesa_19", "nombre": "Mesa 19", "colorHex": "#d63384", "w": 2, "h": 2, "x": 12, "y": 4, "piso": 2, "cuentas": [] }
+    ]
+  };
+
+  let contadorMesas = 20;
+
+  // --- PISOS DINÁMICOS ---
+  // Antes había solo 2 pisos fijos en el HTML; ahora la lista vive en JS
+  // y se puede ampliar/renombrar desde el modo edición (ver crearPisoDOM,
+  // agregarPiso, renombrarPiso, eliminarPiso).
+  let pisosData = [
+    { id: 1, nombre: 'Piso 1' },
+    { id: 2, nombre: 'Piso 2' }
+  ];
+  let contadorPisos = 2; // último id de piso usado, para no repetir ids
+
+  let pisoActual = 1;
+  const grids = {};
+  const mesasData = {}; // Estructura idMesa -> array de cuentas único por mesa
+
+  // --- INVENTARIO ---
+  // Mapa productId -> unidades disponibles. Se inicializa con el stock
+  // de ejemplo de dbJSON.products y luego se sobreescribe con lo que
+  // haya guardado (ver cargarInventarioGuardado).
+  let inventario = {};
+  dbJSON.products.forEach(p => { inventario[p.id] = p.stock; });
+  let categoriaInventarioSeleccionada = "cat-all";
+
+  // Productos agregados por el usuario desde el modal de Inventario
+  // (además de los de ejemplo). Se guardan aparte para persistirlos.
+  let productosPersonalizados = [];
+
+  // --- USUARIOS (meseros/personal) ---
+  // Lista de usuarios compartida (todo el personal ve la misma lista).
+  // El "usuario activo" es una preferencia LOCAL de este dispositivo/
+  // navegador (cada terminal puede tener a alguien distinto operando).
+  let usuariosData = [];
+  let contadorUsuarios = 0;
+  let usuarioActivoId = null;
+
+  // --- VENTAS (historial de cuentas liquidadas) ---
+  let ventasData = [];
+  const MAX_VENTAS_GUARDADAS = 300;
+
+  // --- MOVIMIENTOS DE INVENTARIO (entradas y salidas) ---
+  let movimientosInventario = [];
+  const MAX_MOVIMIENTOS_GUARDADOS = 300;
+
+  let mesaActivaId = null;
+  let cuentaActivaIndex = 0;
+  let categoriaSeleccionada = "cat-all";
+
+  let elementosSeleccionados = new Set();
+  let itemMenuContextual = null;
+  let modoEdicion = false;
+
+  const modalCuentasBS = new bootstrap.Modal(document.getElementById('modalCuentas'));
+  const modalCatalogoBS = new bootstrap.Modal(document.getElementById('modalCatalogoProductos'));
+  const modalInventarioBS = new bootstrap.Modal(document.getElementById('modalInventario'));
+  const modalUsuariosBS = new bootstrap.Modal(document.getElementById('modalUsuarios'));
+  const modalVentasBS = new bootstrap.Modal(document.getElementById('modalVentas'));
+  const modalMovimientosBS = new bootstrap.Modal(document.getElementById('modalMovimientos'));
+  const toastNotificacionBS = new bootstrap.Toast(document.getElementById('toastNotificacion'), { delay: 2000 });
+  const modalPromptBS = new bootstrap.Modal(document.getElementById('modalPromptTexto'));
+  const modalConfirmarBS = new bootstrap.Modal(document.getElementById('modalConfirmarAccion'));
+
+  // --- Reemplazos propios de prompt()/confirm() ---
+  // Algunos navegadores y entornos de vista previa bloquean los diálogos
+  // nativos del navegador (prompt/confirm/alert). Estas funciones hacen
+  // lo mismo pero con un modal propio de la página, que siempre funciona.
+
+  function pedirTexto(titulo, valorInicial, onConfirmar) {
+    document.getElementById('modalPromptTitulo').innerText = titulo;
+    const input = document.getElementById('modalPromptInput');
+    input.value = valorInicial || '';
+
+    const btnConfirmar = document.getElementById('modalPromptConfirmarBtn');
+    const modalEl = document.getElementById('modalPromptTexto');
+
+    const limpiar = () => {
+      btnConfirmar.removeEventListener('click', onAceptar);
+      input.removeEventListener('keydown', onEnter);
+      modalEl.removeEventListener('hidden.bs.modal', limpiar);
+    };
+    const onAceptar = () => {
+      const valor = input.value.trim();
+      limpiar();
+      modalPromptBS.hide();
+      if (valor) onConfirmar(valor);
+    };
+    const onEnter = (e) => { if (e.key === 'Enter') { e.preventDefault(); onAceptar(); } };
+
+    btnConfirmar.addEventListener('click', onAceptar);
+    input.addEventListener('keydown', onEnter);
+    modalEl.addEventListener('hidden.bs.modal', limpiar);
+
+    modalPromptBS.show();
+    setTimeout(() => { input.focus(); input.select(); }, 300);
+  }
+
+  function pedirConfirmacion(mensaje, onConfirmar) {
+    document.getElementById('modalConfirmarTexto').innerText = mensaje;
+    const btnAceptar = document.getElementById('modalConfirmarAceptarBtn');
+
+    const onAceptar = () => {
+      btnAceptar.removeEventListener('click', onAceptar);
+      modalConfirmarBS.hide();
+      onConfirmar();
+    };
+    btnAceptar.addEventListener('click', onAceptar, { once: true });
+
+    modalConfirmarBS.show();
+  }
+
+  function pedirColor(colorInicial, onConfirmar) {
+    const picker = document.getElementById('colorPickerOculto');
+    picker.value = colorInicial || '#0d6efd';
+    const onChange = () => {
+      picker.removeEventListener('input', onChange);
+      onConfirmar(picker.value);
+    };
+    picker.addEventListener('input', onChange, { once: true });
+    picker.click();
+  }
+
+  // Apilado correcto de modales (Cuentas + Catálogo abierto encima).
+  // Bootstrap no soporta modales anidados "de fábrica"; sin esto, el
+  // fondo oscuro (backdrop) del segundo modal puede terminar con un
+  // z-index más alto que el propio modal y tapar todo en gris.
+  // Este es el patrón estándar recomendado para resolverlo.
+  document.addEventListener('shown.bs.modal', function () {
+    const modalesAbiertos = document.querySelectorAll('.modal.show');
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+
+    backdrops.forEach((bd, i) => {
+      bd.style.zIndex = 1050 + (i * 20);
+    });
+
+    modalesAbiertos.forEach((modalEl, i) => {
+      modalEl.style.zIndex = 1055 + (i * 20) + 10;
+    });
+  });
+
+  // Formato de moneda tipo peso colombiano: sin decimales y con puntos
+  // como separador de miles (ej. $15.000). Se usa Intl para que el
+  // separador y el símbolo salgan siempre correctos.
+  const formatoCOP = new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    maximumFractionDigits: 0
+  });
+  const formatMoney = (val) => formatoCOP.format(Number(val) || 0);
+
+  // Versión compacta para espacios muy chicos, como el total dentro del
+  // círculo de cada persona en la mesa (ej. $15.000 -> $15k).
+  const formatMoneyCorto = (val) => {
+    const num = Number(val) || 0;
+    if (num >= 1000) {
+      return '$' + Math.round(num / 1000) + 'k';
+    }
+    return '$' + Math.round(num);
+  };
+
+  // GridStack solo trae CSS de fábrica para grids de hasta 12 columnas.
+  // Como usamos 20 columnas (para que quepan 10 mesas de 2x2 por fila),
+  // hay que generar nosotros mismos las reglas de ancho/posición para las
+  // columnas 13-20; si no, las mesas que caen ahí no tienen ancho/posición
+  // definidos y arrastrarlas hacia la derecha se rompe.
+  const GRID_COLUMNS = 20;
+  (function inyectarCSSColumnasExtra(cols) {
+    let css = `.gs-${cols}>.grid-stack-item{width:${100 / cols}%}`;
+    for (let i = 1; i < cols; i++) {
+      css += `.gs-${cols}>.grid-stack-item[gs-x="${i}"]{left:${(100 / cols) * i}%}`;
+    }
+    for (let i = 2; i <= cols; i++) {
+      css += `.gs-${cols}>.grid-stack-item[gs-w="${i}"]{width:${(100 / cols) * i}%}`;
+    }
+    const style = document.createElement('style');
+    style.id = 'gs-extra-columns-css';
+    style.textContent = css;
+    document.head.appendChild(style);
+  })(GRID_COLUMNS);
+
+  const gridOptions = {
+    column: GRID_COLUMNS,        /* Número de columnas en el grid: 20 cols permite 10 mesas de 2x2 por fila */
+    cellHeight: 60,              /* Mantiene una altura fija por celda (px) */
+    margin: 0,
+    float: true,
+    animate: true,
+    disableResize: false,        /* Cambia a true si no quieres que el usuario cambie el tamaño de las mesas */
+    staticGrid: true,            /* Bloqueado hasta pulsar Editar */
+    autoFit: false,               /* Evita que Gridstack intente estirar o encoger el grid */
+    resizable: {
+      handles: 'all' // Activa los 8 lados y esquinas (n, e, s, w, ne, se, sw, nw)
+    }
+  };
+
+  // Nota: los grids de cada piso (GridStack.init) ya NO se crean aquí de
+  // forma fija para piso 1 y 2. Ahora los pisos son dinámicos: cada uno
+  // se crea (DOM + GridStack.init + listeners) en crearPisoDOM(), llamada
+  // desde la carga inicial (DOMContentLoaded) por cada piso guardado/de
+  // ejemplo, y también cada vez que el usuario agrega un piso nuevo.
+
+  // Sincroniza el tamaño del fondo cuadriculado con el ancho REAL de cada
+  // columna del grid, para que cada mesa "caiga" visualmente justo dentro
+  // de su cuadro. El ancho de columna depende del ancho del contenedor
+  // (que es fluido), así que se recalcula cada vez que cambia el tamaño.
+  function sincronizarFondoCuadricula() {
+    document.querySelectorAll('.grid-container').forEach(el => {
+      const anchoColumna = el.clientWidth / GRID_COLUMNS;
+      el.style.backgroundSize = `${anchoColumna}px ${gridOptions.cellHeight}px`;
+    });
+  }
+  sincronizarFondoCuadricula();
+  window.addEventListener('resize', sincronizarFondoCuadricula);
+
+  // --- ZOOM DEL PLANO ---
+  // Se usa la propiedad CSS "zoom" (no transform: scale) porque "zoom" sí
+  // recalcula el layout real de los hijos, de modo que GridStack sigue
+  // detectando correctamente los tamaños/posiciones al arrastrar o
+  // redimensionar mesas, y el scroll del contenedor funciona sin trucos.
+  let nivelZoom = 1;
+  let zoomManual = false; // true en cuanto el usuario toca algún botón de zoom
+  const ZOOM_MIN = 0.15;
+  const ZOOM_MAX = 1.5;
+  const ZOOM_PASO = 0.1;
+
+  function aplicarNivelZoom() {
+    const wrapper = document.getElementById('zoomWrapper');
+    wrapper.style.zoom = nivelZoom;
+    document.getElementById('zoomPct').innerText = Math.round(nivelZoom * 100) + '%';
+    // Recalcular el fondo cuadriculado con el nuevo tamaño ya renderizado
+    requestAnimationFrame(sincronizarFondoCuadricula);
+  }
+
+  function ajustarZoom(delta, resetear = false) {
+    zoomManual = true; // el usuario tomó control manual del zoom
+    if (resetear) {
+      nivelZoom = 1;
+    } else {
+      nivelZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, +(nivelZoom + delta).toFixed(2)));
+    }
+    aplicarNivelZoom();
+  }
+
+  // Calcula el zoom para que las mesas ocupen TODO EL ANCHO disponible
+  // de la pantalla (sin scroll horizontal). A propósito NO se toma en
+  // cuenta el alto: si el plano tiene muchas filas, el contenedor ya
+  // tiene su propio scroll vertical (.zoom-scroll-area) para eso. Antes
+  // se usaba el menor entre ancho y alto, pero en pantalla completa (o
+  // con muchas mesas) el alto terminaba siendo el factor limitante y
+  // todo se achicaba de más. Desde este 100%-de-ancho, el usuario puede
+  // seguir acercando o alejando manualmente con los botones de zoom.
+  function calcularZoomDeAjuste() {
+    const gridEl = document.getElementById('grid-piso' + pisoActual);
+    const scrollArea = document.querySelector('.zoom-scroll-area');
+    if (!gridEl || !scrollArea) return null;
+
+    const anchoDisponible = scrollArea.clientWidth - 6; // pequeño margen
+
+    // Tamaño "real" del grid sin zoom (se basa en min-width del CSS y en
+    // cuántas columnas ocupen las mesas ya colocadas)
+    const anchoNatural = gridEl.scrollWidth / (nivelZoom || 1);
+    if (!anchoNatural) return null;
+
+    const nuevoZoom = anchoDisponible / anchoNatural;
+
+    return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, +nuevoZoom.toFixed(2)));
+  }
+
+  // Botón "Ajustar el plano al ancho de la pantalla": acción explícita del usuario
+  function ajustarZoomAjustar() {
+    const nuevoZoom = calcularZoomDeAjuste();
+    if (nuevoZoom === null) return;
+    zoomManual = true;
+    nivelZoom = nuevoZoom;
+    aplicarNivelZoom();
+  }
+
+  // Auto-ajuste silencioso: se ejecuta solo, al cargar la página, al
+  // cambiar de piso o al redimensionar la ventana, MIENTRAS el usuario no
+  // haya tocado manualmente el zoom. Así, de entrada, siempre se ve el
+  // plano completo (todas las mesas) en vez de una porción diminuta.
+  function autoAjustarZoomSiCorresponde() {
+    if (zoomManual) return;
+    const nuevoZoom = calcularZoomDeAjuste();
+    if (nuevoZoom === null) return;
+    nivelZoom = nuevoZoom;
+    aplicarNivelZoom();
+  }
+
+  window.addEventListener('resize', () => {
+    requestAnimationFrame(autoAjustarZoomSiCorresponde);
+  });
+
+  function hexToRgba(hex, opacity = 0.8) {
+    let c = hex.replace('#', '');
+    if (c.length === 3) c = c.split('').map(char => char + char).join('');
+    const num = parseInt(c, 16);
+    return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${opacity})`;
+  }
+
+  const coloresPaleta=['#0d6efd','#198754','#6f42c1','#fd7e14','#dc3545','#0dcaf0','#d63384','#20c997','#ffc107','#6610f2'];
+  function renderPaletaColores(){return coloresPaleta.map(c=>`<button type="button" class="color-dot" style="background:${hexToRgba(c,.72)}" title="${c}" onclick="seleccionarColorElemento(this,'${c}',event)"></button>`).join('');}
+
+  // Color seleccionado para la próxima mesa/zona a crear desde el
+  // formulario de "Crear nueva mesa / zona": usa la MISMA paleta de
+  // colores que el modo edición (coloresPaleta), en vez de un color libre.
+  let colorNuevoSeleccionado = coloresPaleta[0];
+
+  function renderPaletaColorNuevo() {
+    const cont = document.getElementById('paletaColorNuevo');
+    if (!cont) return;
+    cont.innerHTML = coloresPaleta.map(c => `
+      <button type="button"
+        class="color-dot ${c === colorNuevoSeleccionado ? 'selected' : ''}"
+        style="background:${hexToRgba(c, .85)}"
+        title="${c}"
+        onclick="seleccionarColorNuevo('${c}')"></button>
+    `).join('');
+  }
+
+  function seleccionarColorNuevo(color) {
+    colorNuevoSeleccionado = color;
+    renderPaletaColorNuevo();
+  }
+
+  document.addEventListener('DOMContentLoaded', renderPaletaColorNuevo);
+
+  function toggleModoEdicion(){
+    modoEdicion=!modoEdicion;
+    document.body.classList.toggle('edit-mode-active', modoEdicion);
+    Object.values(grids).forEach(grid=>{grid.setStatic(!modoEdicion);grid.el.classList.toggle('edit-mode',modoEdicion);});
+    const btn=document.getElementById('btn-editar'), status=document.getElementById('edit-status');
+    btn.classList.toggle('active',modoEdicion);btn.classList.toggle('btn-primary',modoEdicion);btn.classList.toggle('btn-outline-primary',!modoEdicion);
+    btn.innerHTML=modoEdicion?'<i class="bi bi-check2-square me-1"></i> Listo':'<i class="bi bi-pencil-square me-1"></i> Editar';
+    status.classList.toggle('active',modoEdicion);status.innerHTML=modoEdicion?'<i class="bi bi-unlock me-1"></i> Edición activa':'<i class="bi bi-lock me-1"></i> Edición desactivada';
+    if(!modoEdicion){document.querySelectorAll('.color-palette.show').forEach(p=>p.classList.remove('show'));deseleccionarTodos();}
+
+    // Con el plano con zoom aplicado (distinto de 100%), el mouse queda
+    // desincronizado de la mesa que se arrastra o redimensiona (problema
+    // conocido al combinar CSS zoom con librerías de drag & drop basadas
+    // en coordenadas de píxeles). Por eso, mientras se edita, se fuerza
+    // el zoom a 100% y se bloquean los botones de zoom.
+    const toolbarZoom = document.querySelector('.zoom-toolbar-flotante');
+    if (modoEdicion) {
+      if (nivelZoom !== 1) { nivelZoom = 1; aplicarNivelZoom(); }
+      if (toolbarZoom) {
+        toolbarZoom.querySelectorAll('button').forEach(b => b.disabled = true);
+        toolbarZoom.title = 'El zoom se bloquea en 100% mientras editas, para que arrastrar las mesas funcione bien';
+      }
+    } else if (toolbarZoom) {
+      toolbarZoom.querySelectorAll('button').forEach(b => b.disabled = false);
+      toolbarZoom.title = '';
+    }
+  }
+  function verificarModoEdicion(){return modoEdicion;}
+
+  function cambiarPiso(pisoId) {
+    pisoActual = pisoId;
+    deseleccionarTodos();
+
+    document.querySelectorAll('.piso-panel').forEach(panel => {
+      panel.classList.toggle('d-none', panel.id !== 'panel-piso' + pisoId);
+    });
+
+    document.querySelectorAll('.btn-piso-item').forEach(btn => {
+      const activo = Number(btn.dataset.pisoId) === Number(pisoId);
+      btn.classList.toggle('active', activo);
+      btn.classList.toggle('btn-primary', activo);
+      btn.classList.toggle('btn-outline-primary', !activo);
+    });
+
+    sincronizarFondoCuadricula();
+    actualizarSidebar();
+    requestAnimationFrame(autoAjustarZoomSiCorresponde);
+  }
+
+  // --- GESTIÓN DE PISOS (crear, renombrar, eliminar) ---
+
+  // Crea el botón de pestaña + el panel (título y grid) de un piso, e
+  // inicializa su GridStack. Se usa tanto en la carga inicial (por cada
+  // piso guardado/de ejemplo) como al agregar un piso nuevo desde el
+  // modo edición.
+  function crearPisoDOM(piso) {
+    const btnGroup = document.getElementById('pisoTabsGroup');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-outline-primary btn-piso-item';
+    btn.id = 'btn-piso' + piso.id;
+    btn.dataset.pisoId = piso.id;
+    btn.innerHTML = `<span class="piso-btn-label">${piso.nombre}</span>`;
+    btn.onclick = () => cambiarPiso(piso.id);
+    btnGroup.appendChild(btn);
+
+    const panelsContainer = document.getElementById('pisosPanelsContainer');
+    const panel = document.createElement('div');
+    panel.id = 'panel-piso' + piso.id;
+    panel.className = 'piso-panel d-none';
+    panel.innerHTML = `
+      <div class="piso-titulo-row mb-2">
+        <h5 class="text-secondary mb-0"><i class="bi bi-building me-1"></i> Plano - <span class="piso-titulo">${piso.nombre}</span></h5>
+        <button class="btn btn-sm btn-outline-secondary edit-only" onclick="renombrarPiso(${piso.id})" title="Cambiar el nombre de este piso">
+          <i class="bi bi-pencil"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-danger edit-only" onclick="eliminarPiso(${piso.id})" title="Eliminar este piso">
+          <i class="bi bi-trash3"></i>
+        </button>
+      </div>
+      <div id="grid-piso${piso.id}" class="grid-stack grid-container"></div>
+    `;
+    panelsContainer.appendChild(panel);
+
+    grids[piso.id] = GridStack.init(gridOptions, '#grid-piso' + piso.id);
+    grids[piso.id].on('change added removed', () => actualizarSidebar());
+    new ResizeObserver(sincronizarFondoCuadricula).observe(document.getElementById('grid-piso' + piso.id));
+  }
+
+  function agregarPiso() {
+    if (!verificarModoEdicion()) return;
+    pedirTexto('Nombre del nuevo piso:', `Piso ${pisosData.length + 1}`, (nombre) => {
+      contadorPisos++;
+      const piso = { id: contadorPisos, nombre };
+      pisosData.push(piso);
+      crearPisoDOM(piso);
+      cambiarPiso(piso.id);
+      guardarEstado();
+    });
+  }
+
+  function renombrarPiso(pisoId) {
+    if (!verificarModoEdicion()) return;
+    const piso = pisosData.find(p => p.id === pisoId);
+    if (!piso) return;
+    pedirTexto('Nuevo nombre para este piso:', piso.nombre, (nuevoNombre) => {
+      piso.nombre = nuevoNombre;
+      const label = document.querySelector(`#btn-piso${pisoId} .piso-btn-label`);
+      const titulo = document.querySelector(`#panel-piso${pisoId} .piso-titulo`);
+      if (label) label.innerText = nuevoNombre;
+      if (titulo) titulo.innerText = nuevoNombre;
+      guardarEstado();
+    });
+  }
+
+  function eliminarPiso(pisoId) {
+    if (!verificarModoEdicion()) return;
+    if (pisosData.length <= 1) {
+      mostrarNotificacion('Debe existir al menos un piso.', 'danger', 'bi-exclamation-triangle-fill');
+      return;
+    }
+    pedirConfirmacion('¿Eliminar este piso y todas sus mesas? Esta acción no se puede deshacer.', () => {
+      const grid = grids[pisoId];
+      if (grid) {
+        grid.engine.nodes.forEach(node => {
+          const content = node.el ? node.el.querySelector('[data-mesaid]') : null;
+          if (content) delete mesasData[content.dataset.mesaid];
+        });
+        grid.destroy(false);
+      }
+      document.getElementById('panel-piso' + pisoId)?.remove();
+      document.getElementById('btn-piso' + pisoId)?.remove();
+      delete grids[pisoId];
+      pisosData = pisosData.filter(p => p.id !== pisoId);
+
+      if (pisoActual === pisoId) {
+        cambiarPiso(pisosData[0].id);
+      }
+      guardarEstado();
+    });
+  }
+
+  function crearElemento({ id, nombre, cuentas = [], colorHex, w, h, x = undefined, y = undefined, piso = pisoActual }) {
+    const mesaId = id || 'mesa_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+    
+    // Asignación de copia profunda para desacoplar las cuentas entre mesas
+    mesasData[mesaId] = JSON.parse(JSON.stringify(cuentas));
+
+    const colorRgba = hexToRgba(colorHex, 0.8);
+
+    const contenidoHTML = `
+      <div class="grid-stack-item-content" style="background-color: ${colorRgba};" data-colorhex="${colorHex}" data-mesaid="${mesaId}">
+        <div class="edit-toolbar">
+          <button class="edit-mini-btn" onclick="accionRenombrarElemento(this)" title="Cambiar nombre"><i class="bi bi-pencil"></i></button>
+          <button class="edit-mini-btn color" onclick="togglePaletaColor(this,event)" title="Cambiar color"><i class="bi bi-palette"></i></button>
+          <button class="edit-mini-btn duplicate" onclick="duplicarElementoEspecifico(this,${piso})" title="Duplicar"><i class="bi bi-copy"></i></button>
+          <button class="edit-mini-btn danger" onclick="eliminarElementoEspecifico(this,${piso})" title="Eliminar"><i class="bi bi-trash3"></i></button>
+          <div class="color-palette">${renderPaletaColores()}</div>
+        </div>
+        <div class="mesa-nombre-row fw-bold text-shadow">
+          <span class="nombre-label fs-6 text-truncate">${nombre}</span>
+        </div>
+        <div class="mesa-badge-row">
+          <div class="table-actions-container d-flex align-items-center gap-1">
+            <div class="cuentas-badge-wrapper">${renderMesaBadge(mesaId)}</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const widget = grids[piso].addWidget({
+      w: w, h: h, x: x, y: y,
+      content: contenidoHTML
+    });
+
+    // En GridStack 9.x, addWidget() devuelve directamente el elemento del
+    // DOM (con el nodo interno adjunto en .gridstackNode), no un objeto
+    // envoltorio con propiedad ".el". Se contempla igualmente widget.el
+    // por si en algún momento se actualiza a una versión que sí lo use.
+    const el = widget.el || widget;
+
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.badge-cuentas-btn') || e.target.closest('.btn-close-custom')) return;
+      deseleccionarTodos();
+      elementosSeleccionados.add(el);
+      el.classList.add('selected');
+    });
+
+    el.addEventListener('contextmenu', (e) => {
+      if(!modoEdicion) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      itemMenuContextual = el;
+      deseleccionarTodos();
+      elementosSeleccionados.add(el);
+      el.classList.add('selected');
+
+      const menu = document.getElementById('context-menu');
+      menu.style.left = `${e.pageX}px`;
+      menu.style.top = `${e.pageY}px`;
+      menu.style.display = 'block';
+    });
+
+    actualizarSidebar();
+  }
+
+  function renderMesaBadge(mesaId) {
+    const cuentas = mesasData[mesaId] || [];
+
+    // Un ícono de "persona" por cada cuenta abierta en la mesa: da una
+    // idea visual rápida de cuánta gente/grupos hay, con su total chiquito
+    // abajo dentro del mismo círculo, y cada ícono lleva directo a SU
+    // cuenta (no a la primera) al hacer clic.
+    const iconosPersonas = cuentas.map((c, idx) => {
+      const total = c.productos.reduce((sum, p) => sum + (p.cant * p.precio), 0);
+      return `<span class="persona-badge badge-cuentas-btn" onclick="abrirModalCuentas('${mesaId}', ${idx})" title="${c.nombreCuenta} · ${formatMoney(total)}">
+        <i class="bi bi-person-fill"></i>
+        <span class="persona-total">${formatMoneyCorto(total)}</span>
+      </span>`;
+    }).join('');
+
+    const botonExtra = cuentas.length === 0
+      ? `<span class="persona-badge persona-add badge-cuentas-btn" onclick="abrirModalCuentas('${mesaId}')" title="Abrir cuenta"><i class="bi bi-person-plus-fill"></i></span>`
+      : `<span class="persona-badge persona-add badge-cuentas-btn" onclick="agregarCuentaRapida('${mesaId}')" title="Agregar otra cuenta"><i class="bi bi-plus-lg"></i></span>`;
+
+    return `<div class="d-flex align-items-center gap-1 flex-wrap justify-content-center">${iconosPersonas}${botonExtra}</div>`;
+  }
+
+  function actualizarBadgeMesa(mesaId) {
+    const el = document.querySelector(`[data-mesaid="${mesaId}"]`);
+    if (el) {
+      const wrapper = el.querySelector('.cuentas-badge-wrapper');
+      if (wrapper) wrapper.innerHTML = renderMesaBadge(mesaId);
+    }
+  }
+
+  // Abre el modal de cuentas de la mesa y, si ya tenía cuentas, dispara
+  // de una vez el flujo de "Nueva Cuenta" (pide el nombre) para que el
+  // ícono "+" agregue una cuenta adicional sin pasos extra.
+  function agregarCuentaRapida(mesaId) {
+    const teniaCuentas = (mesasData[mesaId] || []).length > 0;
+    abrirModalCuentas(mesaId, (mesasData[mesaId] || []).length);
+    if (teniaCuentas) {
+      crearNuevaCuentaEnModal();
+    }
+  }
+
+  // --- GESTIÓN DE CUENTAS POR MESA ---
+  function abrirModalCuentas(mesaId, cuentaIdxTarget = 0) {
+    mesaActivaId = mesaId;
+    const el = document.querySelector(`[data-mesaid="${mesaId}"]`);
+    const nombreMesa = el ? el.querySelector('.nombre-label').innerText : 'Mesa';
+
+    document.getElementById('modalTitle').innerHTML = `<i class="bi bi-receipt me-2"></i> Cuentas de ${nombreMesa}`;
+
+    if (!mesasData[mesaId]) {
+      mesasData[mesaId] = [];
+    }
+
+    // Si la mesa no tiene cuentas, inicializa únicamente UNA cuenta exclusiva para ESA mesa
+    if (mesasData[mesaId].length === 0) {
+      mesasData[mesaId].push({
+        idCuenta: Date.now(),
+        nombreCuenta: 'Cuenta #1',
+        productos: [],
+        usuarioId: usuarioActivoId,
+        usuarioNombre: obtenerNombreUsuarioActivo()
+      });
+      actualizarBadgeMesa(mesaId);
+      actualizarSidebar();
+    }
+
+    cuentaActivaIndex = cuentaIdxTarget < mesasData[mesaId].length ? cuentaIdxTarget : 0;
+    
+    renderModalTabs();
+    renderSelectMesero();
+    renderModalContenidoCuenta();
+    modalCuentasBS.show();
+  }
+
+  function renderModalTabs() {
+    const tabsContainer = document.getElementById('cuentasTabs');
+    tabsContainer.innerHTML = '';
+
+    const cuentas = mesasData[mesaActivaId] || [];
+
+    cuentas.forEach((cuenta, idx) => {
+      const total = cuenta.productos.reduce((acc, p) => acc + (p.cant * p.precio), 0);
+
+      const li = document.createElement('li');
+      li.className = 'nav-item';
+      li.innerHTML = `
+        <button class="nav-link ${idx === cuentaActivaIndex ? 'active' : ''} py-1 px-3 me-1" onclick="seleccionarCuentaTab(${idx})">
+          ${cuenta.nombreCuenta} <span class="badge bg-light text-dark ms-1">${formatMoney(total)}</span>
+        </button>
+      `;
+      tabsContainer.appendChild(li);
+    });
+  }
+
+  function seleccionarCuentaTab(idx) {
+    cuentaActivaIndex = idx;
+    renderModalTabs();
+    renderSelectMesero();
+    renderModalContenidoCuenta();
+  }
+
+  function crearNuevaCuentaEnModal() {
+    const cuentas = mesasData[mesaActivaId];
+    const numNueva = cuentas.length + 1;
+    const nombreSugerido = `Cuenta #${numNueva}`;
+
+    pedirTexto('¿Cómo quieres llamar a esta nueva cuenta?', nombreSugerido, (nombre) => {
+      cuentas.push({
+        idCuenta: Date.now(),
+        nombreCuenta: nombre,
+        productos: [],
+        usuarioId: usuarioActivoId,
+        usuarioNombre: obtenerNombreUsuarioActivo()
+      });
+
+      cuentaActivaIndex = cuentas.length - 1;
+
+      actualizarBadgeMesa(mesaActivaId);
+      actualizarSidebar();
+      renderModalTabs();
+      renderSelectMesero();
+      renderModalContenidoCuenta();
+    });
+  }
+
+  // Llena el <select> de "Atendido por" con la lista de usuarios y deja
+  // seleccionado el que tenga asignado la cuenta activa (o "Sin asignar").
+  function renderSelectMesero() {
+    const sel = document.getElementById('selectMeseroCuenta');
+    if (!sel) return;
+    const cuenta = mesasData[mesaActivaId] ? mesasData[mesaActivaId][cuentaActivaIndex] : null;
+
+    const opciones = ['<option value="">Sin asignar</option>']
+      .concat(usuariosData.map(u => `<option value="${u.id}">${u.nombre}</option>`));
+    sel.innerHTML = opciones.join('');
+    sel.value = (cuenta && cuenta.usuarioId) ? String(cuenta.usuarioId) : '';
+  }
+
+  function cambiarMeseroCuentaActiva(valor) {
+    const cuenta = mesasData[mesaActivaId] ? mesasData[mesaActivaId][cuentaActivaIndex] : null;
+    if (!cuenta) return;
+
+    if (!valor) {
+      cuenta.usuarioId = null;
+      cuenta.usuarioNombre = null;
+    } else {
+      const usuario = usuariosData.find(u => u.id === Number(valor));
+      cuenta.usuarioId = usuario ? usuario.id : null;
+      cuenta.usuarioNombre = usuario ? usuario.nombre : null;
+    }
+    guardarEstado();
+  }
+
+  function renombrarCuentaActiva() {
+    const cuenta = mesasData[mesaActivaId] ? mesasData[mesaActivaId][cuentaActivaIndex] : null;
+    if (!cuenta) return;
+
+    pedirTexto('Nombre de la cuenta:', cuenta.nombreCuenta, (nuevoNombre) => {
+      cuenta.nombreCuenta = nuevoNombre;
+      actualizarSidebar();
+      renderModalTabs();
+    });
+  }
+
+  function renderModalContenidoCuenta() {
+    const cuenta = mesasData[mesaActivaId] ? mesasData[mesaActivaId][cuentaActivaIndex] : null;
+    const tbody = document.getElementById('tablaProductosBody');
+    tbody.innerHTML = '';
+
+    if (!cuenta) return;
+
+    let totalGlobal = 0;
+
+    if (cuenta.productos.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No hay productos añadidos. Utiliza el botón <strong>Catálogo de Productos</strong> para agregar consumos.</td></tr>`;
+    } else {
+      cuenta.productos.forEach((p, idx) => {
+        const subtotal = p.cant * p.precio;
+        totalGlobal += subtotal;
+
+        const stockRestante = obtenerStock(p.productId);
+        const stockBadgeClase = stockRestante === 0 ? 'bg-danger' : stockRestante <= 5 ? 'bg-warning text-dark' : 'bg-secondary';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="fw-bold">${p.nombre}</td>
+          <td class="text-center">
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-outline-secondary py-0 px-1" onclick="modificarCantidadProducto(${idx}, -1)">-</button>
+              <span class="btn btn-light disabled py-0 px-2 fw-bold text-dark">${p.cant}</span>
+              <button class="btn btn-outline-secondary py-0 px-1" onclick="modificarCantidadProducto(${idx}, 1)">+</button>
+            </div>
+          </td>
+          <td class="text-end">${formatMoney(p.precio)}</td>
+          <td class="text-end fw-bold">${formatMoney(subtotal)}</td>
+          <td class="text-center">
+            <span class="badge stock-badge-min ${stockBadgeClase}" title="Unidades disponibles en inventario">${stockRestante} und.</span>
+          </td>
+          <td class="text-center">
+            <button class="btn btn-sm btn-link text-danger p-0" onclick="eliminarProducto(${idx})" title="Eliminar Producto">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('totalCuentaTexto').innerText = formatMoney(totalGlobal);
+  }
+
+  function modificarCantidadProducto(prodIndex, delta) {
+    const cuenta = mesasData[mesaActivaId][cuentaActivaIndex];
+    const prod = cuenta.productos[prodIndex];
+
+    // Si se está aumentando la cantidad, se necesita 1 unidad más del
+    // inventario; si ya no queda stock, no se permite subir la cantidad.
+    if (delta > 0 && obtenerStock(prod.productId) <= 0) {
+      notificarSinStock(prod.nombre);
+      return;
+    }
+
+    ajustarStock(prod.productId, -delta, delta > 0 ? 'Venta' : 'Devolución (se bajó cantidad en cuenta)'); // +1 en cuenta = -1 en inventario, y viceversa
+    prod.cant += delta;
+
+    if (prod.cant <= 0) {
+      cuenta.productos.splice(prodIndex, 1);
+    }
+
+    actualizarBadgeMesa(mesaActivaId);
+    actualizarSidebar();
+    renderModalTabs();
+    renderModalContenidoCuenta();
+    refrescarVistasInventarioSiEstanAbiertas();
+  }
+
+  function eliminarProducto(prodIndex) {
+    const cuenta = mesasData[mesaActivaId][cuentaActivaIndex];
+    const prod = cuenta.productos[prodIndex];
+
+    // Al quitar el producto por completo de la cuenta, todas sus
+    // unidades vuelven al inventario.
+    ajustarStock(prod.productId, prod.cant, 'Devolución (producto quitado de cuenta)');
+
+    cuenta.productos.splice(prodIndex, 1);
+
+    actualizarBadgeMesa(mesaActivaId);
+    actualizarSidebar();
+    renderModalTabs();
+    renderModalContenidoCuenta();
+    refrescarVistasInventarioSiEstanAbiertas();
+  }
+
+  function cerrarCuentaActual() {
+    pedirConfirmacion('¿Deseas liquidar y cerrar esta cuenta?', () => {
+      const cuentas = mesasData[mesaActivaId];
+      const cuenta = cuentas[cuentaActivaIndex];
+
+      registrarVenta(mesaActivaId, cuenta);
+
+      cuentas.splice(cuentaActivaIndex, 1);
+
+      if (cuentaActivaIndex >= cuentas.length) {
+        cuentaActivaIndex = Math.max(0, cuentas.length - 1);
+      }
+
+      actualizarBadgeMesa(mesaActivaId);
+      actualizarSidebar();
+
+      if (cuentas.length === 0) {
+        modalCuentasBS.hide();
+      } else {
+        renderModalTabs();
+        renderSelectMesero();
+        renderModalContenidoCuenta();
+      }
+    });
+  }
+
+  function abrirCatalogoProductos() {
+    renderCategoriasTabs();
+    renderGridProductos();
+    actualizarEncabezadoCatalogo();
+    modalCatalogoBS.show();
+  }
+
+  function actualizarEncabezadoCatalogo() {
+    const cuenta = (mesaActivaId && mesasData[mesaActivaId]) ? mesasData[mesaActivaId][cuentaActivaIndex] : null;
+    if (!cuenta) return;
+    const total = cuenta.productos.reduce((acc, p) => acc + (p.cant * p.precio), 0);
+    document.getElementById('catalogoCuentaNombre').innerHTML = `<i class="bi bi-receipt me-1"></i> ${cuenta.nombreCuenta}`;
+    document.getElementById('catalogoSaldoTexto').innerText = formatMoney(total);
+  }
+
+  // Notificación flotante genérica y reutilizable (éxito, error, aviso).
+  function mostrarNotificacion(mensaje, tipo = 'success', icono = 'bi-check-circle-fill') {
+    const el = document.getElementById('toastNotificacion');
+    el.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'text-dark');
+    el.classList.add(`bg-${tipo}`);
+    if (tipo === 'warning') el.classList.add('text-dark');
+    document.getElementById('toastNotificacionTexto').innerHTML = `<i class="bi ${icono} me-1"></i> ${mensaje}`;
+    toastNotificacionBS.show();
+  }
+
+  function notificarProductoAgregado(nombre, cant) {
+    mostrarNotificacion(`${nombre} agregado (x${cant})`, 'success', 'bi-check-circle-fill');
+  }
+
+  function notificarSinStock(nombre) {
+    mostrarNotificacion(`Sin stock disponible de "${nombre}"`, 'danger', 'bi-exclamation-triangle-fill');
+  }
+
+  // --- INVENTARIO: helpers de stock ---
+  function obtenerStock(productId) {
+    return inventario[productId] !== undefined ? inventario[productId] : 0;
+  }
+
+  function ajustarStock(productId, delta, motivo = 'Ajuste manual') {
+    const anterior = obtenerStock(productId);
+    const nuevo = Math.max(0, anterior + delta);
+    inventario[productId] = nuevo;
+    guardarInventario();
+
+    const deltaReal = nuevo - anterior; // puede diferir de delta si se topó con el piso de 0
+    if (deltaReal !== 0) {
+      registrarMovimientoInventario(productId, deltaReal, motivo);
+    }
+  }
+
+  function establecerStock(productId, cantidad) {
+    inventario[productId] = Math.max(0, cantidad);
+    guardarInventario();
+  }
+
+  // Refresca el catálogo y/o el modal de inventario si están abiertos en
+  // ese momento, para que el stock se vea actualizado en tiempo real.
+  function refrescarVistasInventarioSiEstanAbiertas() {
+    if (document.getElementById('modalCatalogoProductos').classList.contains('show')) {
+      renderGridProductos();
+    }
+    if (document.getElementById('modalInventario').classList.contains('show')) {
+      renderListaInventario();
+    }
+  }
+
+  // --- MOVIMIENTOS DE INVENTARIO (entradas y salidas) ---
+
+  function registrarMovimientoInventario(productId, delta, motivo) {
+    const prod = dbJSON.products.find(p => p.id === productId);
+    const movimiento = {
+      id: 'mov-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+      fecha: new Date().toISOString(),
+      productId,
+      productName: prod ? prod.name : productId,
+      tipo: delta > 0 ? 'entrada' : 'salida',
+      cantidad: Math.abs(delta),
+      motivo,
+      usuarioNombre: obtenerNombreUsuarioActivo()
+    };
+    movimientosInventario.push(movimiento);
+    if (movimientosInventario.length > MAX_MOVIMIENTOS_GUARDADOS) {
+      movimientosInventario.splice(0, movimientosInventario.length - MAX_MOVIMIENTOS_GUARDADOS);
+    }
+    guardarMovimientos();
+    if (document.getElementById('modalMovimientos').classList.contains('show')) {
+      renderListaMovimientos();
+    }
+  }
+
+  function formatFecha(iso) {
+    const d = new Date(iso);
+    return d.toLocaleString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function abrirModalMovimientos() {
+    renderListaMovimientos();
+    modalMovimientosBS.show();
+  }
+
+  function renderListaMovimientos() {
+    const cont = document.getElementById('listaMovimientos');
+    cont.innerHTML = '';
+
+    if (movimientosInventario.length === 0) {
+      cont.innerHTML = `<div class="text-center text-muted py-4 small">Todavía no hay movimientos registrados.</div>`;
+      return;
+    }
+
+    // Más recientes primero
+    const ordenados = [...movimientosInventario].reverse();
+
+    ordenados.forEach(m => {
+      const esEntrada = m.tipo === 'entrada';
+      const row = document.createElement('div');
+      row.className = 'd-flex justify-content-between align-items-center border rounded-3 p-2 mb-2';
+      row.innerHTML = `
+        <div>
+          <div class="fw-bold">${m.productName}</div>
+          <div class="small text-muted">${m.motivo} · ${formatFecha(m.fecha)} · <i class="bi bi-person-fill"></i> ${m.usuarioNombre}</div>
+        </div>
+        <span class="badge ${esEntrada ? 'bg-success' : 'bg-danger'} fs-6">
+          <i class="bi ${esEntrada ? 'bi-arrow-down-circle' : 'bi-arrow-up-circle'} me-1"></i>${esEntrada ? '+' : '-'}${m.cantidad}
+        </span>
+      `;
+      cont.appendChild(row);
+    });
+  }
+
+  // --- USUARIOS / PERSONAL ---
+
+  function obtenerNombreUsuarioActivo() {
+    if (!usuarioActivoId) return 'Sin asignar';
+    const u = usuariosData.find(u => u.id === usuarioActivoId);
+    return u ? u.nombre : 'Sin asignar';
+  }
+
+  function actualizarIndicadorUsuarioActivo() {
+    const span = document.getElementById('usuarioActivoTexto');
+    if (!span) return;
+    span.innerText = usuarioActivoId ? obtenerNombreUsuarioActivo() : 'Sin usuario';
+  }
+
+  function abrirModalUsuarios() {
+    document.getElementById('nuevoUsuarioNombre').value = '';
+    renderListaUsuarios();
+    modalUsuariosBS.show();
+  }
+
+  function renderListaUsuarios() {
+    const cont = document.getElementById('listaUsuarios');
+    cont.innerHTML = '';
+
+    if (usuariosData.length === 0) {
+      cont.innerHTML = `<div class="text-center text-muted py-4 small">Todavía no hay usuarios. Agrega el primero arriba.</div>`;
+      return;
+    }
+
+    usuariosData.forEach(u => {
+      const esActivo = u.id === usuarioActivoId;
+      const row = document.createElement('div');
+      row.className = `d-flex justify-content-between align-items-center border rounded-3 p-2 mb-2 ${esActivo ? 'border-success bg-success-subtle' : ''}`;
+      row.innerHTML = `
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi ${esActivo ? 'bi-person-check-fill text-success' : 'bi-person-fill text-secondary'} fs-5"></i>
+          <span class="fw-bold">${u.nombre}</span>
+          ${esActivo ? '<span class="badge bg-success">Activo</span>' : ''}
+        </div>
+        <div class="d-flex gap-2">
+          ${esActivo ? '' : `<button class="btn btn-sm btn-outline-success" onclick="activarUsuario(${u.id})" title="Usar este usuario en este dispositivo"><i class="bi bi-check-lg"></i></button>`}
+          <button class="btn btn-sm btn-outline-secondary" onclick="renombrarUsuario(${u.id})" title="Cambiar nombre"><i class="bi bi-pencil"></i></button>
+          <button class="btn btn-sm btn-outline-danger" onclick="eliminarUsuario(${u.id})" title="Eliminar usuario"><i class="bi bi-trash3"></i></button>
+        </div>
+      `;
+      cont.appendChild(row);
+    });
+  }
+
+  function agregarUsuario() {
+    const input = document.getElementById('nuevoUsuarioNombre');
+    const nombre = input.value.trim();
+    if (!nombre) {
+      mostrarNotificacion('Ponle un nombre al usuario.', 'danger', 'bi-exclamation-triangle-fill');
+      return;
+    }
+    contadorUsuarios++;
+    const nuevoUsuario = { id: contadorUsuarios, nombre };
+    usuariosData.push(nuevoUsuario);
+
+    // Si es el primer usuario que se crea, se activa automáticamente
+    if (usuariosData.length === 1) {
+      usuarioActivoId = nuevoUsuario.id;
+      guardarUsuarioActivo();
+      actualizarIndicadorUsuarioActivo();
+    }
+
+    guardarUsuarios();
+    input.value = '';
+    renderListaUsuarios();
+    mostrarNotificacion(`"${nombre}" se agregó a la lista de usuarios`, 'success', 'bi-person-plus-fill');
+  }
+
+  function activarUsuario(id) {
+    usuarioActivoId = id;
+    guardarUsuarioActivo();
+    actualizarIndicadorUsuarioActivo();
+    renderListaUsuarios();
+  }
+
+  function renombrarUsuario(id) {
+    const usuario = usuariosData.find(u => u.id === id);
+    if (!usuario) return;
+    pedirTexto('Nuevo nombre del usuario:', usuario.nombre, (nuevoNombre) => {
+      usuario.nombre = nuevoNombre;
+      guardarUsuarios();
+      renderListaUsuarios();
+      actualizarIndicadorUsuarioActivo();
+    });
+  }
+
+  function eliminarUsuario(id) {
+    pedirConfirmacion('¿Eliminar este usuario? Las ventas ya registradas a su nombre no se modifican.', () => {
+      usuariosData = usuariosData.filter(u => u.id !== id);
+      if (usuarioActivoId === id) {
+        usuarioActivoId = null;
+        guardarUsuarioActivo();
+        actualizarIndicadorUsuarioActivo();
+      }
+      guardarUsuarios();
+      renderListaUsuarios();
+    });
+  }
+
+  // --- VENTAS (historial de cuentas liquidadas) ---
+
+  function registrarVenta(mesaId, cuenta) {
+    if (!cuenta) return;
+    const total = cuenta.productos.reduce((s, p) => s + (p.cant * p.precio), 0);
+    if (total <= 0) return; // no tiene sentido registrar una cuenta vacía
+
+    const el = document.querySelector(`[data-mesaid="${mesaId}"]`);
+    const mesaNombre = el ? el.querySelector('.nombre-label').innerText : 'Mesa';
+
+    const venta = {
+      id: 'venta-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+      fecha: new Date().toISOString(),
+      mesaId, mesaNombre,
+      cuentaNombre: cuenta.nombreCuenta,
+      usuarioId: cuenta.usuarioId || null,
+      usuarioNombre: cuenta.usuarioNombre || 'Sin asignar',
+      total,
+      productos: cuenta.productos.map(p => ({ nombre: p.nombre, cant: p.cant, precio: p.precio }))
+    };
+
+    ventasData.push(venta);
+    if (ventasData.length > MAX_VENTAS_GUARDADAS) {
+      ventasData.splice(0, ventasData.length - MAX_VENTAS_GUARDADAS);
+    }
+    guardarVentas();
+  }
+
+  function abrirModalVentas() {
+    renderResumenVentasPorUsuario();
+    renderListaVentas();
+    modalVentasBS.show();
+  }
+
+  function renderResumenVentasPorUsuario() {
+    const cont = document.getElementById('resumenVentasPorUsuario');
+    cont.innerHTML = '';
+
+    if (ventasData.length === 0) {
+      cont.innerHTML = `<div class="text-muted small">Todavía no hay ventas registradas.</div>`;
+      return;
+    }
+
+    const totales = {}; // nombre -> {total, cuentas}
+    ventasData.forEach(v => {
+      const nombre = v.usuarioNombre || 'Sin asignar';
+      if (!totales[nombre]) totales[nombre] = { total: 0, cuentas: 0 };
+      totales[nombre].total += v.total;
+      totales[nombre].cuentas += 1;
+    });
+
+    const nombresOrdenados = Object.keys(totales).sort((a, b) => totales[b].total - totales[a].total);
+
+    nombresOrdenados.forEach(nombre => {
+      const info = totales[nombre];
+      const card = document.createElement('div');
+      card.className = 'border rounded-3 p-2 px-3 bg-light';
+      card.innerHTML = `
+        <div class="small text-muted"><i class="bi bi-person-fill me-1"></i>${nombre}</div>
+        <div class="fw-bold text-success">${formatMoney(info.total)}</div>
+        <div class="small text-muted">${info.cuentas} ${info.cuentas === 1 ? 'cuenta' : 'cuentas'}</div>
+      `;
+      cont.appendChild(card);
+    });
+  }
+
+  function renderListaVentas() {
+    const cont = document.getElementById('listaVentas');
+    cont.innerHTML = '';
+
+    if (ventasData.length === 0) {
+      cont.innerHTML = `<div class="text-center text-muted py-4 small">Todavía no hay cuentas liquidadas.</div>`;
+      return;
+    }
+
+    const recientes = [...ventasData].reverse().slice(0, 100);
+
+    recientes.forEach(v => {
+      const row = document.createElement('div');
+      row.className = 'd-flex justify-content-between align-items-center border rounded-3 p-2 mb-2';
+      row.innerHTML = `
+        <div>
+          <div class="fw-bold">${v.mesaNombre} · ${v.cuentaNombre}</div>
+          <div class="small text-muted">${formatFecha(v.fecha)} · <i class="bi bi-person-fill"></i> ${v.usuarioNombre}</div>
+        </div>
+        <span class="fs-6 fw-bold text-success">${formatMoney(v.total)}</span>
+      `;
+      cont.appendChild(row);
+    });
+  }
+
+  // --- MODAL DE INVENTARIO ---
+  function abrirModalInventario() {
+    toggleFormNuevoProducto(false);
+    renderCategoriasInventarioTabs();
+    renderListaInventario();
+    modalInventarioBS.show();
+  }
+
+  function toggleFormNuevoProducto(forceShow) {
+    const form = document.getElementById('formNuevoProducto');
+    const mostrar = forceShow !== undefined ? forceShow : form.style.display === 'none';
+    form.style.display = mostrar ? 'block' : 'none';
+    if (mostrar) {
+      document.getElementById('nuevoProductoNombre').value = '';
+      document.getElementById('nuevoProductoCodigo').value = '';
+      document.getElementById('nuevoProductoPrecio').value = '';
+      document.getElementById('nuevoProductoStock').value = '';
+      poblarSelectCategoriasNuevoProducto();
+      setTimeout(() => document.getElementById('nuevoProductoNombre').focus(), 100);
+    }
+  }
+
+  function poblarSelectCategoriasNuevoProducto() {
+    const sel = document.getElementById('nuevoProductoCategoria');
+    sel.innerHTML = dbJSON.categories
+      .filter(c => c.id !== 'cat-all')
+      .map(c => `<option value="${c.id}">${c.name}</option>`)
+      .join('');
+  }
+
+  // Prefijos de código sugeridos por categoría, solo para autogenerar un
+  // código cuando el usuario deja ese campo vacío al crear un producto.
+  const PREFIJOS_CODIGO_POR_CATEGORIA = {
+    'cat-bebidas': 'BEB', 'cat-entradas': 'ENT', 'cat-fuertes': 'PF', 'cat-postres': 'POS'
+  };
+
+  function guardarNuevoProducto() {
+    const nombre = document.getElementById('nuevoProductoNombre').value.trim();
+    const categoryId = document.getElementById('nuevoProductoCategoria').value;
+    let codigo = document.getElementById('nuevoProductoCodigo').value.trim();
+    const precio = parseFloat(document.getElementById('nuevoProductoPrecio').value);
+    const stockInicial = parseInt(document.getElementById('nuevoProductoStock').value, 10);
+
+    if (!nombre) {
+      mostrarNotificacion('Ponle un nombre al producto.', 'danger', 'bi-exclamation-triangle-fill');
+      return;
+    }
+    if (isNaN(precio) || precio <= 0) {
+      mostrarNotificacion('Ingresa un precio válido.', 'danger', 'bi-exclamation-triangle-fill');
+      return;
+    }
+
+    if (!codigo) {
+      const prefijo = PREFIJOS_CODIGO_POR_CATEGORIA[categoryId] || 'PRD';
+      const numExistentes = dbJSON.products.filter(p => p.categoryId === categoryId).length + 1;
+      codigo = `${prefijo}-${String(numExistentes).padStart(2, '0')}`;
+    }
+
+    const nuevoProducto = {
+      id: 'custom-' + Date.now(),
+      categoryId,
+      name: nombre,
+      price: precio,
+      code: codigo,
+      stock: (!isNaN(stockInicial) && stockInicial > 0) ? stockInicial : 0
+    };
+
+    dbJSON.products.push(nuevoProducto);
+    productosPersonalizados.push(nuevoProducto);
+    inventario[nuevoProducto.id] = nuevoProducto.stock;
+    if (nuevoProducto.stock > 0) {
+      registrarMovimientoInventario(nuevoProducto.id, nuevoProducto.stock, 'Alta de producto');
+    }
+
+    guardarProductosPersonalizados();
+    guardarInventario();
+
+    toggleFormNuevoProducto(false);
+    categoriaInventarioSeleccionada = categoryId; // salta directo a la categoría del producto recién creado
+    renderCategoriasInventarioTabs();
+    renderListaInventario();
+    refrescarVistasInventarioSiEstanAbiertas();
+
+    mostrarNotificacion(`"${nombre}" se agregó al inventario`, 'success', 'bi-check-circle-fill');
+  }
+
+  function renderCategoriasInventarioTabs() {
+    const container = document.getElementById('categoriasInventarioTabs');
+    container.innerHTML = '';
+
+    dbJSON.categories.forEach(cat => {
+      const li = document.createElement('li');
+      li.className = 'nav-item';
+
+      const btn = document.createElement('button');
+      btn.className = `nav-link btn-sm text-nowrap ${categoriaInventarioSeleccionada === cat.id ? 'active' : 'bg-light text-dark'}`;
+      btn.innerHTML = `<i class="bi ${cat.icon} me-1"></i> ${cat.name}`;
+      btn.onclick = () => {
+        categoriaInventarioSeleccionada = cat.id;
+        renderCategoriasInventarioTabs();
+        renderListaInventario();
+      };
+
+      li.appendChild(btn);
+      container.appendChild(li);
+    });
+  }
+
+  function renderListaInventario() {
+    const cont = document.getElementById('listaInventario');
+    cont.innerHTML = '';
+
+    const filtrados = categoriaInventarioSeleccionada === 'cat-all'
+      ? dbJSON.products
+      : dbJSON.products.filter(p => p.categoryId === categoriaInventarioSeleccionada);
+
+    if (filtrados.length === 0) {
+      cont.innerHTML = `<div class="text-center text-muted py-4 small">No hay productos en esta categoría todavía.</div>`;
+      return;
+    }
+
+    filtrados.forEach(prod => {
+      const stock = obtenerStock(prod.id);
+      const badgeClase = stock === 0 ? 'bg-danger' : stock <= 5 ? 'bg-warning text-dark' : 'bg-success';
+      const esPersonalizado = prod.id.startsWith('custom-');
+
+      const row = document.createElement('div');
+      row.className = 'd-flex justify-content-between align-items-center flex-wrap gap-2 border rounded-3 p-2 mb-2';
+      row.innerHTML = `
+        <div>
+          <div class="fw-bold">${prod.name} ${esPersonalizado ? '<span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size:.65rem;">Nuevo</span>' : ''}</div>
+          <div class="small text-muted font-monospace">${prod.code} · ${formatMoney(prod.price)}</div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge ${badgeClase} fs-6" id="stock-badge-${prod.id}">${stock} und.</span>
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary" onclick="ajustarStockDesdeModal('${prod.id}', -1)" title="Quitar 1 unidad">-</button>
+            <button class="btn btn-outline-secondary" onclick="ajustarStockDesdeModal('${prod.id}', 1)" title="Agregar 1 unidad">+</button>
+          </div>
+          <button class="btn btn-sm btn-outline-success fw-bold" onclick="reponerStock('${prod.id}')" title="Registrar una reposición de stock">
+            <i class="bi bi-box-arrow-in-down me-1"></i>Reponer
+          </button>
+        </div>
+      `;
+      cont.appendChild(row);
+    });
+  }
+
+  function ajustarStockDesdeModal(productId, delta) {
+    ajustarStock(productId, delta, 'Ajuste manual');
+    renderListaInventario();
+    refrescarVistasInventarioSiEstanAbiertas();
+  }
+
+  function reponerStock(productId) {
+    const prod = dbJSON.products.find(p => p.id === productId);
+    if (!prod) return;
+    pedirTexto(`¿Cuántas unidades de "${prod.name}" quieres agregar al inventario?`, '', (valor) => {
+      const cantidad = parseInt(valor, 10);
+      if (!isNaN(cantidad) && cantidad > 0) {
+        ajustarStock(productId, cantidad, 'Reposición');
+        renderListaInventario();
+        refrescarVistasInventarioSiEstanAbiertas();
+        mostrarNotificacion(`Se agregaron ${cantidad} und. de "${prod.name}" al inventario`, 'success', 'bi-box-arrow-in-down');
+      }
+    });
+  }
+
+  function renderCategoriasTabs() {
+    const container = document.getElementById('categoriasTabs');
+    container.innerHTML = '';
+
+    dbJSON.categories.forEach(cat => {
+      const li = document.createElement('li');
+      li.className = 'nav-item';
+      
+      const btn = document.createElement('button');
+      btn.className = `nav-link btn-sm text-nowrap ${categoriaSeleccionada === cat.id ? 'active' : 'bg-light text-dark'}`;
+      btn.innerHTML = `<i class="bi ${cat.icon} me-1"></i> ${cat.name}`;
+      btn.onclick = () => {
+        categoriaSeleccionada = cat.id;
+        renderCategoriasTabs();
+        renderGridProductos();
+      };
+
+      li.appendChild(btn);
+      container.appendChild(li);
+    });
+  }
+
+  function renderGridProductos() {
+    const grid = document.getElementById('gridCatalogoProductos');
+    grid.innerHTML = '';
+
+    const filtrados = categoriaSeleccionada === 'cat-all'
+      ? dbJSON.products
+      : dbJSON.products.filter(p => p.categoryId === categoriaSeleccionada);
+
+    const cuenta = (mesaActivaId && mesasData[mesaActivaId]) ? mesasData[mesaActivaId][cuentaActivaIndex] : null;
+
+    filtrados.forEach(prod => {
+      const col = document.createElement('div');
+      col.className = 'col-6 col-md-4';
+
+      const enCuenta = cuenta ? cuenta.productos.find(p => p.productId === prod.id) : null;
+      const badgeCantidad = enCuenta
+        ? `<span class="badge bg-success position-absolute top-0 end-0 m-1 shadow-sm">En cuenta: x${enCuenta.cant}</span>`
+        : '';
+
+      const stock = obtenerStock(prod.id);
+      const agotado = stock <= 0;
+      const stockBadgeClase = agotado ? 'bg-danger' : stock <= 5 ? 'bg-warning text-dark' : 'bg-light text-secondary border';
+
+      col.innerHTML = `
+        <div onclick="${agotado ? '' : `agregarProductoDesdeCatalogo('${prod.id}')`}" class="card h-100 p-2 border product-card bg-light position-relative ${enCuenta ? 'border-success' : ''} ${agotado ? 'opacity-50' : ''}" style="${agotado ? 'cursor:not-allowed;' : ''}">
+          ${badgeCantidad}
+          <small class="text-muted font-monospace" style="font-size: 0.75rem;">${prod.code}</small>
+          <div class="fw-bold text-truncate text-dark" style="font-size: 0.9rem;">${prod.name}</div>
+          <div class="d-flex justify-content-between align-items-center mt-2">
+            <span class="text-primary fw-bold">${formatMoney(prod.price)}</span>
+            <span class="badge ${stockBadgeClase}">${agotado ? 'Agotado' : 'Stock: ' + stock}</span>
+          </div>
+          ${agotado ? '' : '<div class="text-end mt-1"><span class="btn btn-sm btn-outline-primary py-0 px-2 fw-bold">+ Añadir</span></div>'}
+        </div>
+      `;
+      grid.appendChild(col);
+    });
+  }
+
+  function agregarProductoDesdeCatalogo(productId) {
+    if (!mesaActivaId || cuentaActivaIndex === null) return;
+
+    const prodObj = dbJSON.products.find(p => p.id === productId);
+    if (!prodObj) return;
+
+    if (obtenerStock(productId) <= 0) {
+      notificarSinStock(prodObj.name);
+      return;
+    }
+
+    const cuenta = mesasData[mesaActivaId][cuentaActivaIndex];
+    const prodExistente = cuenta.productos.find(p => p.productId === productId);
+
+    let cantidadActual;
+    if (prodExistente) {
+      prodExistente.cant += 1;
+      cantidadActual = prodExistente.cant;
+    } else {
+      cuenta.productos.push({
+        productId: prodObj.id,
+        nombre: prodObj.name,
+        cant: 1,
+        precio: prodObj.price
+      });
+      cantidadActual = 1;
+    }
+
+    ajustarStock(productId, -1, 'Venta');
+
+    notificarProductoAgregado(prodObj.name, cantidadActual);
+
+    actualizarBadgeMesa(mesaActivaId);
+    actualizarSidebar();
+    renderModalTabs();
+    renderModalContenidoCuenta();
+    renderGridProductos();
+    actualizarEncabezadoCatalogo();
+    if (document.getElementById('modalInventario').classList.contains('show')) {
+      renderListaInventario();
+    }
+  }
+
+  // --- BARRA LATERAL ---
+  function actualizarSidebar() {
+    const listaContainer = document.getElementById('lista-mesas-sidebar');
+    const totalCount = document.getElementById('total-cuentas-count');
+    const filtro = document.getElementById('filtroSidebar').value;
+    
+    listaContainer.innerHTML = '';
+    const items = grids[pisoActual].engine.nodes;
+
+    let sumaTotalCuentas = 0;
+    let mesasMostradas = 0;
+
+    items.forEach(node => {
+      const el = node.el;
+      const mesaContent = el.querySelector('[data-mesaid]');
+      if (!mesaContent) return;
+
+      const mesaId = mesaContent.dataset.mesaid;
+      const nombreMesa = el.querySelector('.nombre-label').innerText;
+      const colorHex = mesaContent.dataset.colorhex || '#0d6efd';
+
+      const cuentas = mesasData[mesaId] || [];
+      sumaTotalCuentas += cuentas.length;
+
+      if (filtro === 'ocupadas' && cuentas.length === 0) return;
+
+      mesasMostradas++;
+
+      const li = document.createElement('li');
+      li.className = 'list-group-item p-3';
+
+      let cuentasChipsHTML = '';
+      if (cuentas.length === 0) {
+        cuentasChipsHTML = `<span class="text-muted small fst-italic">Sin cuentas abiertas</span>`;
+      } else {
+        cuentasChipsHTML = cuentas.map((c, idx) => {
+          const total = c.productos.reduce((sum, p) => sum + (p.cant * p.precio), 0);
+          return `
+            <div class="cuenta-chip d-flex justify-content-between align-items-center bg-light p-2 rounded border mb-1" onclick="abrirModalCuentas('${mesaId}', ${idx})">
+              <span class="fw-bold text-dark"><i class="bi bi-receipt me-1 text-primary"></i>${c.nombreCuenta}</span>
+              <span class="badge bg-success">${formatMoney(total)}</span>
+            </div>
+          `;
+        }).join('');
+      }
+
+      li.innerHTML = `
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="d-flex align-items-center gap-2" style="cursor: pointer;" onclick="resaltarMesaDesdeSidebar('${node.id}')">
+            <span style="width: 12px; height: 12px; background-color: ${colorHex}; border-radius: 50%; display: inline-block;"></span>
+            <span class="fw-bold text-dark">${nombreMesa}</span>
+          </div>
+          <button class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 0.75rem;" onclick="abrirModalCuentas('${mesaId}')">
+            <i class="bi bi-plus"></i> Cuenta
+          </button>
+        </div>
+        <div>
+          ${cuentasChipsHTML}
+        </div>
+      `;
+
+      listaContainer.appendChild(li);
+    });
+
+    if (mesasMostradas === 0) {
+      listaContainer.innerHTML = `<li class="list-group-item text-center text-muted py-4 small">No hay mesas con cuentas abiertas en este piso</li>`;
+    }
+
+    totalCount.innerText = `${sumaTotalCuentas} ${sumaTotalCuentas === 1 ? 'cuenta' : 'cuentas'}`;
+
+    const fabBadge = document.getElementById('fabCuentasBadge');
+    if (fabBadge) {
+      fabBadge.innerText = sumaTotalCuentas;
+      fabBadge.classList.toggle('d-none', sumaTotalCuentas === 0);
+    }
+
+    // actualizarSidebar() se llama después de prácticamente cualquier
+    // cambio en el plano (mover/redimensionar mesas, crear, eliminar,
+    // renombrar, cambiar color, agregar/quitar productos de una cuenta...),
+    // así que es el punto ideal para disparar el guardado automático.
+    guardarEstado();
+  }
+
+  // --- PANEL FLOTANTE DE CUENTAS ACTIVAS ---
+  // Oculto por defecto; se muestra/oculta con el botón flotante (FAB)
+  function toggleCuentasFlotante() {
+    const panel = document.getElementById('panelCuentasFlotante');
+    if (!panel) return;
+    panel.classList.toggle('oculto');
+    if (!panel.classList.contains('oculto')) {
+      actualizarSidebar();
+    }
+  }
+
+  function resaltarMesaDesdeSidebar(nodeId) {
+    const items = grids[pisoActual].engine.nodes;
+    const targetNode = items.find(n => n.id === nodeId);
+    
+    if (targetNode && targetNode.el) {
+      deseleccionarTodos();
+      elementosSeleccionados.add(targetNode.el);
+      targetNode.el.classList.add('selected');
+      targetNode.el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
+  function deseleccionarTodos() {
+    elementosSeleccionados.forEach(item => item.classList.remove('selected'));
+    elementosSeleccionados.clear();
+  }
+
+  document.addEventListener('click', (e) => {
+    if(!e.target.closest('.edit-toolbar')) document.querySelectorAll('.color-palette.show').forEach(p=>p.classList.remove('show'));
+    if (!e.target.closest('#context-menu')) {
+      document.getElementById('context-menu').style.display = 'none';
+    }
+  });
+
+  function accionDuplicar() {
+    if(!verificarModoEdicion()) return;
+    document.getElementById('context-menu').style.display = 'none';
+    if (!itemMenuContextual) return;
+
+    const content = itemMenuContextual.querySelector('[data-mesaid]');
+    const mesaId = content ? content.dataset.mesaid : null;
+    const label = itemMenuContextual.querySelector('.nombre-label');
+    const node = itemMenuContextual.gridstackNode;
+    if (!mesaId || !node) return;
+
+    let x = node.x + 1, y = node.y, w = node.w, h = node.h;
+    if (x + w > GRID_COLUMNS) { x = Math.max(0, node.x - 1); y = (node.y || 0) + h; }
+
+    crearElemento({
+      id: 'mesa_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      nombre: `${label ? label.innerText : 'Mesa'} (copia)`,
+      cuentas: JSON.parse(JSON.stringify(mesasData[mesaId] || [])),
+      colorHex: content.dataset.colorhex || '#0d6efd',
+      w, h, x, y, piso: pisoActual
+    });
+  }
+
+  function accionRenombrar() {
+    if(!verificarModoEdicion()) return;
+    document.getElementById('context-menu').style.display = 'none';
+    if (!itemMenuContextual) return;
+
+    const label = itemMenuContextual.querySelector('.nombre-label');
+    pedirTexto('Ingresa el nuevo nombre:', label.innerText, (nuevoNombre) => {
+      label.innerText = nuevoNombre;
+      actualizarSidebar();
+    });
+  }
+
+  function accionCambiarColor() {
+    if(!verificarModoEdicion()) return;
+    document.getElementById('context-menu').style.display = 'none';
+    if (!itemMenuContextual) return;
+
+    pedirColor('#198754', (nuevoColor) => {
+      elementosSeleccionados.forEach(item => {
+        const content = item.querySelector('[data-mesaid]');
+        if (!content) return;
+        content.style.backgroundColor = hexToRgba(nuevoColor, 0.8);
+        content.dataset.colorhex = nuevoColor;
+      });
+      actualizarSidebar();
+    });
+  }
+
+  function accionEliminar() {
+    if(!verificarModoEdicion()) return;
+    document.getElementById('context-menu').style.display = 'none';
+    elementosSeleccionados.forEach(item => {
+      const mesaContent = item.querySelector('[data-mesaid]');
+      if (!mesaContent) return;
+      const mesaId = mesaContent.dataset.mesaid;
+      delete mesasData[mesaId];
+      grids[pisoActual].removeWidget(item);
+    });
+    elementosSeleccionados.clear();
+    actualizarSidebar();
+  }
+
+  function accionRenombrarElemento(btn){
+    if(!verificarModoEdicion()) return; const item=btn.closest('.grid-stack-item'), label=item?.querySelector('.nombre-label'); if(!label)return;
+    pedirTexto('Ingresa el nuevo nombre:', label.innerText, (nuevo) => {
+      label.innerText = nuevo;
+      actualizarSidebar();
+    });
+  }
+  function togglePaletaColor(btn,event){
+    if(!verificarModoEdicion()) return; event.stopPropagation(); const palette=btn.parentElement.querySelector('.color-palette'); document.querySelectorAll('.color-palette.show').forEach(p=>{if(p!==palette)p.classList.remove('show')}); palette.classList.toggle('show');
+  }
+  function seleccionarColorElemento(dot,nuevoColor,event){
+    if(!verificarModoEdicion()) return; event.stopPropagation(); const item=dot.closest('.grid-stack-item'),content=item?.querySelector('[data-mesaid]'); if(!content)return;
+    content.style.backgroundColor=hexToRgba(nuevoColor,.72);content.dataset.colorhex=nuevoColor;dot.closest('.color-palette')?.classList.remove('show');actualizarSidebar();
+  }
+  function duplicarElementoEspecifico(btn,piso){
+    if(!verificarModoEdicion()) return; const item=btn.closest('.grid-stack-item'),content=item?.querySelector('[data-mesaid]'); if(!content)return;
+    const mesaId=content.dataset.mesaid,label=item.querySelector('.nombre-label'),node=item.gridstackNode;
+    let x=node?node.x+1:undefined,y=node?node.y:undefined,w=node?node.w:2,h=node?node.h:2;
+    if(x!==undefined&&x+w>GRID_COLUMNS){x=Math.max(0,node.x-1);y=(node.y||0)+h;}
+    crearElemento({id:'mesa_'+Date.now()+'_'+Math.random().toString(36).substr(2,5),nombre:`${label?label.innerText:'Mesa'} (copia)`,cuentas:JSON.parse(JSON.stringify(mesasData[mesaId]||[])),colorHex:content.dataset.colorhex||'#0d6efd',w,h,x,y,piso});
+  }
+
+  function agregarElementoDesdeFormulario() {
+    const nombreInput = document.getElementById('nombreItem').value.trim();
+    const tipo = document.getElementById('tipoItem').value;
+    const colorHex = colorNuevoSeleccionado;
+
+    let w = 2, h = 2;
+    let nombre = nombreInput;
+
+    if (tipo === 'bar') {
+      w = 6; h = 2;
+      if (!nombre) nombre = 'Bar Principal';
+    } else if (tipo === 'mesa_grande') {
+      w = 4; h = 2;
+      if (!nombre) nombre = `Mesa Grande ${contadorMesas++}`;
+    } else if (tipo === 'zona_vip') {
+      w = 8; h = 4;
+      if (!nombre) nombre = 'Zona VIP';
+    } else {
+      w = 2; h = 2;
+      if (!nombre) nombre = `Mesa ${contadorMesas++}`;
+    }
+
+    crearElemento({ nombre, cuentas: [], colorHex, w, h, piso: pisoActual });
+    document.getElementById('nombreItem').value = '';
+  }
+
+  function eliminarElementoEspecifico(btn, piso) {
+    if(!verificarModoEdicion()) return;
+    const item = btn.closest('.grid-stack-item');
+    const mesaContent = item.querySelector('[data-mesaid]');
+    if (!mesaContent) return;
+    const mesaId = mesaContent.dataset.mesaid;
+    delete mesasData[mesaId];
+    grids[piso].removeWidget(item);
+    elementosSeleccionados.delete(item);
+    actualizarSidebar();
+  }
+
+  // --- PERSISTENCIA DEL PLANO (pisos, posiciones, colores, mesas y cuentas) ---
+  // Se guarda como dato COMPARTIDO (shared: true): todo el personal que
+  // abra este plano ve la misma distribución de mesas y las mismas
+  // cuentas activas, como corresponde a un plano de un restaurante real.
+  const STORAGE_KEY = 'plano-restaurante-estado-v3';
+  let guardarEstadoTimeout = null;
+
+  function construirListaMesasParaGuardar() {
+    const lista = [];
+    pisosData.forEach(piso => {
+      const grid = grids[piso.id];
+      if (!grid) return;
+      grid.engine.nodes.forEach(node => {
+        const content = node.el ? node.el.querySelector('[data-mesaid]') : null;
+        if (!content) return;
+        const mesaId = content.dataset.mesaid;
+        const labelEl = node.el.querySelector('.nombre-label');
+        lista.push({
+          id: mesaId,
+          nombre: labelEl ? labelEl.innerText : 'Mesa',
+          colorHex: content.dataset.colorhex || '#0d6efd',
+          w: node.w, h: node.h, x: node.x, y: node.y,
+          piso: piso.id,
+          cuentas: mesasData[mesaId] || []
+        });
+      });
+    });
+    return lista;
+  }
+
+  // Debounced: agrupa varios cambios seguidos (p.ej. mientras arrastras)
+  // en un solo guardado, para no saturar el almacenamiento.
+  function guardarEstado() {
+    clearTimeout(guardarEstadoTimeout);
+    guardarEstadoTimeout = setTimeout(async () => {
+      try {
+        const payload = {
+          mesas: construirListaMesasParaGuardar(),
+          contadorMesas,
+          pisos: pisosData,
+          contadorPisos
+        };
+        await window.storage.set(STORAGE_KEY, JSON.stringify(payload), true);
+      } catch (e) {
+        console.error('No se pudo guardar el plano:', e);
+      }
+    }, 350);
+  }
+
+  async function cargarEstadoGuardado() {
+    try {
+      const resultado = await window.storage.get(STORAGE_KEY, true);
+      if (resultado && resultado.value) {
+        return JSON.parse(resultado.value);
+      }
+    } catch (e) {
+      // Todavía no existe un plano guardado (primera vez) o hubo un error de lectura;
+      // en ambos casos se sigue con los datos de ejemplo.
+    }
+    return null;
+  }
+
+  // --- PERSISTENCIA DEL INVENTARIO ---
+  // Se guarda aparte del plano (clave propia) porque el stock es un dato
+  // de negocio independiente de la distribución de mesas: reiniciar el
+  // plano de ejemplo no debería borrar el inventario real acumulado.
+  const STORAGE_KEY_INVENTARIO = 'plano-restaurante-inventario-v1';
+  let guardarInventarioTimeout = null;
+
+  function guardarInventario() {
+    clearTimeout(guardarInventarioTimeout);
+    guardarInventarioTimeout = setTimeout(async () => {
+      try {
+        await window.storage.set(STORAGE_KEY_INVENTARIO, JSON.stringify(inventario), true);
+      } catch (e) {
+        console.error('No se pudo guardar el inventario:', e);
+      }
+    }, 350);
+  }
+
+  async function cargarInventarioGuardado() {
+    try {
+      const resultado = await window.storage.get(STORAGE_KEY_INVENTARIO, true);
+      if (resultado && resultado.value) {
+        return JSON.parse(resultado.value);
+      }
+    } catch (e) {
+      // Todavía no existe inventario guardado (primera vez) o hubo un error de lectura.
+    }
+    return null;
+  }
+
+  // --- PERSISTENCIA DE PRODUCTOS PERSONALIZADOS (creados desde Inventario) ---
+  const STORAGE_KEY_PRODUCTOS = 'plano-restaurante-productos-v1';
+  let guardarProductosTimeout = null;
+
+  function guardarProductosPersonalizados() {
+    clearTimeout(guardarProductosTimeout);
+    guardarProductosTimeout = setTimeout(async () => {
+      try {
+        await window.storage.set(STORAGE_KEY_PRODUCTOS, JSON.stringify(productosPersonalizados), true);
+      } catch (e) {
+        console.error('No se pudo guardar los productos nuevos:', e);
+      }
+    }, 350);
+  }
+
+  async function cargarProductosPersonalizadosGuardados() {
+    try {
+      const resultado = await window.storage.get(STORAGE_KEY_PRODUCTOS, true);
+      if (resultado && resultado.value) {
+        return JSON.parse(resultado.value);
+      }
+    } catch (e) {
+      // Todavía no hay productos personalizados guardados o hubo un error de lectura.
+    }
+    return null;
+  }
+
+  // --- PERSISTENCIA DE USUARIOS (compartida: todo el personal ve la misma lista) ---
+  const STORAGE_KEY_USUARIOS = 'plano-restaurante-usuarios-v1';
+  let guardarUsuariosTimeout = null;
+
+  function guardarUsuarios() {
+    clearTimeout(guardarUsuariosTimeout);
+    guardarUsuariosTimeout = setTimeout(async () => {
+      try {
+        const payload = { usuarios: usuariosData, contadorUsuarios };
+        await window.storage.set(STORAGE_KEY_USUARIOS, JSON.stringify(payload), true);
+      } catch (e) {
+        console.error('No se pudo guardar los usuarios:', e);
+      }
+    }, 350);
+  }
+
+  async function cargarUsuariosGuardados() {
+    try {
+      const resultado = await window.storage.get(STORAGE_KEY_USUARIOS, true);
+      if (resultado && resultado.value) {
+        return JSON.parse(resultado.value);
+      }
+    } catch (e) {
+      // Todavía no hay usuarios guardados o hubo un error de lectura.
+    }
+    return null;
+  }
+
+  // --- PERSISTENCIA DEL USUARIO ACTIVO (LOCAL a este dispositivo/navegador) ---
+  const STORAGE_KEY_USUARIO_ACTIVO = 'plano-restaurante-usuario-activo-v1';
+
+  function guardarUsuarioActivo() {
+    window.storage.set(STORAGE_KEY_USUARIO_ACTIVO, JSON.stringify(usuarioActivoId), false)
+      .catch(e => console.error('No se pudo guardar el usuario activo:', e));
+  }
+
+  async function cargarUsuarioActivoGuardado() {
+    try {
+      const resultado = await window.storage.get(STORAGE_KEY_USUARIO_ACTIVO, false);
+      if (resultado && resultado.value !== undefined) {
+        return JSON.parse(resultado.value);
+      }
+    } catch (e) {
+      // Todavía no hay usuario activo guardado en este dispositivo.
+    }
+    return null;
+  }
+
+  // --- PERSISTENCIA DE VENTAS (compartida) ---
+  const STORAGE_KEY_VENTAS = 'plano-restaurante-ventas-v1';
+  let guardarVentasTimeout = null;
+
+  function guardarVentas() {
+    clearTimeout(guardarVentasTimeout);
+    guardarVentasTimeout = setTimeout(async () => {
+      try {
+        await window.storage.set(STORAGE_KEY_VENTAS, JSON.stringify(ventasData), true);
+      } catch (e) {
+        console.error('No se pudo guardar las ventas:', e);
+      }
+    }, 350);
+  }
+
+  async function cargarVentasGuardadas() {
+    try {
+      const resultado = await window.storage.get(STORAGE_KEY_VENTAS, true);
+      if (resultado && resultado.value) {
+        return JSON.parse(resultado.value);
+      }
+    } catch (e) {
+      // Todavía no hay ventas guardadas o hubo un error de lectura.
+    }
+    return null;
+  }
+
+  // --- PERSISTENCIA DE MOVIMIENTOS DE INVENTARIO (compartida) ---
+  const STORAGE_KEY_MOVIMIENTOS = 'plano-restaurante-movimientos-v1';
+  let guardarMovimientosTimeout = null;
+
+  function guardarMovimientos() {
+    clearTimeout(guardarMovimientosTimeout);
+    guardarMovimientosTimeout = setTimeout(async () => {
+      try {
+        await window.storage.set(STORAGE_KEY_MOVIMIENTOS, JSON.stringify(movimientosInventario), true);
+      } catch (e) {
+        console.error('No se pudo guardar los movimientos de inventario:', e);
+      }
+    }, 350);
+  }
+
+  async function cargarMovimientosGuardados() {
+    try {
+      const resultado = await window.storage.get(STORAGE_KEY_MOVIMIENTOS, true);
+      if (resultado && resultado.value) {
+        return JSON.parse(resultado.value);
+      }
+    } catch (e) {
+      // Todavía no hay movimientos guardados o hubo un error de lectura.
+    }
+    return null;
+  }
+
+  // --- CARGA INICIAL DE DATOS ---
+  document.addEventListener('DOMContentLoaded', async () => {
+    // 1) Inventario: se combina lo guardado con los valores de ejemplo
+    // (por si en el futuro se agregan productos nuevos que aún no
+    // existían cuando se guardó el inventario por primera vez).
+    const inventarioGuardado = await cargarInventarioGuardado();
+    if (inventarioGuardado) {
+      inventario = { ...inventario, ...inventarioGuardado };
+    }
+
+    // 1.b) Productos personalizados: se agregan a dbJSON.products para
+    // que el catálogo y el inventario los traten igual que a los de
+    // ejemplo. Su stock ya viene de "inventario" (paso anterior); si por
+    // algún motivo no estuviera ahí, se usa el guardado en el propio
+    // producto como respaldo.
+    const productosGuardados = await cargarProductosPersonalizadosGuardados();
+    if (Array.isArray(productosGuardados) && productosGuardados.length > 0) {
+      productosPersonalizados = productosGuardados;
+      productosPersonalizados.forEach(p => {
+        if (!dbJSON.products.find(existing => existing.id === p.id)) {
+          dbJSON.products.push(p);
+        }
+        if (inventario[p.id] === undefined) {
+          inventario[p.id] = p.stock || 0;
+        }
+      });
+    }
+
+    // 1.c) Usuarios (personal), usuario activo de este dispositivo,
+    // ventas registradas y movimientos de inventario.
+    const usuariosGuardados = await cargarUsuariosGuardados();
+    if (usuariosGuardados && Array.isArray(usuariosGuardados.usuarios)) {
+      usuariosData = usuariosGuardados.usuarios;
+      if (typeof usuariosGuardados.contadorUsuarios === 'number') {
+        contadorUsuarios = usuariosGuardados.contadorUsuarios;
+      }
+    }
+
+    const usuarioActivoGuardado = await cargarUsuarioActivoGuardado();
+    if (usuarioActivoGuardado && usuariosData.find(u => u.id === usuarioActivoGuardado)) {
+      usuarioActivoId = usuarioActivoGuardado;
+    }
+    actualizarIndicadorUsuarioActivo();
+
+    const ventasGuardadas = await cargarVentasGuardadas();
+    if (Array.isArray(ventasGuardadas)) {
+      ventasData = ventasGuardadas;
+    }
+
+    const movimientosGuardados = await cargarMovimientosGuardados();
+    if (Array.isArray(movimientosGuardados)) {
+      movimientosInventario = movimientosGuardados;
+    }
+
+    // 2) Plano: pisos + mesas
+    const estadoGuardado = await cargarEstadoGuardado();
+
+    if (estadoGuardado && Array.isArray(estadoGuardado.pisos) && estadoGuardado.pisos.length > 0) {
+      pisosData = estadoGuardado.pisos;
+      if (typeof estadoGuardado.contadorPisos === 'number') {
+        contadorPisos = estadoGuardado.contadorPisos;
+      }
+    }
+
+    // Se crea el DOM (botón + panel + grid) de cada piso ANTES de crear
+    // las mesas, porque crearElemento() necesita que el grid del piso
+    // correspondiente ya exista.
+    pisosData.forEach(piso => crearPisoDOM(piso));
+    cambiarPiso(pisosData[0].id);
+
+    if (estadoGuardado && Array.isArray(estadoGuardado.mesas) && estadoGuardado.mesas.length > 0) {
+      // Ya existía un plano guardado: se restaura tal cual quedó
+      // (posiciones, colores, nombres y cuentas incluidos).
+      if (typeof estadoGuardado.contadorMesas === 'number') {
+        contadorMesas = estadoGuardado.contadorMesas;
+      }
+      estadoGuardado.mesas.forEach(mesa => {
+        crearElemento({
+          id: mesa.id,
+          nombre: mesa.nombre,
+          cuentas: mesa.cuentas,
+          colorHex: mesa.colorHex,
+          w: mesa.w,
+          h: mesa.h,
+          x: mesa.x,
+          y: mesa.y,
+          piso: mesa.piso
+        });
+      });
+    } else {
+      // Primera vez que se abre: se carga el plano de EJEMPLO
+      // (Bar Principal, mesas, mesas grandes, bar de terraza y zonas VIP)
+      // para que se pueda probar mover mesas, cambiar de piso, etc.
+      dbJSON.initialMesas.forEach(mesa => {
+        crearElemento({
+          id: mesa.id,
+          nombre: mesa.nombre,
+          cuentas: mesa.cuentas,
+          colorHex: mesa.colorHex,
+          w: mesa.w,
+          h: mesa.h,
+          x: mesa.x,
+          y: mesa.y,
+          piso: mesa.piso
+        });
+      });
+      // Deja guardado el ejemplo inicial, así la próxima vez que se
+      // abra el plano (o al recargar) se parte de este mismo estado.
+      guardarEstado();
+    }
+
+    // Ajusta el zoom automáticamente para que se vea el plano COMPLETO
+    // (todas las mesas) apenas carga la página, en vez de una porción
+    // diminuta. El usuario puede seguir ajustando manualmente después.
+    requestAnimationFrame(() => requestAnimationFrame(autoAjustarZoomSiCorresponde));
+  });
+</script>
+
+</body>
+</html>
