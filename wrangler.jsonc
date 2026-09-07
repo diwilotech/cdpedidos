@@ -1,0 +1,31 @@
+{
+  // ─────────────────────────────────────────────────────────────────────────
+  //  wrangler.jsonc — configuración del Cloudflare Worker "cdpedidos"
+  //  Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
+  // ─────────────────────────────────────────────────────────────────────────
+
+  "name": "cdpedidos",
+
+  // Punto de entrada del Worker (código que corre en el servidor/edge).
+  "main": "src/worker.js",
+
+  // Fecha del "runtime" de Workers. Fíjala y no la muevas salvo que quieras
+  // adoptar cambios nuevos del runtime.
+  "compatibility_date": "2025-09-01",
+
+  // ── Archivos estáticos (Static Assets) ────────────────────────────────────
+  // "directory" es la carpeta que se publica tal cual (index.html, js/, assets/).
+  // Aquí es la raíz del repo; lo que NO debe publicarse va en .assetsignore.
+  //
+  // Comportamiento por defecto: si la URL coincide con un archivo, Cloudflare
+  // lo sirve y el Worker NI SE EJECUTA. El Worker (src/worker.js) solo recibe
+  // las peticiones que NO son un archivo (p. ej. /api/health).
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS",             // así el Worker puede pedir archivos: env.ASSETS.fetch()
+    "not_found_handling": "404-page" // 404 -> muestra el archivo 404.html si existe
+  },
+
+  // Logs en el dashboard (Workers → cdpedidos → Logs).
+  "observability": { "enabled": true }
+}

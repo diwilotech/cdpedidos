@@ -1,0 +1,17 @@
+# Archivos del repo que NO forman parte del sitio publicado.
+# Sintaxis tipo .gitignore. Todo lo que quede fuera de aquí se sube como
+# asset estático servible desde https://cdpedidos...workers.dev/<ruta>
+
+# Código y config del Worker (no es contenido web)
+src/
+wrangler.jsonc
+package.json
+package-lock.json
+
+# Documentación y respaldos
+README.md
+api/
+index.html.bak
+
+# Estado local de wrangler
+.wrangler/

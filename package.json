@@ -1,0 +1,14 @@
+{
+  "name": "cdpedidos",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Control de Pedidos — SPA estática servida por un Cloudflare Worker",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^4.42.0"
+  }
+}
