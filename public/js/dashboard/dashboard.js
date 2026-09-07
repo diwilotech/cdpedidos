@@ -104,11 +104,21 @@ function poblarSelectCatNuevo() {
   if (actual) sel.value = actual;
 }
 
+// Una venta es "por cobrar" si quedó asociada a un cliente (Guardar para
+// pago después). Esas NO se suman al dinero cobrado.
+const esPorCobrar = (v) => !!v.clienteId;
+const COLOR_COBRADO = '#198754';
+const COLOR_PORCOBRAR = '#fd7e14';
+
 /* ---------- KPIs ---------- */
 function renderKPIs() {
   const hoy = D.ventas.filter(v => esHoy(v.fecha));
-  const totalHoy = hoy.reduce((s, v) => s + (v.total || 0), 0);
-  const porCobrar = D.clientes.reduce((s, c) => {
+  const cobradasHoy = hoy.filter(v => !esPorCobrar(v));
+  const creditoHoy = hoy.filter(v => esPorCobrar(v));
+  const cobradoHoy = cobradasHoy.reduce((s, v) => s + (v.total || 0), 0);
+  const porCobrarHoy = creditoHoy.reduce((s, v) => s + (v.total || 0), 0);
+
+  const porCobrarTotal = D.clientes.reduce((s, c) => {
     const saldo = D.fiados.filter(m => m.clienteId === c.id)
       .reduce((a, m) => a + (m.tipo === 'cargo' ? m.monto : -m.monto), 0);
     return s + Math.max(0, saldo);
@@ -119,10 +129,13 @@ function renderKPIs() {
     return s + Math.max(0, saldo);
   }, 0);
 
-  document.getElementById('kpiVentasHoy').textContent = formatMoney(totalHoy);
-  document.getElementById('kpiCuentasHoy').textContent = hoy.length + (hoy.length === 1 ? ' venta' : ' ventas');
-  document.getElementById('kpiPorCobrar').textContent = formatMoney(porCobrar);
-  document.getElementById('kpiPorPagar').textContent = formatMoney(porPagar);
+  const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+  set('kpiVentasHoy', formatMoney(cobradoHoy));
+  set('kpiVentasHoySub', `${cobradasHoy.length} ${cobradasHoy.length === 1 ? 'venta cobrada' : 'ventas cobradas'}`);
+  set('kpiPorCobrarHoy', formatMoney(porCobrarHoy));
+  set('kpiPorCobrarHoySub', `${creditoHoy.length} a crédito hoy`);
+  set('kpiPorCobrar', formatMoney(porCobrarTotal));
+  set('kpiPorPagar', formatMoney(porPagar));
 }
 
 /* ---------- ventas del día por personal ---------- */
@@ -131,21 +144,23 @@ function renderVentasPorPersonal() {
   const porPersona = {};
   hoy.forEach(v => {
     const n = v.usuarioNombre || 'Sin asignar';
-    if (!porPersona[n]) porPersona[n] = { total: 0, ventas: 0, unidades: 0 };
-    porPersona[n].total += v.total || 0;
+    if (!porPersona[n]) porPersona[n] = { cobrado: 0, porCobrar: 0, ventas: 0, unidades: 0 };
+    porPersona[n][esPorCobrar(v) ? 'porCobrar' : 'cobrado'] += v.total || 0;
     porPersona[n].ventas += 1;
     porPersona[n].unidades += (v.productos || []).reduce((s, p) => s + (p.cant || 0), 0);
   });
-  const filas = Object.keys(porPersona).sort((a, b) => porPersona[b].total - porPersona[a].total);
+  const filas = Object.keys(porPersona)
+    .sort((a, b) => (porPersona[b].cobrado + porPersona[b].porCobrar) - (porPersona[a].cobrado + porPersona[a].porCobrar));
   const tb = document.getElementById('tbodyPersonal');
   tb.innerHTML = filas.length === 0
-    ? `<tr><td colspan="4" class="text-center text-muted py-3 small">Sin ventas hoy.</td></tr>`
+    ? `<tr><td colspan="5" class="text-center text-muted py-3 small">Sin ventas hoy.</td></tr>`
     : filas.map(n => `
       <tr>
         <td class="fw-bold">${n}</td>
         <td class="text-end">${porPersona[n].ventas}</td>
         <td class="text-end">${porPersona[n].unidades}</td>
-        <td class="text-end fw-bold text-success">${formatMoney(porPersona[n].total)}</td>
+        <td class="text-end fw-bold text-success">${formatMoney(porPersona[n].cobrado)}</td>
+        <td class="text-end fw-bold" style="color:${COLOR_PORCOBRAR}">${porPersona[n].porCobrar ? formatMoney(porPersona[n].porCobrar) : '—'}</td>
       </tr>`).join('');
 }
 
@@ -481,12 +496,12 @@ function ultimos7Dias() {
   const dias = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0);
-    dias.push({ ini: d.getTime(), fin: d.getTime() + 86400000, label: d.toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit' }), total: 0 });
+    dias.push({ ini: d.getTime(), fin: d.getTime() + 86400000, label: d.toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit' }), cobrado: 0, porCobrar: 0 });
   }
   D.ventas.forEach(v => {
     const t = new Date(v.fecha).getTime();
     const dia = dias.find(x => t >= x.ini && t < x.fin);
-    if (dia) dia.total += v.total || 0;
+    if (dia) dia[esPorCobrar(v) ? 'porCobrar' : 'cobrado'] += v.total || 0;
   });
   return dias;
 }
@@ -497,8 +512,24 @@ function renderGraficoSemana() {
   if (chartSemana) chartSemana.destroy();
   chartSemana = new Chart(ctx, {
     type: 'bar',
-    data: { labels: dias.map(d => d.label), datasets: [{ label: 'Ventas', data: dias.map(d => d.total), backgroundColor: '#0d6efd' }] },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => formatMoney(v) } } } }
+    data: {
+      labels: dias.map(d => d.label),
+      datasets: [
+        { label: 'Cobrado', data: dias.map(d => d.cobrado), backgroundColor: COLOR_COBRADO },
+        { label: 'Por cobrar', data: dias.map(d => d.porCobrar), backgroundColor: COLOR_PORCOBRAR }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: { callbacks: { label: c => c.dataset.label + ': ' + formatMoney(c.parsed.y) } }
+      },
+      scales: {
+        x: { stacked: true },
+        y: { stacked: true, beginAtZero: true, ticks: { callback: v => formatMoney(v) } }
+      }
+    }
   });
 }
 function renderGraficoCategoria() {

@@ -42,10 +42,10 @@
 
       <!-- KPIs -->
       <div class="row g-2 g-md-3 mb-3">
-        <div class="col-6 col-lg-3"><div class="kpi"><div class="lbl"><i class="bi bi-cash-stack me-1"></i>Ventas de hoy</div><div class="val text-success" id="kpiVentasHoy">$0</div></div></div>
-        <div class="col-6 col-lg-3"><div class="kpi"><div class="lbl"><i class="bi bi-receipt me-1"></i>Cuentas de hoy</div><div class="val" id="kpiCuentasHoy">0</div></div></div>
-        <div class="col-6 col-lg-3"><div class="kpi"><div class="lbl"><i class="bi bi-people me-1"></i>Por cobrar (clientes)</div><div class="val text-danger" id="kpiPorCobrar">$0</div></div></div>
-        <div class="col-6 col-lg-3"><div class="kpi"><div class="lbl"><i class="bi bi-truck me-1"></i>Por pagar (proveedores)</div><div class="val text-danger" id="kpiPorPagar">$0</div></div></div>
+        <div class="col-6 col-lg-3"><div class="kpi"><div class="lbl"><i class="bi bi-cash-stack me-1"></i>Cobrado hoy</div><div class="val text-success" id="kpiVentasHoy">$0</div><div class="lbl" id="kpiVentasHoySub"></div></div></div>
+        <div class="col-6 col-lg-3"><div class="kpi"><div class="lbl"><i class="bi bi-hourglass-split me-1"></i>Por cobrar hoy</div><div class="val" style="color:#fd7e14" id="kpiPorCobrarHoy">$0</div><div class="lbl" id="kpiPorCobrarHoySub"></div></div></div>
+        <div class="col-6 col-lg-3"><div class="kpi"><div class="lbl"><i class="bi bi-people me-1"></i>Por cobrar total</div><div class="val text-danger" id="kpiPorCobrar">$0</div><div class="lbl">saldo de clientes</div></div></div>
+        <div class="col-6 col-lg-3"><div class="kpi"><div class="lbl"><i class="bi bi-truck me-1"></i>Por pagar</div><div class="val text-danger" id="kpiPorPagar">$0</div><div class="lbl">a proveedores</div></div></div>
       </div>
 
       <div class="row g-3">
@@ -57,7 +57,7 @@
             <div class="bd">
               <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
-                  <thead class="table-light"><tr><th>Personal</th><th class="text-end">Ventas</th><th class="text-end">Unid.</th><th class="text-end">Total</th></tr></thead>
+                  <thead class="table-light"><tr><th>Personal</th><th class="text-end">Vtas</th><th class="text-end">Unid.</th><th class="text-end text-success">Cobrado</th><th class="text-end" style="color:#fd7e14">Por cobrar</th></tr></thead>
                   <tbody id="tbodyPersonal"></tbody>
                 </table>
               </div>
