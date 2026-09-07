@@ -28,5 +28,13 @@
   },
 
   // Logs en el dashboard (Workers → cdpedidos → Logs / Observability).
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cdpedidos-db",
+      "database_id": "d3147562-511e-403f-962b-4b68233e1f62"   // <- el que te dio el paso 3 o el panel
+    }
+  ]
 }
