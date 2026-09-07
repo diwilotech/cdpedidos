@@ -55,12 +55,6 @@
         <button type="button" class="btn btn-outline-dark" id="btn-proveedores" onclick="abrirModalProveedores()" title="Proveedores y cuentas por pagar">
           <i class="bi bi-truck me-1"></i> Proveedores
         </button>
-
-        <div class="vr mx-1 d-none d-md-block" style="height: 30px;"></div>
-
-        <button type="button" class="btn btn-outline-dark" id="btn-usuario-activo" onclick="abrirModalUsuarios()" title="Elegir quién está usando el sistema en este dispositivo">
-          <i class="bi bi-person-circle me-1"></i> <span id="usuarioActivoTexto">Sin usuario</span>
-        </button>
       </div>
 
       <div class="col-12 col-md d-flex justify-content-md-end">
@@ -208,9 +202,7 @@
 
           <div class="d-flex align-items-center gap-2 mb-3">
             <label class="small text-muted mb-0 fw-bold"><i class="bi bi-person-badge me-1"></i>Atendido por:</label>
-            <select id="selectMeseroCuenta" class="form-select form-select-sm" style="width: auto;" onchange="cambiarMeseroCuentaActiva(this.value)">
-              <!-- Opciones dinámicas -->
-            </select>
+            <span id="cuentaAtendidoPor" class="badge text-bg-secondary">—</span>
           </div>
 
           <!-- Contenido de la Cuenta Seleccionada -->
@@ -363,33 +355,8 @@
     </div>
   </div>
 
-  <!-- MODAL 4: USUARIOS / PERSONAL -->
-  <div class="modal fade" id="modalUsuarios" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header bg-dark text-white">
-          <h5 class="modal-title"><i class="bi bi-person-badge me-2"></i> Usuarios / Personal</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="alert alert-light border py-2 px-3 mb-3 small text-muted">
-            <i class="bi bi-info-circle me-1"></i> El usuario activo es con quien quedan registradas las ventas que se hagan desde este dispositivo. Tócalo para activarlo.
-          </div>
-
-          <div class="d-flex gap-2 mb-3">
-            <input type="text" id="nuevoUsuarioNombre" class="form-control form-control-sm" placeholder="Nombre del mesero/a" maxlength="40">
-            <button class="btn btn-sm btn-success fw-bold text-nowrap" onclick="agregarUsuario()">
-              <i class="bi bi-person-plus-fill me-1"></i> Agregar
-            </button>
-          </div>
-
-          <div id="listaUsuarios" style="max-height: 340px; overflow-y: auto;">
-            <!-- Filas de usuarios dinámicas -->
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- (El antiguo modal "Usuarios / Personal" se eliminó: el acceso lo maneja
+       el login único y el admin gestiona al personal desde "Personal · Accesos".) -->
 
   <!-- MODAL 5: REPORTE DE VENTAS -->
   <div class="modal fade" id="modalVentas" tabindex="-1" aria-hidden="true">

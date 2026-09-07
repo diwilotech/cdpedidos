@@ -2,7 +2,7 @@
 
 Sistema para **restaurantes, bares y negocios de mostrador** con:
 
-- **Acceso multiusuario** — login por correo + PIN. Rol **admin** y rol **personal**. El admin agrega al personal por correo y cada uno se auto-registra con un link de invitación.
+- **Acceso multiusuario** — un **único login** por correo + PIN para todos (admin y personal). El admin agrega al personal por correo y cada uno se auto-registra con un link de invitación. Todo lo que hace cada persona (ventas, inventario, fiados, proveedores, mesas) queda **registrado a su nombre**; el operador de cada sesión es quien inició sesión (no hay lista de usuarios "por dispositivo").
 - **Ventas** — plano interactivo de mesas/zonas por pisos, cuentas y comandas por mesa, liquidación y reporte por usuario.
 - **Inventario** — stock por producto, baja automática al vender, reposición y **historial de entradas/salidas**.
 - **Fiados a clientes** — cuentas por cobrar: cargos, abonos, saldo por cliente y "cargar una cuenta directo al fiado".
@@ -57,7 +57,8 @@ cdpedidos/
 │       │   └── repositories.js  Única capa que toca window.storage
 │       ├── modules/
 │       │   ├── plano.js  cuentas.js  catalogo.js  inventario.js
-│       │   ├── usuarios.js  ventas.js  clientes-fiados.js  proveedores-cxp.js
+│       │   ├── ventas.js  clientes-fiados.js  proveedores-cxp.js
+│       │   ├── usuarios.js           Operador actual = quien inició sesión (helpers)
 │       │   └── personal-accesos.js   Gestión de accesos del personal (solo admin)
 │       └── app.js              Define window.__cdpArrancar (NO arranca solo)
 ├── src/worker.js               Worker: /api/auth, /api/personal, /api/estado + assets

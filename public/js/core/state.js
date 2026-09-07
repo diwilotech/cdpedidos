@@ -33,13 +33,9 @@ let categoriaInventarioSeleccionada = "cat-all";
 // (además de los de ejemplo). Se guardan aparte para persistirlos.
 let productosPersonalizados = [];
 
-// --- USUARIOS (meseros/personal) ---
-// Lista de usuarios compartida (todo el personal ve la misma lista).
-// El "usuario activo" es una preferencia LOCAL de este dispositivo/
-// navegador (cada terminal puede tener a alguien distinto operando).
-let usuariosData = [];
-let contadorUsuarios = 0;
-let usuarioActivoId = null;
+// --- USUARIO EN SESIÓN ---
+// No hay lista local de usuarios: el operador es quien inició sesión
+// (window.__CDP_USER__, lo fija js/core/auth-gate.js). Ver js/modules/usuarios.js.
 
 // --- VENTAS (historial de cuentas liquidadas) ---
 let ventasData = [];
@@ -71,7 +67,6 @@ let modoEdicion = false;
 const modalCuentasBS = new bootstrap.Modal(document.getElementById('modalCuentas'));
 const modalCatalogoBS = new bootstrap.Modal(document.getElementById('modalCatalogoProductos'));
 const modalInventarioBS = new bootstrap.Modal(document.getElementById('modalInventario'));
-const modalUsuariosBS = new bootstrap.Modal(document.getElementById('modalUsuarios'));
 const modalVentasBS = new bootstrap.Modal(document.getElementById('modalVentas'));
 const modalMovimientosBS = new bootstrap.Modal(document.getElementById('modalMovimientos'));
 const toastNotificacionBS = new bootstrap.Toast(document.getElementById('toastNotificacion'), { delay: 2000 });

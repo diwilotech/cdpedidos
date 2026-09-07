@@ -24,8 +24,6 @@ const APP_CONFIG = {
 const STORAGE_KEY = 'plano-restaurante-estado-v3';
 const STORAGE_KEY_INVENTARIO = 'plano-restaurante-inventario-v1';
 const STORAGE_KEY_PRODUCTOS = 'plano-restaurante-productos-v1';
-const STORAGE_KEY_USUARIOS = 'plano-restaurante-usuarios-v1';
-const STORAGE_KEY_USUARIO_ACTIVO = 'plano-restaurante-usuario-activo-v1';
 const STORAGE_KEY_VENTAS = 'plano-restaurante-ventas-v1';
 const STORAGE_KEY_MOVIMIENTOS = 'plano-restaurante-movimientos-v1';
 /* Nuevos dominios */

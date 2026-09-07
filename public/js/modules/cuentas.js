@@ -1,9 +1,9 @@
 /* ============================================================================
    js/modules/cuentas.js — Gestión de cuentas / comandas por mesa
    ----------------------------------------------------------------------------
-   Modal de cuentas: pestañas por cuenta, mesero asignado, tabla de
-   productos consumidos, control de cantidades (con impacto en inventario)
-   y liquidación de la cuenta (que registra la venta).
+   Modal de cuentas: pestañas por cuenta, operador (quien la abrió), tabla
+   de productos consumidos, control de cantidades (con impacto en inventario)
+   y liquidación de la cuenta (que registra la venta a nombre del operador).
    ========================================================================== */
 
 function abrirModalCuentas(mesaId, cuentaIdxTarget = 0) {
@@ -23,8 +23,7 @@ function abrirModalCuentas(mesaId, cuentaIdxTarget = 0) {
       idCuenta: Date.now(),
       nombreCuenta: 'Cuenta #1',
       productos: [],
-      usuarioId: usuarioActivoId,
-      usuarioNombre: obtenerNombreUsuarioActivo()
+      usuarioNombre: obtenerNombreUsuarioActivo()   // queda a nombre de quien la abre
     });
     actualizarBadgeMesa(mesaId);
     actualizarSidebar();
@@ -33,7 +32,7 @@ function abrirModalCuentas(mesaId, cuentaIdxTarget = 0) {
   cuentaActivaIndex = cuentaIdxTarget < mesasData[mesaId].length ? cuentaIdxTarget : 0;
 
   renderModalTabs();
-  renderSelectMesero();
+  renderAtendidoPor();
   renderModalContenidoCuenta();
   modalCuentasBS.show();
 }
@@ -61,7 +60,7 @@ function renderModalTabs() {
 function seleccionarCuentaTab(idx) {
   cuentaActivaIndex = idx;
   renderModalTabs();
-  renderSelectMesero();
+  renderAtendidoPor();
   renderModalContenidoCuenta();
 }
 
@@ -75,8 +74,7 @@ function crearNuevaCuentaEnModal() {
       idCuenta: Date.now(),
       nombreCuenta: nombre,
       productos: [],
-      usuarioId: usuarioActivoId,
-      usuarioNombre: obtenerNombreUsuarioActivo()
+      usuarioNombre: obtenerNombreUsuarioActivo()   // queda a nombre de quien la abre
     });
 
     cuentaActivaIndex = cuentas.length - 1;
@@ -84,37 +82,18 @@ function crearNuevaCuentaEnModal() {
     actualizarBadgeMesa(mesaActivaId);
     actualizarSidebar();
     renderModalTabs();
-    renderSelectMesero();
+    renderAtendidoPor();
     renderModalContenidoCuenta();
   });
 }
 
-// Llena el <select> de "Atendido por" y deja seleccionado el usuario
-// asignado a la cuenta activa (o "Sin asignar").
-function renderSelectMesero() {
-  const sel = document.getElementById('selectMeseroCuenta');
-  if (!sel) return;
+// Muestra (solo lectura) a nombre de quién quedó la cuenta activa. Se asigna
+// sola a quien inicia sesión; ya no hay selector de mesero.
+function renderAtendidoPor() {
+  const el = document.getElementById('cuentaAtendidoPor');
+  if (!el) return;
   const cuenta = mesasData[mesaActivaId] ? mesasData[mesaActivaId][cuentaActivaIndex] : null;
-
-  const opciones = ['<option value="">Sin asignar</option>']
-    .concat(usuariosData.map(u => `<option value="${u.id}">${u.nombre}</option>`));
-  sel.innerHTML = opciones.join('');
-  sel.value = (cuenta && cuenta.usuarioId) ? String(cuenta.usuarioId) : '';
-}
-
-function cambiarMeseroCuentaActiva(valor) {
-  const cuenta = mesasData[mesaActivaId] ? mesasData[mesaActivaId][cuentaActivaIndex] : null;
-  if (!cuenta) return;
-
-  if (!valor) {
-    cuenta.usuarioId = null;
-    cuenta.usuarioNombre = null;
-  } else {
-    const usuario = usuariosData.find(u => u.id === Number(valor));
-    cuenta.usuarioId = usuario ? usuario.id : null;
-    cuenta.usuarioNombre = usuario ? usuario.nombre : null;
-  }
-  guardarEstado();
+  el.textContent = (cuenta && cuenta.usuarioNombre) || obtenerNombreUsuarioActivo();
 }
 
 function renombrarCuentaActiva() {
@@ -236,7 +215,7 @@ function cerrarCuentaActual() {
       modalCuentasBS.hide();
     } else {
       renderModalTabs();
-      renderSelectMesero();
+      renderAtendidoPor();
       renderModalContenidoCuenta();
     }
   });

@@ -35,22 +35,8 @@ window.__cdpArrancar = async function arrancarApp() {
     });
   }
 
-  // 1.c) Usuarios (personal), usuario activo de este dispositivo, ventas y
-  // movimientos de inventario.
-  const usuariosGuardados = await cargarUsuariosGuardados();
-  if (usuariosGuardados && Array.isArray(usuariosGuardados.usuarios)) {
-    usuariosData = usuariosGuardados.usuarios;
-    if (typeof usuariosGuardados.contadorUsuarios === 'number') {
-      contadorUsuarios = usuariosGuardados.contadorUsuarios;
-    }
-  }
-
-  const usuarioActivoGuardado = await cargarUsuarioActivoGuardado();
-  if (usuarioActivoGuardado && usuariosData.find(u => u.id === usuarioActivoGuardado)) {
-    usuarioActivoId = usuarioActivoGuardado;
-  }
-  actualizarIndicadorUsuarioActivo();
-
+  // 1.c) Ventas y movimientos de inventario.
+  // (El operador ya no se carga acá: es quien inició sesión, ver auth-gate.js.)
   const ventasGuardadas = await cargarVentasGuardadas();
   if (Array.isArray(ventasGuardadas)) {
     ventasData = ventasGuardadas;

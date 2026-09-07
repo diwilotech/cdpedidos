@@ -120,54 +120,8 @@ async function cargarProductosPersonalizadosGuardados() {
   return null;
 }
 
-/* ---------------------------------------------------------------------------
-   USUARIOS / PERSONAL — dato COMPARTIDO
-   --------------------------------------------------------------------------- */
-let guardarUsuariosTimeout = null;
-
-function guardarUsuarios() {
-  clearTimeout(guardarUsuariosTimeout);
-  guardarUsuariosTimeout = setTimeout(async () => {
-    try {
-      const payload = { usuarios: usuariosData, contadorUsuarios };
-      await window.storage.set(STORAGE_KEY_USUARIOS, JSON.stringify(payload), true);
-    } catch (e) {
-      console.error('No se pudo guardar los usuarios:', e);
-    }
-  }, 350);
-}
-
-async function cargarUsuariosGuardados() {
-  try {
-    const resultado = await window.storage.get(STORAGE_KEY_USUARIOS, true);
-    if (resultado && resultado.value) {
-      return JSON.parse(resultado.value);
-    }
-  } catch (e) {
-    // Primera vez o error de lectura.
-  }
-  return null;
-}
-
-/* ---------------------------------------------------------------------------
-   USUARIO ACTIVO — preferencia LOCAL de este dispositivo
-   --------------------------------------------------------------------------- */
-function guardarUsuarioActivo() {
-  window.storage.set(STORAGE_KEY_USUARIO_ACTIVO, JSON.stringify(usuarioActivoId), false)
-    .catch(e => console.error('No se pudo guardar el usuario activo:', e));
-}
-
-async function cargarUsuarioActivoGuardado() {
-  try {
-    const resultado = await window.storage.get(STORAGE_KEY_USUARIO_ACTIVO, false);
-    if (resultado && resultado.value !== undefined) {
-      return JSON.parse(resultado.value);
-    }
-  } catch (e) {
-    // Todavía no hay usuario activo guardado en este dispositivo.
-  }
-  return null;
-}
+/* Los "usuarios" ya no son un dato de la app: el acceso lo maneja el Worker
+   (tablas users/sessions en D1) y el operador es quien inició sesión. */
 
 /* ---------------------------------------------------------------------------
    VENTAS (cuentas liquidadas) — dato COMPARTIDO

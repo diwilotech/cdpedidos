@@ -246,7 +246,7 @@ function confirmarCargoDesdeSeleccion(clienteId) {
   actualizarBadgeMesa(mesaId);
   actualizarSidebar();
   if (cuentas.length === 0) modalCuentasBS.hide();
-  else { renderModalTabs(); renderSelectMesero(); renderModalContenidoCuenta(); }
+  else { renderModalTabs(); renderAtendidoPor(); renderModalContenidoCuenta(); }
 
   fiadoModoSeleccion = null;
   renderListaClientes();
