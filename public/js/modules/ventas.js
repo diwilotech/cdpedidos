@@ -75,25 +75,47 @@ function abrirModalVentas() {
   modalVentasBS.show();
 }
 
-// Solo MIS números.
+// Solo MIS números: 3 tarjetas — vendido hoy (efectivo), cuentas por
+// cobrar (ventas a crédito) y mesas/comandas mías todavía abiertas.
 function renderResumenVentasPorUsuario() {
   const cont = document.getElementById('resumenVentasPorUsuario');
   const mio = obtenerNombreUsuarioActivo();
   const mias = ventasData.filter(v => (v.usuarioNombre || 'Sin asignar') === mio);
-  const hoy = mias.filter(v => esMismoDiaVenta(v.fecha));
-  const totalHoy = hoy.reduce((s, v) => s + v.total, 0);
-  const totalTodo = mias.reduce((s, v) => s + v.total, 0);
+
+  // 1) Vendido hoy = ventas de hoy cobradas (sin cliente asociado)
+  const hoyCobrado = mias.filter(v => esMismoDiaVenta(v.fecha) && !v.clienteId);
+  const totalHoy = hoyCobrado.reduce((s, v) => s + v.total, 0);
+
+  // 2) Cuentas por cobrar = mis ventas asociadas a un cliente
+  const aCredito = mias.filter(v => v.clienteId);
+  const totalCredito = aCredito.reduce((s, v) => s + v.total, 0);
+
+  // 3) Abiertos = mis comandas sin liquidar y su total pendiente
+  let comandasAbiertas = 0, pendiente = 0;
+  Object.values(mesasData).forEach(cuentas => {
+    (cuentas || []).forEach(c => {
+      if ((c.usuarioNombre || 'Sin asignar') === mio && (c.productos || []).length) {
+        comandasAbiertas++;
+        pendiente += c.productos.reduce((s, p) => s + p.cant * p.precio, 0);
+      }
+    });
+  });
 
   cont.innerHTML = `
     <div class="border rounded-3 p-2 px-3 bg-light">
-      <div class="small text-muted"><i class="bi bi-person-fill me-1"></i>${mio} · hoy</div>
+      <div class="small text-muted"><i class="bi bi-cash-stack me-1"></i>Vendido hoy</div>
       <div class="fw-bold text-success fs-5">${formatMoney(totalHoy)}</div>
-      <div class="small text-muted">${hoy.length} ${hoy.length === 1 ? 'venta' : 'ventas'}</div>
+      <div class="small text-muted">${hoyCobrado.length} ${hoyCobrado.length === 1 ? 'venta' : 'ventas'}</div>
     </div>
     <div class="border rounded-3 p-2 px-3 bg-light">
-      <div class="small text-muted">Acumulado</div>
-      <div class="fw-bold text-secondary fs-6">${formatMoney(totalTodo)}</div>
-      <div class="small text-muted">${mias.length} ${mias.length === 1 ? 'venta' : 'ventas'}</div>
+      <div class="small text-muted"><i class="bi bi-hourglass-split me-1"></i>Cuentas por cobrar</div>
+      <div class="fw-bold fs-6" style="color:#fd7e14">${formatMoney(totalCredito)}</div>
+      <div class="small text-muted">${aCredito.length} ${aCredito.length === 1 ? 'venta a crédito' : 'ventas a crédito'}</div>
+    </div>
+    <div class="border rounded-3 p-2 px-3 bg-light">
+      <div class="small text-muted"><i class="bi bi-receipt-cutoff me-1"></i>Abiertos</div>
+      <div class="fw-bold fs-5 text-primary">${comandasAbiertas}</div>
+      <div class="small text-muted">${formatMoney(pendiente)} sin liquidar</div>
     </div>`;
 }
 
