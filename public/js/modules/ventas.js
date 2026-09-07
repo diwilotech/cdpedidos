@@ -40,6 +40,13 @@ function registrarVenta(mesaId, cuenta) {
     })
   };
 
+  // Recién ACÁ se descuenta el inventario: un movimiento por producto con
+  // su cantidad total (no uno por unidad al agregarlo a la comanda).
+  venta.productos.forEach(p => {
+    if (p.productId) ajustarStock(p.productId, -p.cant, 'Venta · ' + mesaNombre);
+  });
+  refrescarVistasInventarioSiEstanAbiertas();
+
   ventasData.push(venta);
   if (ventasData.length > MAX_VENTAS_GUARDADAS) {
     ventasData.splice(0, ventasData.length - MAX_VENTAS_GUARDADAS);

@@ -61,9 +61,9 @@ function renderGridProductos() {
       ? `<span class="badge bg-success position-absolute top-0 end-0 m-1 shadow-sm">En cuenta: x${enCuenta.cant}</span>`
       : '';
 
-    const stock = obtenerStock(prod.id);
-    const agotado = stock <= 0;
-    const stockBadgeClase = agotado ? 'bg-danger' : stock <= 5 ? 'bg-warning text-dark' : 'bg-light text-secondary border';
+    const disp = disponibleParaAgregar(prod.id);   // stock físico − lo reservado en comandas abiertas
+    const agotado = disp <= 0;
+    const stockBadgeClase = agotado ? 'bg-danger' : disp <= 5 ? 'bg-warning text-dark' : 'bg-light text-secondary border';
 
     col.innerHTML = `
       <div onclick="${agotado ? '' : `agregarProductoDesdeCatalogo('${prod.id}')`}" class="card h-100 p-2 border product-card bg-light position-relative ${enCuenta ? 'border-success' : ''} ${agotado ? 'opacity-50' : ''}" style="${agotado ? 'cursor:not-allowed;' : ''}">
@@ -72,7 +72,7 @@ function renderGridProductos() {
         <div class="fw-bold text-truncate text-dark" style="font-size: 0.9rem;">${prod.name}</div>
         <div class="d-flex justify-content-between align-items-center mt-2">
           <span class="text-primary fw-bold">${formatMoney(prod.price)}</span>
-          <span class="badge ${stockBadgeClase}">${agotado ? 'Agotado' : 'Stock: ' + stock}</span>
+          <span class="badge ${stockBadgeClase}">${agotado ? 'Sin disponible' : 'Disp: ' + disp}</span>
         </div>
         ${agotado ? '' : '<div class="text-end mt-1"><span class="btn btn-sm btn-outline-primary py-0 px-2 fw-bold">+ Añadir</span></div>'}
       </div>
@@ -87,7 +87,10 @@ function agregarProductoDesdeCatalogo(productId) {
   const prodObj = dbJSON.products.find(p => p.id === productId);
   if (!prodObj) return;
 
-  if (obtenerStock(productId) <= 0) {
+  // El stock NO se descuenta acá: se reserva en la comanda y se descuenta
+  // TODO junto al liquidar (ver registrarVenta). Solo se controla que no se
+  // reserve más de lo que hay físicamente.
+  if (disponibleParaAgregar(productId) <= 0) {
     notificarSinStock(prodObj.name);
     return;
   }
@@ -108,8 +111,6 @@ function agregarProductoDesdeCatalogo(productId) {
     });
     cantidadActual = 1;
   }
-
-  ajustarStock(productId, -1, 'Venta');
 
   notificarProductoAgregado(prodObj.name, cantidadActual);
 

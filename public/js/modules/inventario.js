@@ -11,6 +11,24 @@ function obtenerStock(productId) {
   return inventario[productId] !== undefined ? inventario[productId] : 0;
 }
 
+// Unidades de un producto que están en comandas ABIERTAS (todavía no
+// liquidadas): reservan stock pero aún no lo descontaron.
+function unidadesReservadas(productId) {
+  let n = 0;
+  Object.values(mesasData).forEach(cuentas => {
+    (cuentas || []).forEach(c => (c.productos || []).forEach(p => {
+      if (p.productId === productId) n += p.cant;
+    }));
+  });
+  return n;
+}
+
+// Lo que realmente se puede seguir agregando a una comanda:
+// stock físico − lo ya reservado en comandas abiertas.
+function disponibleParaAgregar(productId) {
+  return obtenerStock(productId) - unidadesReservadas(productId);
+}
+
 function ajustarStock(productId, delta, motivo = 'Ajuste manual') {
   const anterior = obtenerStock(productId);
   const nuevo = Math.max(0, anterior + delta);

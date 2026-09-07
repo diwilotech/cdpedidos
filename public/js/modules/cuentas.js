@@ -123,8 +123,8 @@ function renderModalContenidoCuenta() {
       const subtotal = p.cant * p.precio;
       totalGlobal += subtotal;
 
-      const stockRestante = obtenerStock(p.productId);
-      const stockBadgeClase = stockRestante === 0 ? 'bg-danger' : stockRestante <= 5 ? 'bg-warning text-dark' : 'bg-secondary';
+      const stockRestante = disponibleParaAgregar(p.productId);  // lo que aún se puede sumar
+      const stockBadgeClase = stockRestante <= 0 ? 'bg-danger' : stockRestante <= 5 ? 'bg-warning text-dark' : 'bg-secondary';
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -139,7 +139,7 @@ function renderModalContenidoCuenta() {
         <td class="text-end">${formatMoney(p.precio)}</td>
         <td class="text-end fw-bold">${formatMoney(subtotal)}</td>
         <td class="text-center">
-          <span class="badge stock-badge-min ${stockBadgeClase}" title="Unidades disponibles en inventario">${stockRestante} und.</span>
+          <span class="badge stock-badge-min ${stockBadgeClase}" title="Unidades que todavía se pueden agregar (stock físico − reservado en comandas)">${stockRestante} disp.</span>
         </td>
         <td class="text-center">
           <button class="btn btn-sm btn-link text-danger p-0" onclick="eliminarProducto(${idx})" title="Eliminar Producto">
@@ -158,16 +158,14 @@ function modificarCantidadProducto(prodIndex, delta) {
   const cuenta = mesasData[mesaActivaId][cuentaActivaIndex];
   const prod = cuenta.productos[prodIndex];
 
-  // Si se sube la cantidad se necesita 1 unidad más del inventario;
-  // si ya no queda stock, no se permite subir.
-  if (delta > 0 && obtenerStock(prod.productId) <= 0) {
+  // El stock recién se descuenta al liquidar: acá solo se ajusta la comanda
+  // y se controla no reservar más de lo que hay físicamente.
+  if (delta > 0 && disponibleParaAgregar(prod.productId) <= 0) {
     notificarSinStock(prod.nombre);
     return;
   }
 
-  ajustarStock(prod.productId, -delta, delta > 0 ? 'Venta' : 'Devolución (se bajó cantidad en cuenta)');
   prod.cant += delta;
-
   if (prod.cant <= 0) {
     cuenta.productos.splice(prodIndex, 1);
   }
@@ -181,11 +179,8 @@ function modificarCantidadProducto(prodIndex, delta) {
 
 function eliminarProducto(prodIndex) {
   const cuenta = mesasData[mesaActivaId][cuentaActivaIndex];
-  const prod = cuenta.productos[prodIndex];
-
-  // Al quitar el producto de la cuenta, todas sus unidades vuelven al inventario.
-  ajustarStock(prod.productId, prod.cant, 'Devolución (producto quitado de cuenta)');
-
+  // El producto todavía no descontó stock (se descuenta al liquidar):
+  // basta con quitarlo de la comanda.
   cuenta.productos.splice(prodIndex, 1);
 
   actualizarBadgeMesa(mesaActivaId);
