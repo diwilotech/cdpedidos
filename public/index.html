@@ -304,52 +304,10 @@
             <i class="bi bi-info-circle me-1"></i> El stock baja/sube solo con las ventas. Para corregirlo o cargar mercadería nueva: escribí el <strong>total</strong> que debe quedar (o usá − / +), mirá la diferencia y pulsá <strong>"Guardar total"</strong>.
           </div>
 
-          <div class="d-flex justify-content-between align-items-center gap-2 mb-2 flex-wrap">
-            <ul class="nav nav-pills gap-2 pb-2 flex-nowrap overflow-x-auto flex-grow-1 mb-0" id="categoriasInventarioTabs">
-              <!-- Categorías dinámicas -->
-            </ul>
-            <button class="btn btn-sm btn-success fw-bold flex-shrink-0" onclick="toggleFormNuevoProducto()">
-              <i class="bi bi-plus-circle me-1"></i> Nuevo Producto
-            </button>
-          </div>
-
-          <div id="formNuevoProducto" class="border rounded-3 p-3 mb-3 bg-light" style="display:none;">
-            <div class="row g-2 align-items-end">
-              <div class="col-12 col-md-4">
-                <label class="form-label small fw-bold mb-1">Nombre</label>
-                <input type="text" id="nuevoProductoNombre" class="form-control form-control-sm" placeholder="Ej. Limonada de Coco" maxlength="60">
-              </div>
-              <div class="col-6 col-md-3">
-                <label class="form-label small fw-bold mb-1">Categoría</label>
-                <select id="nuevoProductoCategoria" class="form-select form-select-sm"></select>
-              </div>
-              <div class="col-6 col-md-2">
-                <label class="form-label small fw-bold mb-1">Código</label>
-                <input type="text" id="nuevoProductoCodigo" class="form-control form-control-sm" placeholder="Opcional" maxlength="15">
-              </div>
-              <div class="col-6 col-md-3">
-                <label class="form-label small fw-bold mb-1">Costo (compra)</label>
-                <input type="number" id="nuevoProductoCosto" class="form-control form-control-sm" min="0" step="500" placeholder="Ej. 9000" oninput="calcularGananciaNuevoProducto()">
-              </div>
-              <div class="col-6 col-md-3">
-                <label class="form-label small fw-bold mb-1">Precio venta</label>
-                <input type="number" id="nuevoProductoPrecio" class="form-control form-control-sm" min="0" step="500" placeholder="Ej. 15000" oninput="calcularGananciaNuevoProducto()">
-              </div>
-              <div class="col-6 col-md-3">
-                <label class="form-label small fw-bold mb-1">Stock inicial</label>
-                <input type="number" id="nuevoProductoStock" class="form-control form-control-sm" min="0" step="1" placeholder="0">
-              </div>
-              <div class="col-6 col-md-3 d-flex align-items-end">
-                <div class="small text-muted" id="nuevoProductoGanancia">Ganancia: —</div>
-              </div>
-            </div>
-            <div class="d-flex justify-content-end gap-2 mt-3">
-              <button class="btn btn-sm btn-outline-secondary" onclick="toggleFormNuevoProducto(false)">Cancelar</button>
-              <button class="btn btn-sm btn-success fw-bold" onclick="guardarNuevoProducto()">
-                <i class="bi bi-check-lg me-1"></i> Guardar Producto
-              </button>
-            </div>
-          </div>
+          <ul class="nav nav-pills gap-2 pb-2 mb-2 flex-nowrap overflow-x-auto" id="categoriasInventarioTabs">
+            <!-- Categorías dinámicas -->
+          </ul>
+          <div class="small text-muted mb-2"><i class="bi bi-info-circle me-1"></i> Crear productos y precios se hace en el <strong>Dashboard</strong> (solo el administrador).</div>
 
           <div id="listaInventario" style="max-height: 380px; overflow-y: auto;">
             <!-- Filas de inventario dinámicas -->

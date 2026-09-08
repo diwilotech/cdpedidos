@@ -18,6 +18,11 @@
     .tabla-scroll { max-height: 380px; overflow: auto; }
     #dashToast { position: fixed; right: 16px; bottom: 16px; z-index: 3000; min-width: 220px; }
     canvas { max-height: 260px; }
+    .dash-overlay { position: fixed; inset: 0; z-index: 2500; background: rgba(15,23,42,.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .dash-overlay[hidden] { display: none; }
+    .dash-modal { background: #fff; border-radius: 14px; max-width: 520px; width: 100%; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; }
+    .dash-modal-hd { padding: 12px 16px; border-bottom: 1px solid #eef0f2; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .dash-modal-bd { padding: 14px 16px; overflow: auto; }
     /* El personal (no admin) solo ve sus movimientos: se oculta el resto. */
     body:not([data-rol="admin"]) .solo-admin { display: none !important; }
     body[data-rol="admin"] .solo-personal { display: none !important; }
@@ -58,14 +63,17 @@
 
       <div class="row g-3">
 
-        <!-- Ventas del día por personal -->
+        <!-- Ventas por personal (del día elegido) -->
         <div class="col-12 col-xl-6 solo-admin">
           <div class="card-dash h-100">
-            <div class="hd"><i class="bi bi-person-badge me-2"></i>Ventas de hoy por personal</div>
+            <div class="hd d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <span><i class="bi bi-person-badge me-2"></i>Ventas por personal</span>
+              <select id="filtroDiaPersonal" class="form-select form-select-sm" style="width:auto" onchange="filtrarDiaPersonal(this.value)"></select>
+            </div>
             <div class="bd">
               <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
-                  <thead class="table-light"><tr><th>Personal</th><th class="text-end">Vtas</th><th class="text-end">Unid.</th><th class="text-end text-success">Cobrado</th><th class="text-end" style="color:#fd7e14">Por cobrar</th></tr></thead>
+                  <thead class="table-light"><tr><th>Personal</th><th class="text-end">Vtas</th><th class="text-end">Unid.</th><th class="text-end text-success">Cobrado</th><th class="text-end" style="color:#fd7e14">Por cobrar</th><th></th></tr></thead>
                   <tbody id="tbodyPersonal"></tbody>
                 </table>
               </div>
@@ -201,6 +209,20 @@
   </div>
 
   <div id="dashToast" class="toast align-items-center text-white border-0"><div class="d-flex"><div class="toast-body"></div></div></div>
+
+  <!-- Modal: ventas de una persona en el día elegido -->
+  <div id="modalVentasDia" class="dash-overlay" hidden onclick="if(event.target===this) cerrarVentasDia()">
+    <div class="dash-modal">
+      <div class="dash-modal-hd">
+        <div>
+          <div class="fw-bold" id="ventasDiaTitulo">—</div>
+          <div class="small text-muted" id="ventasDiaResumen"></div>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" onclick="cerrarVentasDia()"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="dash-modal-bd" id="ventasDiaBody"></div>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="js/core/config.js"></script>

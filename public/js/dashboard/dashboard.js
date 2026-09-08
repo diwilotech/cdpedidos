@@ -103,8 +103,11 @@ window.__dashInit = async function (user) {
   // El resto del panel es solo para el administrador (además queda oculto
   // por CSS con body[data-rol]).
   if (D.esAdmin) {
+    const dd = ultimos7Dias();
+    D.diaPersonal = dd[dd.length - 1]; // por defecto: hoy
     poblarSelectCatNuevo();
     renderKPIs();
+    renderSelectDiaPersonal();
     renderVentasPorPersonal();
     renderFiltroCats();
     renderGestionCats();
@@ -181,11 +184,37 @@ function renderKPIs() {
   set('kpiPorPagar', formatMoney(porPagar));
 }
 
-/* ---------- ventas del día por personal ---------- */
+/* ---------- ventas por personal (del día elegido) ---------- */
+function diaLabel(d) {
+  const dd = ultimos7Dias();
+  return d && d.ini === dd[dd.length - 1].ini ? 'Hoy' : (d ? d.label : '');
+}
+function ventasDelDia(dia) {
+  if (!dia) return [];
+  return D.ventas.filter(v => {
+    const t = new Date(v.fecha).getTime();
+    return t >= dia.ini && t < dia.fin;
+  });
+}
+function renderSelectDiaPersonal() {
+  const sel = document.getElementById('filtroDiaPersonal');
+  if (!sel) return;
+  const dd = ultimos7Dias();
+  if (!D.diaPersonal) D.diaPersonal = dd[dd.length - 1];
+  sel.innerHTML = dd.map((d, i) =>
+    `<option value="${d.ini}" ${d.ini === D.diaPersonal.ini ? 'selected' : ''}>${i === dd.length - 1 ? 'Hoy' : d.label}</option>`
+  ).join('');
+}
+function filtrarDiaPersonal(v) {
+  const dd = ultimos7Dias();
+  D.diaPersonal = dd.find(d => String(d.ini) === String(v)) || dd[dd.length - 1];
+  renderVentasPorPersonal();
+}
+
 function renderVentasPorPersonal() {
-  const hoy = D.ventas.filter(v => esHoy(v.fecha));
+  const delDia = ventasDelDia(D.diaPersonal);
   const porPersona = {};
-  hoy.forEach(v => {
+  delDia.forEach(v => {
     const n = v.usuarioNombre || 'Sin asignar';
     if (!porPersona[n]) porPersona[n] = { cobrado: 0, porCobrar: 0, ventas: 0, unidades: 0 };
     porPersona[n][esPorCobrar(v) ? 'porCobrar' : 'cobrado'] += v.total || 0;
@@ -196,7 +225,7 @@ function renderVentasPorPersonal() {
     .sort((a, b) => (porPersona[b].cobrado + porPersona[b].porCobrar) - (porPersona[a].cobrado + porPersona[a].porCobrar));
   const tb = document.getElementById('tbodyPersonal');
   tb.innerHTML = filas.length === 0
-    ? `<tr><td colspan="5" class="text-center text-muted py-3 small">Sin ventas hoy.</td></tr>`
+    ? `<tr><td colspan="6" class="text-center text-muted py-3 small">Sin ventas ${diaLabel(D.diaPersonal).toLowerCase()}.</td></tr>`
     : filas.map(n => `
       <tr>
         <td class="fw-bold">${n}</td>
@@ -204,7 +233,45 @@ function renderVentasPorPersonal() {
         <td class="text-end">${porPersona[n].unidades}</td>
         <td class="text-end fw-bold text-success">${formatMoney(porPersona[n].cobrado)}</td>
         <td class="text-end fw-bold" style="color:${COLOR_PORCOBRAR}">${porPersona[n].porCobrar ? formatMoney(porPersona[n].porCobrar) : '—'}</td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-primary py-0 px-2" onclick='abrirVentasDia(${JSON.stringify(n).replace(/'/g, "&#39;")})'>Ver</button></td>
       </tr>`).join('');
+}
+
+function cerrarVentasDia() {
+  const ov = document.getElementById('modalVentasDia');
+  if (ov) ov.hidden = true;
+}
+function abrirVentasDia(nombre) {
+  const dia = D.diaPersonal;
+  const vts = ventasDelDia(dia)
+    .filter(v => (v.usuarioNombre || 'Sin asignar') === nombre)
+    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+  const cob = vts.filter(v => !esPorCobrar(v)).reduce((s, v) => s + v.total, 0);
+  const pc = vts.filter(v => esPorCobrar(v)).reduce((s, v) => s + v.total, 0);
+
+  document.getElementById('ventasDiaTitulo').textContent = `${nombre} · ${diaLabel(dia)}`;
+  document.getElementById('ventasDiaResumen').innerHTML =
+    `${vts.length} ${vts.length === 1 ? 'venta' : 'ventas'} · cobrado <b class="text-success">${formatMoney(cob)}</b> · por cobrar <b style="color:${COLOR_PORCOBRAR}">${formatMoney(pc)}</b>`;
+
+  document.getElementById('ventasDiaBody').innerHTML = vts.length === 0
+    ? '<div class="text-muted small py-3 text-center">Sin ventas ese día.</div>'
+    : vts.map(v => {
+        const hora = new Date(v.fecha).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+        const prods = (v.productos || []).map(p =>
+          `<div class="d-flex justify-content-between small"><span>${p.cant}× ${p.nombre}</span><span>${formatMoney(p.cant * p.precio)}</span></div>`
+        ).join('');
+        return `
+          <div class="border rounded-3 p-2 mb-2">
+            <div class="d-flex justify-content-between align-items-center flex-wrap">
+              <div class="fw-bold">${v.mesaNombre} · ${v.cuentaNombre} <span class="text-muted fw-normal small">${hora}</span>
+                ${v.clienteNombre ? `<span class="badge text-bg-warning ms-1">${v.clienteNombre} · por cobrar</span>` : ''}</div>
+              <div class="fw-bold text-success">${formatMoney(v.total)}</div>
+            </div>
+            <div class="mt-1">${prods}</div>
+          </div>`;
+      }).join('');
+
+  document.getElementById('modalVentasDia').hidden = false;
 }
 
 /* ---------- movimientos de producto ---------- */

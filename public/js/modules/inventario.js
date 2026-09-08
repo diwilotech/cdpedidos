@@ -118,116 +118,14 @@ function renderListaMovimientos() {
   });
 }
 
-/* --- MODAL DE INVENTARIO --- */
+/* --- MODAL DE INVENTARIO ---
+   Acá el personal SOLO ajusta stock (contar / cargar mercadería / registrar
+   pérdida con "Guardar total") y ve sus movimientos. El catálogo (crear
+   productos, costo, precio de venta, % de ganancia) vive en el Dashboard. */
 function abrirModalInventario() {
-  toggleFormNuevoProducto(false);
   renderCategoriasInventarioTabs();
   renderListaInventario();
   modalInventarioBS.show();
-}
-
-function toggleFormNuevoProducto(forceShow) {
-  const form = document.getElementById('formNuevoProducto');
-  const mostrar = forceShow !== undefined ? forceShow : form.style.display === 'none';
-  form.style.display = mostrar ? 'block' : 'none';
-  if (mostrar) {
-    ['nuevoProductoNombre', 'nuevoProductoCodigo', 'nuevoProductoCosto', 'nuevoProductoPrecio', 'nuevoProductoStock']
-      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-    calcularGananciaNuevoProducto();
-    poblarSelectCategoriasNuevoProducto();
-    setTimeout(() => document.getElementById('nuevoProductoNombre').focus(), 100);
-  }
-}
-
-// % de ganancia sobre el costo:  (venta − costo) / costo · 100
-function gananciaPct(costo, venta) {
-  costo = Number(costo) || 0;
-  venta = Number(venta) || 0;
-  if (costo <= 0) return null;
-  return ((venta - costo) / costo) * 100;
-}
-function gananciaTexto(costo, venta) {
-  const g = gananciaPct(costo, venta);
-  if (g === null) return '<span class="text-muted">—</span>';
-  const cls = g < 0 ? 'text-danger' : g < 20 ? 'text-warning' : 'text-success';
-  return `<span class="${cls} fw-bold">${g.toFixed(0)}%</span>`;
-}
-function calcularGananciaNuevoProducto() {
-  const el = document.getElementById('nuevoProductoGanancia');
-  if (!el) return;
-  const c = parseFloat(document.getElementById('nuevoProductoCosto').value);
-  const v = parseFloat(document.getElementById('nuevoProductoPrecio').value);
-  const g = gananciaPct(c, v);
-  el.innerHTML = g === null
-    ? 'Ganancia: —'
-    : `Ganancia: <strong class="${g < 0 ? 'text-danger' : 'text-success'}">${g.toFixed(0)}%</strong> · ${formatMoney((Number(v) || 0) - (Number(c) || 0))} por unidad`;
-}
-
-function poblarSelectCategoriasNuevoProducto() {
-  const sel = document.getElementById('nuevoProductoCategoria');
-  sel.innerHTML = dbJSON.categories
-    .filter(c => c.id !== 'cat-all')
-    .map(c => `<option value="${c.id}">${c.name}</option>`)
-    .join('');
-}
-
-// Prefijos de código sugeridos por categoría, solo para autogenerar un
-// código cuando el usuario deja ese campo vacío al crear un producto.
-const PREFIJOS_CODIGO_POR_CATEGORIA = {
-  'cat-bebidas': 'BEB', 'cat-entradas': 'ENT', 'cat-fuertes': 'PF', 'cat-postres': 'POS'
-};
-
-function guardarNuevoProducto() {
-  const nombre = document.getElementById('nuevoProductoNombre').value.trim();
-  const categoryId = document.getElementById('nuevoProductoCategoria').value;
-  let codigo = document.getElementById('nuevoProductoCodigo').value.trim();
-  const costo = Math.max(0, parseFloat(document.getElementById('nuevoProductoCosto').value) || 0);
-  const precio = parseFloat(document.getElementById('nuevoProductoPrecio').value);
-  const stockInicial = parseInt(document.getElementById('nuevoProductoStock').value, 10);
-
-  if (!nombre) {
-    mostrarNotificacion('Ponle un nombre al producto.', 'danger', 'bi-exclamation-triangle-fill');
-    return;
-  }
-  if (isNaN(precio) || precio <= 0) {
-    mostrarNotificacion('Ingresa un precio válido.', 'danger', 'bi-exclamation-triangle-fill');
-    return;
-  }
-
-  if (!codigo) {
-    const prefijo = PREFIJOS_CODIGO_POR_CATEGORIA[categoryId] || 'PRD';
-    const numExistentes = dbJSON.products.filter(p => p.categoryId === categoryId).length + 1;
-    codigo = `${prefijo}-${String(numExistentes).padStart(2, '0')}`;
-  }
-
-  const nuevoProducto = {
-    id: 'custom-' + Date.now(),
-    categoryId,
-    name: nombre,
-    costo,
-    price: precio,
-    code: codigo,
-    stock: (!isNaN(stockInicial) && stockInicial > 0) ? stockInicial : 0
-  };
-
-  // productosPersonalizados y dbJSON.products son la MISMA lista (ver app.js):
-  // basta con agregar el producto una vez.
-  dbJSON.products.push(nuevoProducto);
-  inventario[nuevoProducto.id] = nuevoProducto.stock;
-  if (nuevoProducto.stock > 0) {
-    registrarMovimientoInventario(nuevoProducto.id, nuevoProducto.stock, 'Alta de producto');
-  }
-
-  guardarProductosPersonalizados();
-  guardarInventario();
-
-  toggleFormNuevoProducto(false);
-  categoriaInventarioSeleccionada = categoryId; // salta a la categoría del producto recién creado
-  renderCategoriasInventarioTabs();
-  renderListaInventario();
-  refrescarVistasInventarioSiEstanAbiertas();
-
-  mostrarNotificacion(`"${nombre}" se agregó al inventario`, 'success', 'bi-check-circle-fill');
 }
 
 function renderCategoriasInventarioTabs() {
@@ -280,7 +178,7 @@ function renderListaInventario() {
     row.innerHTML = `
       <div>
         <div class="fw-bold">${prod.name} ${esPersonalizado ? '<span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size:.65rem;">Nuevo</span>' : ''}</div>
-        <div class="small text-muted font-monospace">${prod.code} · compra ${formatMoney(prod.costo || 0)} · venta ${formatMoney(prod.price)} · gan. ${gananciaTexto(prod.costo, prod.price)}</div>
+        <div class="small text-muted font-monospace">${prod.code} · ${formatMoney(prod.price)}</div>
       </div>
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <span class="badge ${badgeClase}" title="Stock actual">${stock} und.</span>
