@@ -158,9 +158,16 @@ function registrarCargoFiado(clienteId) {
       mostrarNotificacion('Ingresa un monto válido.', 'danger', 'bi-exclamation-triangle-fill');
       return;
     }
-    registrarMovimientoFiado(clienteId, 'cargo', monto, 'Cargo manual');
-    renderListaClientes();
-    mostrarNotificacion('Cargo registrado', 'success', 'bi-cart-plus');
+    // Segundo paso: descripción. Se espera a que el primer diálogo termine de
+    // cerrarse antes de reabrirlo (mismo modal). Valor por defecto para que
+    // nunca quede vacío (pedirTexto ignora el vacío).
+    setTimeout(() => {
+      pedirTexto('Descripción del cargo (qué consumió):', 'Cargo manual', (desc) => {
+        registrarMovimientoFiado(clienteId, 'cargo', monto, desc.trim() || 'Cargo manual');
+        renderListaClientes();
+        mostrarNotificacion('Cargo registrado', 'success', 'bi-cart-plus');
+      });
+    }, 350);
   });
 }
 

@@ -23,6 +23,7 @@ const D = {
   filtroCat: 'cat-all',  // filtro activo de la tabla de catálogo
   filtroUsuario: 'todos',// filtro de usuario en la tabla de movimientos
   clientes: [],
+  contadorClientes: 0,
   fiados: [],
   proveedores: [],
   contadorProveedores: 0,
@@ -30,6 +31,7 @@ const D = {
 };
 let chartSemana = null;
 let chartCategoria = null;
+let chartGanancias = null;
 
 /* ---------- helpers de datos ---------- */
 async function leer(key) {
@@ -78,6 +80,7 @@ window.__dashInit = async function (user) {
   D.inventario = inv && typeof inv === 'object' ? inv : {};
   D.catalogo = (Array.isArray(cat) && cat.length) ? cat.map(p => ({ ...p })) : dbJSON.products.map(p => ({ ...p }));
   D.clientes = (cli && Array.isArray(cli.clientes)) ? cli.clientes : [];
+  D.contadorClientes = (cli && typeof cli.contadorClientes === 'number') ? cli.contadorClientes : D.clientes.length;
   D.fiados = Array.isArray(fdo) ? fdo : [];
   D.proveedores = (prov && Array.isArray(prov.proveedores)) ? prov.proveedores : [];
   D.contadorProveedores = (prov && typeof prov.contadorProveedores === 'number') ? prov.contadorProveedores : D.proveedores.length;
@@ -106,8 +109,10 @@ window.__dashInit = async function (user) {
     renderFiltroCats();
     renderGestionCats();
     renderCatalogo();
+    renderClientes();
     renderProveedores();
     renderGraficoSemana();
+    renderGraficoGanancias();
     renderGraficoCategoria();
   }
 };
@@ -485,6 +490,96 @@ function registrarMov(productId, productName, delta, motivo) {
   });
 }
 
+/* ---------- clientes / cuentas por cobrar ---------- */
+function saldoCli(id) {
+  return D.fiados.filter(m => m.clienteId === id)
+    .reduce((a, m) => a + (m.tipo === 'cargo' ? m.monto : -m.monto), 0);
+}
+async function guardarClientesD() {
+  await escribir(STORAGE_KEY_CLIENTES, { clientes: D.clientes, contadorClientes: D.contadorClientes });
+}
+async function guardarFiadosD() { await escribir(STORAGE_KEY_FIADOS, D.fiados); }
+
+function movFiado(clienteId, tipo, monto, concepto) {
+  D.fiados.push({ id: uid('fdo'), fecha: new Date().toISOString(), clienteId, tipo, monto: Math.abs(monto), concepto, ventaId: null, usuarioNombre: D.usuario ? D.usuario.nombre : 'admin' });
+}
+
+function extractoHtml(movs, tCargo, tAbono) {
+  if (!movs.length) return '<div class="small text-muted fst-italic py-1">Sin movimientos.</div>';
+  return movs.slice().reverse().map(m => {
+    const esCargo = m.tipo === tCargo;
+    return `<div class="d-flex justify-content-between align-items-center small border-top py-1">
+      <span>${esCargo ? '<i class="bi bi-arrow-down-circle text-danger me-1"></i>' : '<i class="bi bi-arrow-up-circle text-success me-1"></i>'}${m.concepto || (esCargo ? tCargo : tAbono)} <span class="text-muted">· ${formatFecha(m.fecha)}</span></span>
+      <span class="fw-bold ${esCargo ? 'text-danger' : 'text-success'}">${esCargo ? '+' : '−'}${formatMoney(m.monto)}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderClientes() {
+  const cont = document.getElementById('listaCli');
+  if (!cont) return;
+  document.getElementById('cliTotalPorCobrar').textContent = formatMoney(
+    D.clientes.reduce((s, c) => s + Math.max(0, saldoCli(c.id)), 0)
+  );
+  if (D.clientes.length === 0) { cont.innerHTML = '<div class="text-muted small py-2">Sin clientes todavía.</div>'; return; }
+  cont.innerHTML = [...D.clientes].sort((a, b) => saldoCli(b.id) - saldoCli(a.id)).map(c => {
+    const s = saldoCli(c.id);
+    const txt = s > 0 ? formatMoney(s) + ' por cobrar' : s < 0 ? formatMoney(-s) + ' a favor' : 'Al día';
+    return `
+      <div class="border rounded-3 p-2 mb-2">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <div class="fw-bold"><i class="bi bi-person-vcard me-1 text-primary"></i>${c.nombre}</div>
+            <div class="small ${s > 0 ? 'text-danger' : s < 0 ? 'text-success' : 'text-muted'} fw-bold">${txt}</div>
+          </div>
+          <div class="d-flex gap-1 flex-wrap">
+            <button class="btn btn-sm btn-outline-danger" onclick="cliCargo(${c.id})" title="Anotar consumo / cargo"><i class="bi bi-cart-plus"></i> Cargo</button>
+            <button class="btn btn-sm btn-outline-success" onclick="cliAbono(${c.id})" title="Registrar pago"><i class="bi bi-cash-coin"></i> Abono</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="cliDetalle(${c.id})" title="Ver detalle / cuentas"><i class="bi bi-clock-history"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="cliBorrar(${c.id})"><i class="bi bi-trash3"></i></button>
+          </div>
+        </div>
+        <div id="cliHist-${c.id}" class="mt-2 d-none">${extractoHtml(D.fiados.filter(m => m.clienteId === c.id), 'cargo', 'abono')}</div>
+      </div>`;
+  }).join('');
+}
+function cliDetalle(id) {
+  const el = document.getElementById('cliHist-' + id);
+  if (el) el.classList.toggle('d-none');
+}
+async function cliNuevo() {
+  const nombre = document.getElementById('nvCliNombre').value.trim();
+  if (!nombre) { alert('Poné el nombre del cliente.'); return; }
+  D.contadorClientes++;
+  D.clientes.push({ id: D.contadorClientes, nombre, telefono: document.getElementById('nvCliTel').value.trim() });
+  await guardarClientesD();
+  document.getElementById('nvCliNombre').value = '';
+  document.getElementById('nvCliTel').value = '';
+  renderClientes(); toast(`Cliente "${nombre}" agregado`);
+}
+async function cliBorrar(id) {
+  const c = D.clientes.find(x => x.id === id);
+  if (!c || !confirm(`¿Eliminar "${c.nombre}" y su historial de cuenta por cobrar?`)) return;
+  D.clientes = D.clientes.filter(x => x.id !== id);
+  D.fiados = D.fiados.filter(m => m.clienteId !== id);
+  await guardarClientesD(); await guardarFiadosD();
+  renderClientes(); renderKPIs();
+}
+async function cliCargo(id) {
+  const m = parseFloat(String(prompt('Monto del consumo / cargo (COP):', '')).replace(/[^\d.-]/g, ''));
+  if (isNaN(m) || m <= 0) return;
+  const desc = (prompt('Descripción (qué consumió / concepto):', '') || '').trim();
+  movFiado(id, 'cargo', m, desc || 'Cargo manual');
+  await guardarFiadosD(); renderClientes(); renderKPIs(); toast('Cargo registrado');
+}
+async function cliAbono(id) {
+  const m = parseFloat(String(prompt('Monto del pago / abono (COP):', '')).replace(/[^\d.-]/g, ''));
+  if (isNaN(m) || m <= 0) return;
+  const desc = (prompt('Nota del pago (opcional):', '') || '').trim();
+  movFiado(id, 'abono', m, desc || 'Abono');
+  await guardarFiadosD(); renderClientes(); renderKPIs(); toast('Abono registrado');
+}
+
 /* ---------- proveedores ---------- */
 function saldoProv(id) {
   return D.cxp.filter(m => m.proveedorId === id)
@@ -497,6 +592,8 @@ async function guardarCxp() { await escribir(STORAGE_KEY_CXP, D.cxp); }
 
 function renderProveedores() {
   const cont = document.getElementById('listaProv');
+  const totEl = document.getElementById('cxpTotalPorPagar');
+  if (totEl) totEl.textContent = formatMoney(D.proveedores.reduce((s, p) => s + Math.max(0, saldoProv(p.id)), 0));
   if (D.proveedores.length === 0) {
     cont.innerHTML = `<div class="text-muted small py-2">Sin proveedores todavía.</div>`;
     return;
@@ -505,18 +602,26 @@ function renderProveedores() {
     const s = saldoProv(p.id);
     const txt = s > 0 ? formatMoney(s) + ' por pagar' : s < 0 ? formatMoney(-s) + ' a favor' : 'Al día';
     return `
-      <div class="border rounded-3 p-2 mb-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div>
-          <div class="fw-bold"><i class="bi bi-truck me-1 text-primary"></i>${p.nombre}</div>
-          <div class="small ${s > 0 ? 'text-danger' : s < 0 ? 'text-success' : 'text-muted'} fw-bold">${txt}</div>
+      <div class="border rounded-3 p-2 mb-2">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <div class="fw-bold"><i class="bi bi-truck me-1 text-primary"></i>${p.nombre}</div>
+            <div class="small ${s > 0 ? 'text-danger' : s < 0 ? 'text-success' : 'text-muted'} fw-bold">${txt}</div>
+          </div>
+          <div class="d-flex gap-1 flex-wrap">
+            <button class="btn btn-sm btn-outline-danger" onclick="provFactura(${p.id})" title="Registrar una compra / factura"><i class="bi bi-receipt"></i> Factura</button>
+            <button class="btn btn-sm btn-outline-success" onclick="provPago(${p.id})" title="Registrar un pago"><i class="bi bi-cash-coin"></i> Pago</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="provDetalle(${p.id})" title="Ver compras y pagos"><i class="bi bi-clock-history"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="provBorrar(${p.id})"><i class="bi bi-trash3"></i></button>
+          </div>
         </div>
-        <div class="d-flex gap-1">
-          <button class="btn btn-sm btn-outline-danger" onclick="provFactura(${p.id})"><i class="bi bi-receipt"></i> Factura</button>
-          <button class="btn btn-sm btn-outline-success" onclick="provPago(${p.id})"><i class="bi bi-cash-coin"></i> Pago</button>
-          <button class="btn btn-sm btn-outline-danger" onclick="provBorrar(${p.id})"><i class="bi bi-trash3"></i></button>
-        </div>
+        <div id="provHist-${p.id}" class="mt-2 d-none">${extractoHtml(D.cxp.filter(m => m.proveedorId === p.id), 'factura', 'pago')}</div>
       </div>`;
   }).join('');
+}
+function provDetalle(id) {
+  const el = document.getElementById('provHist-' + id);
+  if (el) el.classList.toggle('d-none');
 }
 
 async function provNuevo() {
@@ -543,29 +648,80 @@ function movCxp(proveedorId, tipo, monto, concepto) {
 async function provFactura(id) {
   const m = parseFloat(String(prompt('Monto de la factura / compra (COP):', '')).replace(/[^\d.-]/g, ''));
   if (isNaN(m) || m <= 0) return;
-  movCxp(id, 'factura', m, 'Factura de compra');
+  const desc = (prompt('Descripción de la compra (qué compraste):', '') || '').trim();
+  movCxp(id, 'factura', m, desc || 'Factura de compra');
   await guardarCxp(); renderProveedores(); renderKPIs(); toast('Factura registrada');
 }
 async function provPago(id) {
   const m = parseFloat(String(prompt('Monto del pago al proveedor (COP):', '')).replace(/[^\d.-]/g, ''));
   if (isNaN(m) || m <= 0) return;
-  movCxp(id, 'pago', m, 'Pago a proveedor');
+  const desc = (prompt('Nota del pago (opcional, p. ej. abono factura X):', '') || '').trim();
+  movCxp(id, 'pago', m, desc || 'Pago a proveedor');
   await guardarCxp(); renderProveedores(); renderKPIs(); toast('Pago registrado');
 }
 
 /* ---------- gráficos ---------- */
+// Costo de lo vendido en una venta (según el costo ACTUAL del catálogo).
+function costoDeVenta(v) {
+  return (v.productos || []).reduce((s, p) => {
+    const prod = D.catalogo.find(x => x.id === p.productId) || dbJSON.products.find(x => x.name === p.nombre);
+    const c = prod ? (Number(prod.costo) || 0) : 0;
+    return s + c * (p.cant || 0);
+  }, 0);
+}
+
 function ultimos7Dias() {
   const dias = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i); d.setHours(0, 0, 0, 0);
-    dias.push({ ini: d.getTime(), fin: d.getTime() + 86400000, label: d.toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit' }), cobrado: 0, porCobrar: 0 });
+    dias.push({ ini: d.getTime(), fin: d.getTime() + 86400000, label: d.toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit' }), cobrado: 0, porCobrar: 0, ventaTotal: 0, costo: 0 });
   }
   D.ventas.forEach(v => {
     const t = new Date(v.fecha).getTime();
     const dia = dias.find(x => t >= x.ini && t < x.fin);
-    if (dia) dia[esPorCobrar(v) ? 'porCobrar' : 'cobrado'] += v.total || 0;
+    if (!dia) return;
+    dia[esPorCobrar(v) ? 'porCobrar' : 'cobrado'] += v.total || 0;
+    dia.ventaTotal += v.total || 0;
+    dia.costo += costoDeVenta(v);
+  });
+  dias.forEach(d => {
+    d.utilidad = d.ventaTotal - d.costo;
+    d.margen = d.costo > 0 ? (d.utilidad / d.costo) * 100 : 0;   // % ganancia sobre el costo
   });
   return dias;
+}
+
+function renderGraficoGanancias() {
+  if (typeof Chart === 'undefined') return;
+  const dias = ultimos7Dias();
+  const ctx = document.getElementById('chartGanancias');
+  if (!ctx) return;
+  if (chartGanancias) chartGanancias.destroy();
+  chartGanancias = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: dias.map(d => d.label),
+      datasets: [
+        { type: 'bar', label: 'Utilidad', data: dias.map(d => d.utilidad), backgroundColor: '#20c997', order: 2, yAxisID: 'y' },
+        { type: 'line', label: '% ganancia', data: dias.map(d => Math.round(d.margen)), borderColor: '#6f42c1', backgroundColor: '#6f42c1', tension: 0.3, order: 1, yAxisID: 'y1' }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: c => c.dataset.label + ': ' + (c.dataset.yAxisID === 'y1' ? c.parsed.y + '%' : formatMoney(c.parsed.y))
+          }
+        }
+      },
+      scales: {
+        y: { position: 'left', beginAtZero: true, ticks: { callback: v => formatMoney(v) } },
+        y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { callback: v => v + '%' } }
+      }
+    }
+  });
 }
 function renderGraficoSemana() {
   if (typeof Chart === 'undefined') return;

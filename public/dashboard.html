@@ -73,11 +73,19 @@
           </div>
         </div>
 
-        <!-- Gráfico semana -->
+        <!-- Gráfico semana (ventas) -->
         <div class="col-12 col-xl-6 solo-admin">
           <div class="card-dash h-100">
             <div class="hd"><i class="bi bi-bar-chart me-2"></i>Ventas de la semana</div>
             <div class="bd"><canvas id="chartSemana"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Gráfico semana (ganancias) -->
+        <div class="col-12 col-xl-6 solo-admin">
+          <div class="card-dash h-100">
+            <div class="hd"><i class="bi bi-graph-up-arrow me-2"></i>Ganancias de la semana <span class="text-muted fw-normal small">— utilidad y % de ganancia</span></div>
+            <div class="bd"><canvas id="chartGanancias"></canvas></div>
           </div>
         </div>
 
@@ -89,10 +97,31 @@
           </div>
         </div>
 
+        <!-- Clientes / cuentas por cobrar -->
+        <div class="col-12 col-xl-6 solo-admin">
+          <div class="card-dash h-100">
+            <div class="hd d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <span><i class="bi bi-people me-2"></i>Clientes y cuentas por cobrar</span>
+              <span class="badge text-bg-danger">Total: <span id="cliTotalPorCobrar">$0</span></span>
+            </div>
+            <div class="bd">
+              <div class="row g-2 mb-2">
+                <div class="col-6"><input id="nvCliNombre" class="form-control form-control-sm" placeholder="Nombre del cliente"></div>
+                <div class="col-4"><input id="nvCliTel" class="form-control form-control-sm" placeholder="Teléfono (opcional)"></div>
+                <div class="col-2 d-grid"><button class="btn btn-sm btn-danger" onclick="cliNuevo()"><i class="bi bi-plus-lg"></i></button></div>
+              </div>
+              <div id="listaCli" class="tabla-scroll"></div>
+            </div>
+          </div>
+        </div>
+
         <!-- Proveedores -->
         <div class="col-12 col-xl-6 solo-admin">
           <div class="card-dash h-100">
-            <div class="hd"><i class="bi bi-truck me-2"></i>Proveedores y cuentas por pagar</div>
+            <div class="hd d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <span><i class="bi bi-truck me-2"></i>Proveedores y cuentas por pagar</span>
+              <span class="badge text-bg-dark">Total: <span id="cxpTotalPorPagar">$0</span></span>
+            </div>
             <div class="bd">
               <div class="row g-2 mb-2">
                 <div class="col-6"><input id="nvProvNombre" class="form-control form-control-sm" placeholder="Nombre del proveedor"></div>
