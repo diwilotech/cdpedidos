@@ -107,7 +107,7 @@ window.__dashInit = async function (user) {
     D.diaPersonal = dd[dd.length - 1]; // por defecto: hoy
     poblarSelectCatNuevo();
     renderKPIs();
-    renderSelectDiaPersonal();
+    renderBotonesDiaPersonal();
     renderVentasPorPersonal();
     renderFiltroCats();
     renderGestionCats();
@@ -196,18 +196,20 @@ function ventasDelDia(dia) {
     return t >= dia.ini && t < dia.fin;
   });
 }
-function renderSelectDiaPersonal() {
-  const sel = document.getElementById('filtroDiaPersonal');
-  if (!sel) return;
+function renderBotonesDiaPersonal() {
+  const cont = document.getElementById('filtroDiaPersonal');
+  if (!cont) return;
   const dd = ultimos7Dias();
   if (!D.diaPersonal) D.diaPersonal = dd[dd.length - 1];
-  sel.innerHTML = dd.map((d, i) =>
-    `<option value="${d.ini}" ${d.ini === D.diaPersonal.ini ? 'selected' : ''}>${i === dd.length - 1 ? 'Hoy' : d.label}</option>`
-  ).join('');
+  cont.innerHTML = dd.map((d, i) => {
+    const activo = d.ini === D.diaPersonal.ini;
+    return `<button class="btn btn-sm ${activo ? 'btn-primary' : 'btn-outline-secondary'} text-nowrap px-2 py-0" onclick="filtrarDiaPersonal(${d.ini})">${i === dd.length - 1 ? 'Hoy' : d.label}</button>`;
+  }).join('');
 }
 function filtrarDiaPersonal(v) {
   const dd = ultimos7Dias();
   D.diaPersonal = dd.find(d => String(d.ini) === String(v)) || dd[dd.length - 1];
+  renderBotonesDiaPersonal();
   renderVentasPorPersonal();
 }
 
