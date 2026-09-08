@@ -60,36 +60,47 @@ function pedirColor(colorInicial, onConfirmar) {
   picker.click();
 }
 
-// Apilado correcto de modales anidados (p.ej. Cuentas + Catálogo, o el
-// diálogo de confirmación abierto desde otro modal). Bootstrap no lo maneja
-// bien "de fábrica": sin esto el segundo modal (y/o su fondo oscuro) queda
-// por detrás y todo se ve gris e inutilizable.
+// Apilado correcto de modales anidados (Cuentas + Catálogo, un diálogo de
+// confirmación/entrada de texto abierto desde otro modal, etc.). Bootstrap
+// no lo maneja bien "de fábrica": sin esto el segundo modal y/o su fondo
+// oscuro quedan por detrás y todo se ve gris e inutilizable.
 //
-// Enfoque: al ABRIR un modal, si ya hay otro(s) abierto(s), a ESTE se le
-// sube el z-index por encima; a su backdrop (el último agregado) también.
-// Los modales de más abajo se dejan como están.
-document.addEventListener('show.bs.modal', function (e) {
-  const yaAbiertos = document.querySelectorAll('.modal.show').length;
-  if (yaAbiertos === 0) return; // modal simple: valores por defecto de Bootstrap
+// Se lleva la lista de modales abiertos EN ORDEN DE APERTURA (no de DOM) y
+// se reasigna el z-index a partir de eso. Se recalcula tanto al 'show'
+// (con un tick de margen para que el backdrop ya exista) como al 'shown',
+// así también funciona cuando dos modales se abren en el mismo instante
+// (p. ej. abrir Cuentas y pedir el nombre de la cuenta seguido).
+(function () {
+  const abiertos = []; // elementos .modal, en orden de apertura
 
-  const z = 1055 + yaAbiertos * 20;
-  e.target.style.zIndex = z + 5;
-
-  // El backdrop de este modal se inserta justo después de este evento.
-  setTimeout(function () {
+  function restackear() {
     const backdrops = document.querySelectorAll('.modal-backdrop');
-    const ultimo = backdrops[backdrops.length - 1];
-    if (ultimo) ultimo.style.zIndex = z;
-  }, 0);
-});
-
-// Bootstrap quita "modal-open" del <body> al cerrar CUALQUIER modal; si
-// todavía queda otro abierto, se repone para no perder el bloqueo de scroll.
-document.addEventListener('hidden.bs.modal', function () {
-  if (document.querySelectorAll('.modal.show').length > 0) {
-    document.body.classList.add('modal-open');
+    abiertos.forEach(function (modal, i) {
+      if (i === 0) return; // el primero queda con los valores por defecto de Bootstrap
+      const z = 1055 + i * 20;
+      modal.style.zIndex = (z + 5);
+      if (backdrops[i]) backdrops[i].style.zIndex = z;
+    });
   }
-});
+
+  document.addEventListener('show.bs.modal', function (e) {
+    if (abiertos.indexOf(e.target) === -1) abiertos.push(e.target);
+    setTimeout(restackear, 0);
+  });
+  document.addEventListener('shown.bs.modal', restackear);
+
+  document.addEventListener('hidden.bs.modal', function (e) {
+    const i = abiertos.indexOf(e.target);
+    if (i > -1) abiertos.splice(i, 1);
+    e.target.style.zIndex = '';
+    // Bootstrap quita "modal-open" del <body> al cerrar CUALQUIER modal; si
+    // todavía queda otro abierto, se repone para no perder el bloqueo de scroll.
+    if (abiertos.length > 0) {
+      document.body.classList.add('modal-open');
+      restackear();
+    }
+  });
+})();
 
 // Notificación flotante genérica y reutilizable (éxito, error, aviso).
 function mostrarNotificacion(mensaje, tipo = 'success', icono = 'bi-check-circle-fill') {

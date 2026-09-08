@@ -408,8 +408,19 @@ function actualizarBadgeMesa(mesaId) {
 function agregarCuentaRapida(mesaId) {
   const teniaCuentas = (mesasData[mesaId] || []).length > 0;
   abrirModalCuentas(mesaId, (mesasData[mesaId] || []).length);
-  if (teniaCuentas) {
+  if (!teniaCuentas) return;
+
+  // Esperar a que el modal de cuentas TERMINE de abrirse antes de pedir el
+  // nombre; si se llama en el mismo instante, el diálogo de texto queda
+  // detrás y en gris ("no aparece").
+  const el = document.getElementById('modalCuentas');
+  if (el.classList.contains('show')) {
     crearNuevaCuentaEnModal();
+  } else {
+    el.addEventListener('shown.bs.modal', function unaVez() {
+      el.removeEventListener('shown.bs.modal', unaVez);
+      crearNuevaCuentaEnModal();
+    });
   }
 }
 
