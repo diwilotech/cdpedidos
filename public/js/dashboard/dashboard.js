@@ -334,6 +334,18 @@ function refrescarTodoCategorias() {
 }
 
 /* ---------- catálogo ---------- */
+// % ganancia sobre el costo: (venta − costo) / costo · 100
+function ganPct(p) {
+  const c = Number(p.costo) || 0, v = Number(p.price) || 0;
+  return c > 0 ? ((v - c) / c) * 100 : null;
+}
+function ganCell(p) {
+  const g = ganPct(p);
+  if (g === null) return '<span class="text-muted">—</span>';
+  const cls = g < 0 ? 'text-danger' : g < 20 ? 'text-warning' : 'text-success';
+  return `<span class="${cls} fw-bold">${g.toFixed(0)}%</span>`;
+}
+
 function renderCatalogo() {
   const tb = document.getElementById('tbodyCatalogo');
   const cats = D.categorias;
@@ -341,7 +353,7 @@ function renderCatalogo() {
     .map((p, i) => ({ p, i }))
     .filter(x => D.filtroCat === 'cat-all' || x.p.categoryId === D.filtroCat);
   if (visibles.length === 0) {
-    tb.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3 small">Sin productos en esta categoría.</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3 small">Sin productos en esta categoría.</td></tr>`;
     return;
   }
   tb.innerHTML = visibles.map(({ p, i }) => {
@@ -354,7 +366,9 @@ function renderCatalogo() {
           ${cats.map(c => `<option value="${c.id}" ${c.id === p.categoryId ? 'selected' : ''}>${c.name}</option>`).join('')}
         </select>
       </td>
-      <td style="width:120px"><input type="number" min="0" step="500" class="form-control form-control-sm text-end" value="${p.price || 0}" onchange="catEditar(${i},'price',this.value)"></td>
+      <td style="width:110px"><input type="number" min="0" step="500" class="form-control form-control-sm text-end cat-costo" value="${p.costo || 0}" onchange="catEditar(${i},'costo',this.value)"></td>
+      <td style="width:110px"><input type="number" min="0" step="500" class="form-control form-control-sm text-end cat-precio" value="${p.price || 0}" onchange="catEditar(${i},'price',this.value)"></td>
+      <td class="text-end cat-gan" style="width:64px">${ganCell(p)}</td>
       <td>
         <div class="d-flex align-items-center gap-1">
           <div class="input-group input-group-sm" style="width:118px">
@@ -412,10 +426,14 @@ async function guardarCatalogo() {
 async function catEditar(i, campo, valor) {
   const p = D.catalogo[i];
   if (!p) return;
-  if (campo === 'price') p.price = Math.max(0, parseFloat(valor) || 0);
+  if (campo === 'price' || campo === 'costo') p[campo] = Math.max(0, parseFloat(valor) || 0);
   else p[campo] = valor;
   await guardarCatalogo();
   if (campo === 'categoryId') { renderCatalogo(); renderGraficoCategoria(); }
+  else if (campo === 'price' || campo === 'costo') {
+    const cell = document.querySelector(`[data-catrow="${i}"] .cat-gan`);
+    if (cell) cell.innerHTML = ganCell(p);
+  }
   toast(`"${p.name}" actualizado`);
 }
 
@@ -436,16 +454,17 @@ async function catBorrar(i) {
 async function catNuevo() {
   const name = document.getElementById('nvProdNombre').value.trim();
   const categoryId = document.getElementById('nvProdCat').value;
+  const costo = Math.max(0, parseFloat(document.getElementById('nvProdCosto').value) || 0);
   const price = parseFloat(document.getElementById('nvProdPrecio').value) || 0;
   const stock = parseInt(document.getElementById('nvProdStock').value, 10) || 0;
-  if (!name || price <= 0) { alert('Poné nombre y un precio válido.'); return; }
+  if (!name || price <= 0) { alert('Poné nombre y un precio de venta válido.'); return; }
   const id = 'custom-' + Date.now();
-  D.catalogo.push({ id, categoryId, name, price, code: (name.slice(0, 3).toUpperCase() + '-' + String(D.catalogo.length + 1).padStart(2, '0')), stock });
+  D.catalogo.push({ id, categoryId, name, costo, price, code: (name.slice(0, 3).toUpperCase() + '-' + String(D.catalogo.length + 1).padStart(2, '0')), stock });
   D.inventario[id] = stock;
   if (stock > 0) registrarMov(id, name, stock, 'Alta de producto');
   await guardarCatalogo();
   await escribir(STORAGE_KEY_MOVIMIENTOS, D.movimientos);
-  ['nvProdNombre', 'nvProdPrecio', 'nvProdStock'].forEach(x => document.getElementById(x).value = '');
+  ['nvProdNombre', 'nvProdCosto', 'nvProdPrecio', 'nvProdStock'].forEach(x => document.getElementById(x).value = '');
   D.filtroCat = categoryId;               // mostrar la categoría donde cayó
   renderFiltroCats(); renderCatalogo(); renderMovimientos();
   toast(`"${name}" agregado`);

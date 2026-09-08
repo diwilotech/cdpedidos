@@ -131,13 +131,36 @@ function toggleFormNuevoProducto(forceShow) {
   const mostrar = forceShow !== undefined ? forceShow : form.style.display === 'none';
   form.style.display = mostrar ? 'block' : 'none';
   if (mostrar) {
-    document.getElementById('nuevoProductoNombre').value = '';
-    document.getElementById('nuevoProductoCodigo').value = '';
-    document.getElementById('nuevoProductoPrecio').value = '';
-    document.getElementById('nuevoProductoStock').value = '';
+    ['nuevoProductoNombre', 'nuevoProductoCodigo', 'nuevoProductoCosto', 'nuevoProductoPrecio', 'nuevoProductoStock']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    calcularGananciaNuevoProducto();
     poblarSelectCategoriasNuevoProducto();
     setTimeout(() => document.getElementById('nuevoProductoNombre').focus(), 100);
   }
+}
+
+// % de ganancia sobre el costo:  (venta − costo) / costo · 100
+function gananciaPct(costo, venta) {
+  costo = Number(costo) || 0;
+  venta = Number(venta) || 0;
+  if (costo <= 0) return null;
+  return ((venta - costo) / costo) * 100;
+}
+function gananciaTexto(costo, venta) {
+  const g = gananciaPct(costo, venta);
+  if (g === null) return '<span class="text-muted">—</span>';
+  const cls = g < 0 ? 'text-danger' : g < 20 ? 'text-warning' : 'text-success';
+  return `<span class="${cls} fw-bold">${g.toFixed(0)}%</span>`;
+}
+function calcularGananciaNuevoProducto() {
+  const el = document.getElementById('nuevoProductoGanancia');
+  if (!el) return;
+  const c = parseFloat(document.getElementById('nuevoProductoCosto').value);
+  const v = parseFloat(document.getElementById('nuevoProductoPrecio').value);
+  const g = gananciaPct(c, v);
+  el.innerHTML = g === null
+    ? 'Ganancia: —'
+    : `Ganancia: <strong class="${g < 0 ? 'text-danger' : 'text-success'}">${g.toFixed(0)}%</strong> · ${formatMoney((Number(v) || 0) - (Number(c) || 0))} por unidad`;
 }
 
 function poblarSelectCategoriasNuevoProducto() {
@@ -158,6 +181,7 @@ function guardarNuevoProducto() {
   const nombre = document.getElementById('nuevoProductoNombre').value.trim();
   const categoryId = document.getElementById('nuevoProductoCategoria').value;
   let codigo = document.getElementById('nuevoProductoCodigo').value.trim();
+  const costo = Math.max(0, parseFloat(document.getElementById('nuevoProductoCosto').value) || 0);
   const precio = parseFloat(document.getElementById('nuevoProductoPrecio').value);
   const stockInicial = parseInt(document.getElementById('nuevoProductoStock').value, 10);
 
@@ -180,6 +204,7 @@ function guardarNuevoProducto() {
     id: 'custom-' + Date.now(),
     categoryId,
     name: nombre,
+    costo,
     price: precio,
     code: codigo,
     stock: (!isNaN(stockInicial) && stockInicial > 0) ? stockInicial : 0
@@ -255,7 +280,7 @@ function renderListaInventario() {
     row.innerHTML = `
       <div>
         <div class="fw-bold">${prod.name} ${esPersonalizado ? '<span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size:.65rem;">Nuevo</span>' : ''}</div>
-        <div class="small text-muted font-monospace">${prod.code} · ${formatMoney(prod.price)}</div>
+        <div class="small text-muted font-monospace">${prod.code} · compra ${formatMoney(prod.costo || 0)} · venta ${formatMoney(prod.price)} · gan. ${gananciaTexto(prod.costo, prod.price)}</div>
       </div>
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <span class="badge ${badgeClase}" title="Stock actual">${stock} und.</span>

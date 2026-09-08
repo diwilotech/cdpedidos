@@ -124,15 +124,16 @@
               <ul class="nav nav-pills gap-1 mb-2 flex-wrap" id="catalogoFiltroCats"></ul>
 
               <div class="row g-2 mb-3">
-                <div class="col-12 col-md-4"><input id="nvProdNombre" class="form-control form-control-sm" placeholder="Nombre del producto nuevo"></div>
-                <div class="col-6 col-md-3"><select id="nvProdCat" class="form-select form-select-sm"></select></div>
-                <div class="col-6 col-md-2"><input id="nvProdPrecio" type="number" min="0" step="500" class="form-control form-control-sm" placeholder="Precio"></div>
+                <div class="col-12 col-md-3"><input id="nvProdNombre" class="form-control form-control-sm" placeholder="Nombre del producto nuevo"></div>
+                <div class="col-6 col-md-2"><select id="nvProdCat" class="form-select form-select-sm"></select></div>
+                <div class="col-6 col-md-2"><input id="nvProdCosto" type="number" min="0" step="500" class="form-control form-control-sm" placeholder="Costo (compra)"></div>
+                <div class="col-6 col-md-2"><input id="nvProdPrecio" type="number" min="0" step="500" class="form-control form-control-sm" placeholder="Precio venta"></div>
                 <div class="col-6 col-md-2"><input id="nvProdStock" type="number" min="0" class="form-control form-control-sm" placeholder="Stock inicial"></div>
                 <div class="col-6 col-md-1 d-grid"><button class="btn btn-sm btn-success" onclick="catNuevo()"><i class="bi bi-plus-lg"></i></button></div>
               </div>
               <div class="table-responsive tabla-scroll">
                 <table class="table table-sm align-middle">
-                  <thead class="table-light"><tr><th>Producto</th><th style="width:160px">Categoría</th><th class="text-end" style="width:120px">Precio</th><th style="width:240px">Stock (total)</th><th style="width:56px"></th></tr></thead>
+                  <thead class="table-light"><tr><th>Producto</th><th style="width:150px">Categoría</th><th class="text-end" style="width:110px">Costo</th><th class="text-end" style="width:110px">P. Venta</th><th class="text-end" style="width:64px">Gan.</th><th style="width:230px">Stock (total)</th><th style="width:50px"></th></tr></thead>
                   <tbody id="tbodyCatalogo"></tbody>
                 </table>
               </div>

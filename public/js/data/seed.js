@@ -16,18 +16,18 @@ const dbJSON = {
     { "id": "cat-postres", "name": "Postres", "icon": "bi-cake2-fill" }
   ],
   "products": [
-    { "id": "p-101", "categoryId": "cat-bebidas", "name": "Cerveza IPA 500ml", "price": 15000, "code": "BEB-01", "stock": 48 },
-    { "id": "p-102", "categoryId": "cat-bebidas", "name": "Cocktail Mojito", "price": 22000, "code": "BEB-02", "stock": 30 },
-    { "id": "p-103", "categoryId": "cat-bebidas", "name": "Gaseosa 350ml", "price": 6000, "code": "BEB-03", "stock": 60 },
-    { "id": "p-104", "categoryId": "cat-bebidas", "name": "Jugo Natural", "price": 9000, "code": "BEB-04", "stock": 40 },
-    { "id": "p-201", "categoryId": "cat-entradas", "name": "Nachos con Queso & Guacamole", "price": 25000, "code": "ENT-01", "stock": 25 },
-    { "id": "p-202", "categoryId": "cat-entradas", "name": "Papas Rústicas BBQ", "price": 18000, "code": "ENT-02", "stock": 35 },
-    { "id": "p-203", "categoryId": "cat-entradas", "name": "Alitas Cruncy (6 und)", "price": 32000, "code": "ENT-03", "stock": 20 },
-    { "id": "p-301", "categoryId": "cat-fuertes", "name": "Burger Doble Carne", "price": 38000, "code": "PF-01", "stock": 18 },
-    { "id": "p-302", "categoryId": "cat-fuertes", "name": "Pizza Artesanal 4 Quesos", "price": 45000, "code": "PF-02", "stock": 15 },
-    { "id": "p-303", "categoryId": "cat-fuertes", "name": "Costillas Ahumadas BBQ", "price": 62000, "code": "PF-03", "stock": 12 },
-    { "id": "p-401", "categoryId": "cat-postres", "name": "Volcán de Chocolate", "price": 18000, "code": "POS-01", "stock": 22 },
-    { "id": "p-402", "categoryId": "cat-postres", "name": "Cheesecake de Frutos Rojos", "price": 20000, "code": "POS-02", "stock": 20 }
+    { "id": "p-101", "categoryId": "cat-bebidas", "name": "Cerveza IPA 500ml", "costo": 9000, "price": 15000, "code": "BEB-01", "stock": 48 },
+    { "id": "p-102", "categoryId": "cat-bebidas", "name": "Cocktail Mojito", "costo": 12000, "price": 22000, "code": "BEB-02", "stock": 30 },
+    { "id": "p-103", "categoryId": "cat-bebidas", "name": "Gaseosa 350ml", "costo": 3000, "price": 6000, "code": "BEB-03", "stock": 60 },
+    { "id": "p-104", "categoryId": "cat-bebidas", "name": "Jugo Natural", "costo": 4000, "price": 9000, "code": "BEB-04", "stock": 40 },
+    { "id": "p-201", "categoryId": "cat-entradas", "name": "Nachos con Queso & Guacamole", "costo": 13000, "price": 25000, "code": "ENT-01", "stock": 25 },
+    { "id": "p-202", "categoryId": "cat-entradas", "name": "Papas Rústicas BBQ", "costo": 8000, "price": 18000, "code": "ENT-02", "stock": 35 },
+    { "id": "p-203", "categoryId": "cat-entradas", "name": "Alitas Cruncy (6 und)", "costo": 18000, "price": 32000, "code": "ENT-03", "stock": 20 },
+    { "id": "p-301", "categoryId": "cat-fuertes", "name": "Burger Doble Carne", "costo": 21000, "price": 38000, "code": "PF-01", "stock": 18 },
+    { "id": "p-302", "categoryId": "cat-fuertes", "name": "Pizza Artesanal 4 Quesos", "costo": 24000, "price": 45000, "code": "PF-02", "stock": 15 },
+    { "id": "p-303", "categoryId": "cat-fuertes", "name": "Costillas Ahumadas BBQ", "costo": 35000, "price": 62000, "code": "PF-03", "stock": 12 },
+    { "id": "p-401", "categoryId": "cat-postres", "name": "Volcán de Chocolate", "costo": 8000, "price": 18000, "code": "POS-01", "stock": 22 },
+    { "id": "p-402", "categoryId": "cat-postres", "name": "Cheesecake de Frutos Rojos", "costo": 9000, "price": 20000, "code": "POS-02", "stock": 20 }
   ],
   "initialMesas": [
     { "id": "mesa_bar_01", "nombre": "Bar Principal", "colorHex": "#6f42c1", "w": 6, "h": 2, "x": 0, "y": 0, "piso": 1, "cuentas": [] },

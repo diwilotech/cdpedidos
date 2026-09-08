@@ -319,7 +319,7 @@
                 <label class="form-label small fw-bold mb-1">Nombre</label>
                 <input type="text" id="nuevoProductoNombre" class="form-control form-control-sm" placeholder="Ej. Limonada de Coco" maxlength="60">
               </div>
-              <div class="col-6 col-md-2">
+              <div class="col-6 col-md-3">
                 <label class="form-label small fw-bold mb-1">Categoría</label>
                 <select id="nuevoProductoCategoria" class="form-select form-select-sm"></select>
               </div>
@@ -327,13 +327,20 @@
                 <label class="form-label small fw-bold mb-1">Código</label>
                 <input type="text" id="nuevoProductoCodigo" class="form-control form-control-sm" placeholder="Opcional" maxlength="15">
               </div>
-              <div class="col-6 col-md-2">
-                <label class="form-label small fw-bold mb-1">Precio (COP)</label>
-                <input type="number" id="nuevoProductoPrecio" class="form-control form-control-sm" min="0" step="500" placeholder="Ej. 15000">
+              <div class="col-6 col-md-3">
+                <label class="form-label small fw-bold mb-1">Costo (compra)</label>
+                <input type="number" id="nuevoProductoCosto" class="form-control form-control-sm" min="0" step="500" placeholder="Ej. 9000" oninput="calcularGananciaNuevoProducto()">
               </div>
-              <div class="col-6 col-md-2">
+              <div class="col-6 col-md-3">
+                <label class="form-label small fw-bold mb-1">Precio venta</label>
+                <input type="number" id="nuevoProductoPrecio" class="form-control form-control-sm" min="0" step="500" placeholder="Ej. 15000" oninput="calcularGananciaNuevoProducto()">
+              </div>
+              <div class="col-6 col-md-3">
                 <label class="form-label small fw-bold mb-1">Stock inicial</label>
                 <input type="number" id="nuevoProductoStock" class="form-control form-control-sm" min="0" step="1" placeholder="0">
+              </div>
+              <div class="col-6 col-md-3 d-flex align-items-end">
+                <div class="small text-muted" id="nuevoProductoGanancia">Ganancia: —</div>
               </div>
             </div>
             <div class="d-flex justify-content-end gap-2 mt-3">
