@@ -65,6 +65,12 @@ window.__cdpArrancar = async function arrancarApp() {
     movimientosFiado = fiadosGuardados;
   }
 
+  // 1.e) Flujo de caja (turno abierto + cierres).
+  cajaActual = await cargarCajaGuardada();
+  const cajaHistGuardado = await cargarCajaHistGuardado();
+  if (Array.isArray(cajaHistGuardado)) cajaHist = cajaHistGuardado;
+  if (typeof actualizarBadgeCaja === 'function') actualizarBadgeCaja();
+
   // (Proveedores / cuentas por pagar viven ahora en el Dashboard, no acá.)
 
   // 2) Plano: pisos + mesas.

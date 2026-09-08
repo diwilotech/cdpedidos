@@ -32,9 +32,12 @@ const STORAGE_KEY_CLIENTES = 'cdp-clientes-v1';
 const STORAGE_KEY_FIADOS = 'cdp-fiados-v1';           // cuentas por cobrar (fiados a clientes)
 const STORAGE_KEY_PROVEEDORES = 'cdp-proveedores-v1';
 const STORAGE_KEY_CXP = 'cdp-cuentas-por-pagar-v1';   // cuentas por pagar a proveedores
+const STORAGE_KEY_CAJA = 'cdp-caja-v1';               // turno de caja abierto (o null)
+const STORAGE_KEY_CAJA_HIST = 'cdp-caja-hist-v1';     // cierres de caja archivados
 
 /* --- LÍMITES DE HISTORIAL (para no llenar el almacenamiento) --- */
 const MAX_VENTAS_GUARDADAS = 300;
 const MAX_MOVIMIENTOS_GUARDADOS = 300;
 const MAX_MOV_FIADOS_GUARDADOS = 500;
 const MAX_MOV_CXP_GUARDADOS = 500;
+const MAX_CIERRES_CAJA_GUARDADOS = 200;

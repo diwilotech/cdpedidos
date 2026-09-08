@@ -255,6 +255,33 @@ body {
   padding:3px 6px;
 }
 
+/* FAB: Flujo de caja (POS), abajo a la izquierda */
+.btn-fab-caja{
+  position:fixed;
+  left:20px;
+  bottom:20px;
+  z-index:900;
+  width:56px;
+  height:56px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:1.3rem;
+  box-shadow:0 4px 14px rgba(0,0,0,.28);
+  padding:0;
+}
+.btn-fab-caja.caja-abierta{
+  box-shadow:0 0 0 3px rgba(25,135,84,.5), 0 4px 14px rgba(0,0,0,.28);
+}
+.btn-fab-caja .fab-badge{
+  position:absolute;
+  top:-4px;
+  right:-4px;
+  font-size:.7rem;
+  padding:2px 5px;
+}
+
 /* Panel flotante de Cuentas Activas, oculto por defecto y
    solo visible cuando el usuario pulsa el botón flotante.
    Se anima con opacidad + escala en vez de aparecer/desaparecer
@@ -339,6 +366,7 @@ body {
 @media (max-width:576px){
   .zoom-toolbar-flotante{left:8px;}
   .btn-fab-cuentas{right:12px;bottom:12px;}
+  .btn-fab-caja{left:12px;bottom:12px;}
   .panel-cuentas-flotante{right:8px;left:8px;width:auto;bottom:80px;}
 }
 

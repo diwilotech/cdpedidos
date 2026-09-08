@@ -284,3 +284,30 @@ async function cargarCxpGuardadas() {
   } catch (e) { /* primera vez */ }
   return null;
 }
+
+/* ---------------------------------------------------------------------------
+   FLUJO DE CAJA (POS) — dato COMPARTIDO
+   --------------------------------------------------------------------------- */
+function guardarCaja() {
+  // sin debounce: los cambios de caja son puntuales y conviene que persistan ya
+  window.storage.set(STORAGE_KEY_CAJA, JSON.stringify(cajaActual), true)
+    .catch(e => console.error('No se pudo guardar la caja:', e));
+}
+async function cargarCajaGuardada() {
+  try {
+    const resultado = await window.storage.get(STORAGE_KEY_CAJA, true);
+    if (resultado && resultado.value) return JSON.parse(resultado.value);
+  } catch (e) { /* primera vez */ }
+  return null;
+}
+function guardarCajaHist() {
+  window.storage.set(STORAGE_KEY_CAJA_HIST, JSON.stringify(cajaHist), true)
+    .catch(e => console.error('No se pudo guardar el historial de caja:', e));
+}
+async function cargarCajaHistGuardado() {
+  try {
+    const resultado = await window.storage.get(STORAGE_KEY_CAJA_HIST, true);
+    if (resultado && resultado.value) return JSON.parse(resultado.value);
+  } catch (e) { /* primera vez */ }
+  return null;
+}

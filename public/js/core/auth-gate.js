@@ -164,9 +164,9 @@
       <span class="badge ${admin ? 'text-bg-primary' : 'text-bg-secondary'}">
         <i class="bi bi-person-fill me-1"></i>${user.nombre}${admin ? ' · admin' : ''}
       </span>
-      <a class="btn btn-sm btn-outline-dark" href="/dashboard.html" title="${admin ? 'Panel de administración' : 'Ver mis movimientos de inventario'}">
-        <i class="bi ${admin ? 'bi-speedometer2' : 'bi-arrow-down-up'} me-1"></i>${admin ? 'Dashboard' : 'Movimientos'}
-      </a>
+      ${admin
+        ? `<a class="btn btn-sm btn-outline-dark" href="/dashboard.html" title="Panel de administración"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>`
+        : `<button class="btn btn-sm btn-outline-dark" onclick="abrirModalMovimientos()" title="Ver mis movimientos de inventario"><i class="bi bi-arrow-down-up me-1"></i>Movimientos</button>`}
       ${admin ? `<button class="btn btn-sm btn-outline-primary" onclick="abrirModalPersonal()" title="Gestionar accesos del personal"><i class="bi bi-people-fill me-1"></i>Personal</button>` : ''}
       <button class="btn btn-sm btn-outline-danger" onclick="cdpCerrarSesion()" title="Cerrar sesión"><i class="bi bi-box-arrow-right"></i></button>
     `;

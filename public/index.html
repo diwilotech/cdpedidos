@@ -148,6 +148,12 @@
     <span class="badge bg-danger rounded-pill fab-badge" id="fabCuentasBadge">0</span>
   </button>
 
+  <!-- Botón Flotante: Flujo de caja (POS) (izquierda, abajo) -->
+  <button type="button" class="btn btn-dark btn-fab-caja" id="btnFabCaja" onclick="abrirModalCaja()" title="Flujo de caja (apertura, entradas, salidas, cierre)">
+    <i class="bi bi-cash-coin"></i>
+    <span class="badge bg-success rounded-pill fab-badge d-none" id="fabCajaBadge">•</span>
+  </button>
+
   <!-- Panel Flotante de Cuentas Activas (derecha, abajo) — oculto hasta que se pulse el botón -->
   <div class="panel-cuentas-flotante oculto" id="panelCuentasFlotante">
     <div class="panel-header">
@@ -399,6 +405,21 @@
 
   <!-- (Proveedores y Cuentas por Pagar se movieron al Dashboard, /dashboard.html) -->
 
+  <!-- MODAL: FLUJO DE CAJA (POS) -->
+  <div class="modal fade" id="modalCaja" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title"><i class="bi bi-cash-coin me-2"></i> Flujo de caja</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="cajaContenido">
+          <!-- contenido dinámico (abrir caja / turno abierto) -->
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Menú Contextual Flotante -->
   <div id="context-menu" class="dropdown-menu shadow">
     <a class="dropdown-item" onclick="accionRenombrar()"><i class="bi bi-pencil me-2"></i> Cambiar Nombre</a>
@@ -542,6 +563,7 @@
   <script src="js/modules/usuarios.js"></script>
   <script src="js/modules/ventas.js"></script>
   <script src="js/modules/clientes-fiados.js"></script>
+  <script src="js/modules/caja.js"></script>               <!-- flujo de caja (POS) -->
   <script src="js/modules/personal-accesos.js"></script>   <!-- gestión de accesos (admin) -->
 
   <!-- 4) Arranque -->

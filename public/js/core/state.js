@@ -60,6 +60,10 @@ let proveedoresData = [];
 let contadorProveedores = 0;
 let movimientosCxp = [];     // { id, fecha, proveedorId, tipo:'factura'|'pago', monto, concepto, usuarioNombre }
 
+// --- FLUJO DE CAJA (POS) ---
+let cajaActual = null;       // turno abierto: { id, fecha, usuarioNombre, montoInicial, movimientos:[{tipo:'entrada'|'salida',...}] }
+let cajaHist = [];           // cierres archivados
+
 // --- SELECCIÓN / EDICIÓN DEL PLANO ---
 let mesaActivaId = null;
 let cuentaActivaIndex = 0;
