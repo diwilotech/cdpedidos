@@ -1,9 +1,12 @@
 /* ============================================================================
-   js/dashboard/gate.js — Portón del Dashboard (solo admin)
+   js/dashboard/gate.js — Portón del Dashboard
    ----------------------------------------------------------------------------
    Se carga ÚLTIMO. Pide /api/me:
-     · admin           -> modo remoto (D1) + window.__dashInit(user)
-     · personal / 401  -> redirige a "/" (la app de venta / el login)
+     · con sesión  -> modo remoto (D1) + window.__dashInit(user)
+                      · admin    : ve todo
+                      · personal : ve SOLO sus movimientos (el resto se oculta,
+                                   ver body[data-rol] en dashboard.html)
+     · sin sesión  -> redirige a "/" (login)
    ========================================================================== */
 (function () {
   'use strict';
@@ -18,11 +21,11 @@
       location.replace('/');
       return;
     }
-    if (!user || user.rol !== 'admin') { location.replace('/'); return; }
+    if (!user) { location.replace('/'); return; }
 
     window.__CDP_USER__ = user;
     window.__CDP_BACKEND__ = 'remote';
-    document.body.dataset.rol = 'admin';
+    document.body.dataset.rol = user.rol || 'personal';
 
     const nom = document.getElementById('dashUsuario');
     if (nom) nom.textContent = user.nombre;

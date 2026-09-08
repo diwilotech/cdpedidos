@@ -14,12 +14,14 @@
 /* ---------- estado local ---------- */
 const D = {
   usuario: null,
+  esAdmin: false,
   ventas: [],
   movimientos: [],
   inventario: {},
   catalogo: [],          // lista completa de productos {id,name,price,code,categoryId,stock}
   categorias: [],        // categorías reales (sin "Todos"), en el orden elegido
   filtroCat: 'cat-all',  // filtro activo de la tabla de catálogo
+  filtroUsuario: 'todos',// filtro de usuario en la tabla de movimientos
   clientes: [],
   fiados: [],
   proveedores: [],
@@ -57,6 +59,8 @@ const uid = (p) => p + '-' + Date.now() + '-' + Math.random().toString(36).slice
 /* ---------- carga ---------- */
 window.__dashInit = async function (user) {
   D.usuario = user;
+  D.esAdmin = user.rol === 'admin';
+  if (!D.esAdmin) D.filtroUsuario = user.nombre;  // el personal queda fijo en lo suyo
 
   const [ventas, movs, inv, cat, cats, cli, fdo, prov, cxp] = await Promise.all([
     leer(STORAGE_KEY_VENTAS), leer(STORAGE_KEY_MOVIMIENTOS), leer(STORAGE_KEY_INVENTARIO),
@@ -85,17 +89,51 @@ window.__dashInit = async function (user) {
   document.getElementById('dashCargando').classList.add('d-none');
   document.getElementById('dashContenido').classList.remove('d-none');
 
-  poblarSelectCatNuevo();
-  renderKPIs();
-  renderVentasPorPersonal();
+  if (!D.esAdmin) {
+    const brand = document.querySelector('.navbar-brand');
+    if (brand) brand.innerHTML = '<i class="bi bi-arrow-down-up me-2 text-primary"></i>Mis movimientos';
+  }
+
+  renderFiltroUsuario();
   renderMovimientos();
-  renderFiltroCats();
-  renderGestionCats();
-  renderCatalogo();
-  renderProveedores();
-  renderGraficoSemana();
-  renderGraficoCategoria();
+
+  // El resto del panel es solo para el administrador (además queda oculto
+  // por CSS con body[data-rol]).
+  if (D.esAdmin) {
+    poblarSelectCatNuevo();
+    renderKPIs();
+    renderVentasPorPersonal();
+    renderFiltroCats();
+    renderGestionCats();
+    renderCatalogo();
+    renderProveedores();
+    renderGraficoSemana();
+    renderGraficoCategoria();
+  }
 };
+
+/* ---------- filtro de usuario (tabla de movimientos) ---------- */
+function renderFiltroUsuario() {
+  const sel = document.getElementById('filtroMovUsuario');
+  if (!sel) return;
+  const nombres = [...new Set(
+    D.movimientos.map(m => m.usuarioNombre || 'Sin asignar')
+      .concat(D.ventas.map(v => v.usuarioNombre || 'Sin asignar'))
+      .concat(D.esAdmin ? [] : [D.filtroUsuario])
+  )].filter(Boolean).sort((a, b) => a.localeCompare(b));
+
+  sel.innerHTML = `<option value="todos">Todo el personal</option>` +
+    nombres.map(n => `<option value="${n}">${n}</option>`).join('');
+  sel.value = D.filtroUsuario;
+
+  // El personal no puede cambiarlo: queda fijo en su nombre.
+  sel.disabled = !D.esAdmin;
+}
+function filtrarMovUsuario(v) {
+  if (!D.esAdmin) return;           // por las dudas
+  D.filtroUsuario = v;
+  renderMovimientos();
+}
 
 function poblarSelectCatNuevo() {
   const sel = document.getElementById('nvProdCat');
@@ -177,6 +215,11 @@ function motivoBadge(m) {
 function renderMovimientos() {
   const filtro = document.getElementById('filtroMov').value;
   let movs = [...D.movimientos].reverse();
+
+  // Filtro por usuario. El personal (no admin) queda fijo en su nombre.
+  const fu = D.esAdmin ? D.filtroUsuario : D.usuario.nombre;
+  if (fu && fu !== 'todos') movs = movs.filter(m => (m.usuarioNombre || 'Sin asignar') === fu);
+
   if (filtro === 'salidas') movs = movs.filter(m => m.tipo === 'salida');
   else if (filtro === 'entradas') movs = movs.filter(m => m.tipo === 'entrada');
   else if (filtro === 'perdidas') movs = movs.filter(m => (m.motivo || '').toLowerCase().includes('rdida'));

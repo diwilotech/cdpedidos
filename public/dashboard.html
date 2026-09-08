@@ -18,6 +18,9 @@
     .tabla-scroll { max-height: 380px; overflow: auto; }
     #dashToast { position: fixed; right: 16px; bottom: 16px; z-index: 3000; min-width: 220px; }
     canvas { max-height: 260px; }
+    /* El personal (no admin) solo ve sus movimientos: se oculta el resto. */
+    body:not([data-rol="admin"]) .solo-admin { display: none !important; }
+    body[data-rol="admin"] .solo-personal { display: none !important; }
   </style>
 </head>
 <body>
@@ -40,8 +43,13 @@
 
     <div id="dashContenido" class="d-none">
 
+      <!-- Aviso para el personal (no admin) -->
+      <div class="solo-personal alert alert-light border py-2 px-3 mb-3 small">
+        <i class="bi bi-info-circle me-1"></i> Estás viendo <strong>tus movimientos de inventario</strong> (lo que vendiste, sacaste o ajustaste). El resto del panel es solo para el administrador.
+      </div>
+
       <!-- KPIs -->
-      <div class="row g-2 g-md-3 mb-3">
+      <div class="row g-2 g-md-3 mb-3 solo-admin">
         <div class="col-6 col-lg-3"><div class="kpi"><div class="lbl"><i class="bi bi-cash-stack me-1"></i>Cobrado hoy</div><div class="val text-success" id="kpiVentasHoy">$0</div><div class="lbl" id="kpiVentasHoySub"></div></div></div>
         <div class="col-6 col-lg-3"><div class="kpi"><div class="lbl"><i class="bi bi-hourglass-split me-1"></i>Por cobrar hoy</div><div class="val" style="color:#fd7e14" id="kpiPorCobrarHoy">$0</div><div class="lbl" id="kpiPorCobrarHoySub"></div></div></div>
         <div class="col-6 col-lg-3"><div class="kpi"><div class="lbl"><i class="bi bi-people me-1"></i>Por cobrar total</div><div class="val text-danger" id="kpiPorCobrar">$0</div><div class="lbl">saldo de clientes</div></div></div>
@@ -51,7 +59,7 @@
       <div class="row g-3">
 
         <!-- Ventas del día por personal -->
-        <div class="col-12 col-xl-6">
+        <div class="col-12 col-xl-6 solo-admin">
           <div class="card-dash h-100">
             <div class="hd"><i class="bi bi-person-badge me-2"></i>Ventas de hoy por personal</div>
             <div class="bd">
@@ -66,7 +74,7 @@
         </div>
 
         <!-- Gráfico semana -->
-        <div class="col-12 col-xl-6">
+        <div class="col-12 col-xl-6 solo-admin">
           <div class="card-dash h-100">
             <div class="hd"><i class="bi bi-bar-chart me-2"></i>Ventas de la semana</div>
             <div class="bd"><canvas id="chartSemana"></canvas></div>
@@ -74,7 +82,7 @@
         </div>
 
         <!-- Gráfico categoría -->
-        <div class="col-12 col-xl-6">
+        <div class="col-12 col-xl-6 solo-admin">
           <div class="card-dash h-100">
             <div class="hd"><i class="bi bi-pie-chart me-2"></i>Ventas por categoría</div>
             <div class="bd"><canvas id="chartCategoria"></canvas></div>
@@ -82,7 +90,7 @@
         </div>
 
         <!-- Proveedores -->
-        <div class="col-12 col-xl-6">
+        <div class="col-12 col-xl-6 solo-admin">
           <div class="card-dash h-100">
             <div class="hd"><i class="bi bi-truck me-2"></i>Proveedores y cuentas por pagar</div>
             <div class="bd">
@@ -97,7 +105,7 @@
         </div>
 
         <!-- Catálogo -->
-        <div class="col-12">
+        <div class="col-12 solo-admin">
           <div class="card-dash">
             <div class="hd"><i class="bi bi-journal-text me-2"></i>Catálogo de productos <span class="text-muted fw-normal small">— editá precio, categoría o nombre; se guarda solo</span></div>
             <div class="bd">
@@ -137,12 +145,15 @@
           <div class="card-dash">
             <div class="hd d-flex justify-content-between align-items-center flex-wrap gap-2">
               <span><i class="bi bi-arrow-down-up me-2"></i>Movimientos de inventario — quién sacó / vendió / ajustó</span>
-              <select id="filtroMov" class="form-select form-select-sm" style="width:auto" onchange="renderMovimientos()">
-                <option value="todos">Todos</option>
-                <option value="salidas">Solo salidas</option>
-                <option value="entradas">Solo entradas</option>
-                <option value="perdidas">Solo pérdidas / mermas</option>
-              </select>
+              <div class="d-flex gap-2 flex-wrap">
+                <select id="filtroMovUsuario" class="form-select form-select-sm" style="width:auto" onchange="filtrarMovUsuario(this.value)"></select>
+                <select id="filtroMov" class="form-select form-select-sm" style="width:auto" onchange="renderMovimientos()">
+                  <option value="todos">Todos los tipos</option>
+                  <option value="salidas">Solo salidas</option>
+                  <option value="entradas">Solo entradas</option>
+                  <option value="perdidas">Solo pérdidas / mermas</option>
+                </select>
+              </div>
             </div>
             <div class="bd">
               <div class="table-responsive tabla-scroll">
