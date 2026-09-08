@@ -7,27 +7,34 @@
    ========================================================================== */
 
 function abrirModalCuentas(mesaId, cuentaIdxTarget = 0) {
+  if (!mesasData[mesaId]) mesasData[mesaId] = [];
+
+  // PRIMERA cuenta de la mesa: se pide el nombre igual que en "Nueva Cuenta"
+  // (antes se creaba sola como "Cuenta #1" sin preguntar). Si se cancela, no
+  // se crea nada ni se abre el modal.
+  if (mesasData[mesaId].length === 0) {
+    pedirTexto('¿Cómo quieres llamar a esta nueva cuenta?', 'Cuenta #1', (nombre) => {
+      mesasData[mesaId].push({
+        idCuenta: Date.now(),
+        nombreCuenta: nombre,
+        productos: [],
+        usuarioNombre: obtenerNombreUsuarioActivo()
+      });
+      actualizarBadgeMesa(mesaId);
+      actualizarSidebar();
+      mostrarModalCuentasEnMesa(mesaId, 0);
+    });
+    return;
+  }
+
+  mostrarModalCuentasEnMesa(mesaId, cuentaIdxTarget);
+}
+
+function mostrarModalCuentasEnMesa(mesaId, cuentaIdxTarget) {
   mesaActivaId = mesaId;
   const el = document.querySelector(`[data-mesaid="${mesaId}"]`);
   const nombreMesa = el ? el.querySelector('.nombre-label').innerText : 'Mesa';
-
   document.getElementById('modalTitle').innerHTML = `<i class="bi bi-receipt me-2"></i> Cuentas de ${nombreMesa}`;
-
-  if (!mesasData[mesaId]) {
-    mesasData[mesaId] = [];
-  }
-
-  // Si la mesa no tiene cuentas, inicializa UNA cuenta exclusiva para ESA mesa.
-  if (mesasData[mesaId].length === 0) {
-    mesasData[mesaId].push({
-      idCuenta: Date.now(),
-      nombreCuenta: 'Cuenta #1',
-      productos: [],
-      usuarioNombre: obtenerNombreUsuarioActivo()   // queda a nombre de quien la abre
-    });
-    actualizarBadgeMesa(mesaId);
-    actualizarSidebar();
-  }
 
   cuentaActivaIndex = cuentaIdxTarget < mesasData[mesaId].length ? cuentaIdxTarget : 0;
 

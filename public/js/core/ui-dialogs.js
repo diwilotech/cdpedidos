@@ -76,7 +76,12 @@ function pedirColor(colorInicial, onConfirmar) {
   function restackear() {
     const backdrops = document.querySelectorAll('.modal-backdrop');
     abiertos.forEach(function (modal, i) {
-      if (i === 0) return; // el primero queda con los valores por defecto de Bootstrap
+      if (i === 0) {
+        // el de más abajo: valores por defecto de Bootstrap
+        modal.style.zIndex = '';
+        if (backdrops[i]) backdrops[i].style.zIndex = '';
+        return;
+      }
       const z = 1055 + i * 20;
       modal.style.zIndex = (z + 5);
       if (backdrops[i]) backdrops[i].style.zIndex = z;
