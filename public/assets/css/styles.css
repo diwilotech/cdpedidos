@@ -442,6 +442,34 @@ body[class]{ padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
   background:#0d6efd; color:#fff; border-color:#0d6efd;
 }
 
+/* ===================== KPIs del turno (modal "Ventas") ===================== */
+.kpi-card{
+  border:1px solid transparent; border-radius:12px;
+  padding:10px 8px; height:100%;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; gap:2px;
+}
+.kpi-card .kpi-label{
+  font-size:.72rem; font-weight:700; line-height:1.1;
+  text-transform:uppercase; letter-spacing:.02em;
+}
+.kpi-card .kpi-valor{ font-size:1.15rem; font-weight:800; line-height:1.1; }
+.kpi-card .kpi-sub{ font-size:.68rem; color:#6c757d; line-height:1.1; }
+
+.kpi-card.kpi-verde  { background:#e8f6ee; border-color:#b7e4c7; }
+.kpi-card.kpi-verde  .kpi-label,.kpi-card.kpi-verde  .kpi-valor{ color:#198754; }
+.kpi-card.kpi-naranja{ background:#fff4e8; border-color:#ffd8ac; }
+.kpi-card.kpi-naranja .kpi-label,.kpi-card.kpi-naranja .kpi-valor{ color:#fd7e14; }
+.kpi-card.kpi-azul   { background:#e7f0ff; border-color:#b6d0fb; }
+.kpi-card.kpi-azul   .kpi-label,.kpi-card.kpi-azul   .kpi-valor{ color:#0d6efd; }
+
+@media (max-width:400px){
+  .kpi-card{ padding:8px 4px; }
+  .kpi-card .kpi-label{ font-size:.62rem; }
+  .kpi-card .kpi-valor{ font-size:.95rem; }
+  .kpi-card .kpi-sub{ font-size:.6rem; }
+}
+
 /* Contenedor con scroll propio: así el plano nunca queda "cortado"
    en la parte de abajo, sin importar cuántas mesas tenga.
    Se usa un min-height moderado (no gigante) para no dejar espacio

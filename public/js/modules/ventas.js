@@ -121,8 +121,9 @@ function alcanceVentasActual() {
   };
 }
 
-// Tarjetas del turno de caja actual (todas las personas): cobrado, por
-// cobrar y cuentas abiertas.
+// KPIs del turno de caja actual (todas las personas), arriba del todo y con
+// color: vendido (cobrado), por cobrar y cuentas abiertas. 3 columnas que se
+// reparten parejo y se ven bien también en celular.
 function renderResumenVentas() {
   const cont = document.getElementById('resumenVentasPorUsuario');
   const { ventas, titulo } = alcanceVentasActual();
@@ -133,23 +134,20 @@ function renderResumenVentas() {
   const totalCredito = credito.reduce((s, v) => s + (v.total || 0), 0);
   const abiertas = cuentasAbiertasResumen();
 
-  cont.innerHTML = `
-    <div class="w-100 small fw-bold text-muted mb-1"><i class="bi bi-cash-coin me-1"></i>${titulo}</div>
-    <div class="border rounded-3 p-2 px-3 bg-light">
-      <div class="small text-muted"><i class="bi bi-cash-stack me-1"></i>Vendido (cobrado)</div>
-      <div class="fw-bold text-success fs-5">${formatMoney(totalCobrado)}</div>
-      <div class="small text-muted">${cobrado.length} ${cobrado.length === 1 ? 'venta' : 'ventas'}</div>
-    </div>
-    <div class="border rounded-3 p-2 px-3 bg-light">
-      <div class="small text-muted"><i class="bi bi-hourglass-split me-1"></i>Por cobrar</div>
-      <div class="fw-bold fs-6" style="color:#fd7e14">${formatMoney(totalCredito)}</div>
-      <div class="small text-muted">${credito.length} ${credito.length === 1 ? 'a crédito' : 'a crédito'}</div>
-    </div>
-    <div class="border rounded-3 p-2 px-3 bg-light">
-      <div class="small text-muted"><i class="bi bi-receipt-cutoff me-1"></i>Cuentas abiertas</div>
-      <div class="fw-bold fs-5 text-primary">${abiertas.n}</div>
-      <div class="small text-muted">${formatMoney(abiertas.total)} sin liquidar</div>
+  const kpi = (color, label, valor, sub) => `
+    <div class="col-4">
+      <div class="kpi-card ${color}">
+        <div class="kpi-label">${label}</div>
+        <div class="kpi-valor">${valor}</div>
+        <div class="kpi-sub">${sub}</div>
+      </div>
     </div>`;
+
+  cont.innerHTML = `
+    <div class="col-12 small fw-bold text-muted"><i class="bi bi-cash-coin me-1"></i>${titulo}</div>
+    ${kpi('kpi-verde',   'Vendido',    formatMoney(totalCobrado), `${cobrado.length} ${cobrado.length === 1 ? 'venta' : 'ventas'} · cobrado`)}
+    ${kpi('kpi-naranja', 'Por cobrar', formatMoney(totalCredito), `${credito.length} a crédito`)}
+    ${kpi('kpi-azul',    'Abiertas',   String(abiertas.n),        `${formatMoney(abiertas.total)} sin liquidar`)}`;
 
   // La caja del día vive en el mismo modal: mantené sus tarjetas al día.
   renderCajaEnVentas();
