@@ -70,6 +70,7 @@ function sincronizarCargoFiado(v) {
 }
 
 function abrirModalVentas() {
+  if (typeof renderCajaEnVentas === 'function') renderCajaEnVentas();
   renderResumenVentasPorUsuario();
   renderListaVentas();
   modalVentasBS.show();
@@ -117,6 +118,9 @@ function renderResumenVentasPorUsuario() {
       <div class="fw-bold fs-5 text-primary">${comandasAbiertas}</div>
       <div class="small text-muted">${formatMoney(pendiente)} sin liquidar</div>
     </div>`;
+
+  // La caja del día vive en el mismo modal: mantené sus tarjetas al día.
+  if (typeof renderCajaEnVentas === 'function') renderCajaEnVentas();
 }
 
 function renderListaVentas() {

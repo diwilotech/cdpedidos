@@ -529,27 +529,35 @@ function toggleCuentasFlotante() {
   }
 }
 
-/* --- MENÚ INFERIOR: dropups de "Piso" y "Usuario" --- */
+/* --- MENÚS DESPLEGABLES ---
+   "piso" (dropup del menú inferior), "usuario" y "ajustes" (dropdowns de la
+   barra superior). Solo uno abierto a la vez. */
+const CDP_MENUS = {
+  piso:    ['cdpMenuPiso', 'bbPiso'],
+  usuario: ['cdpMenuUsuario', 'btnUsuarioTop'],
+  ajustes: ['cdpMenuAjustes', 'btnAjustes'],
+};
+
 function cdpCerrarMenus() {
-  document.querySelectorAll('.cdp-dropup').forEach(m => { m.hidden = true; });
-  document.querySelectorAll('.cdp-bb-item.activo').forEach(b => b.classList.remove('activo'));
+  document.querySelectorAll('.cdp-dropup, .cdp-dropdown').forEach(m => { m.hidden = true; });
+  document.querySelectorAll('.cdp-menu-trigger.activo').forEach(b => b.classList.remove('activo'));
 }
 
 function cdpToggleMenu(cual) {
-  const idMenu = cual === 'piso' ? 'cdpMenuPiso' : 'cdpMenuUsuario';
-  const idBtn  = cual === 'piso' ? 'bbPiso' : 'bbUsuario';
-  const menu = document.getElementById(idMenu);
+  const par = CDP_MENUS[cual];
+  if (!par) return;
+  const menu = document.getElementById(par[0]);
   if (!menu) return;
   const abrir = menu.hidden;      // estado al que vamos
   cdpCerrarMenus();
   menu.hidden = !abrir;
-  const btn = document.getElementById(idBtn);
+  const btn = document.getElementById(par[1]);
   if (btn) btn.classList.toggle('activo', abrir);
 }
 
-// Cerrar los dropups al tocar fuera o con Escape.
+// Cerrar los menús al tocar fuera o con Escape.
 document.addEventListener('click', (e) => {
-  if (e.target.closest('.cdp-dropup') || e.target.closest('#bbPiso') || e.target.closest('#bbUsuario')) return;
+  if (e.target.closest('.cdp-dropup') || e.target.closest('.cdp-dropdown') || e.target.closest('.cdp-menu-trigger')) return;
   cdpCerrarMenus();
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cdpCerrarMenus(); });

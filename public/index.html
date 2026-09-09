@@ -28,19 +28,20 @@
 
   <div class="container-fluid">
 
-    <!-- Barra Superior (mínima): marca + edición del plano.
-         Pisos · Inventario · Ventas · Clientes · Cuentas · Caja · Usuario
-         viven ahora en el MENÚ INFERIOR (#cdpBottomBar), para que la app se
-         use igual de cómoda en celular y en escritorio. -->
+    <!-- Barra Superior: marca + menú de USUARIO + menú de EDICIÓN del plano.
+         Pisos · Cuentas · Inventario · Ventas · Clientes viven en el MENÚ
+         INFERIOR (#cdpBottomBar). "Caja" está unificada dentro de Ventas. -->
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2" id="cdpTopBar">
       <span class="fw-bold text-primary d-flex align-items-center">
         <i class="bi bi-box-seam me-2"></i> Control de Pedidos
       </span>
       <div class="d-flex align-items-center gap-2">
-        <button type="button" class="btn btn-sm btn-outline-primary edit-toggle" id="btn-editar" onclick="toggleModoEdicion()" title="Activar edición del plano">
-          <i class="bi bi-pencil-square me-1"></i> Editar
+        <button type="button" class="btn btn-sm btn-outline-secondary cdp-menu-trigger" id="btnUsuarioTop" onclick="cdpToggleMenu('usuario')" title="Usuario">
+          <i class="bi bi-person-circle me-1"></i> Usuario
         </button>
-        <span class="edit-status d-none d-md-inline" id="edit-status"><i class="bi bi-lock me-1"></i> Edición desactivada</span>
+        <button type="button" class="btn btn-sm btn-outline-secondary cdp-menu-trigger" id="btnAjustes" onclick="cdpToggleMenu('ajustes')" title="Edición del plano">
+          <i class="bi bi-sliders"></i>
+        </button>
       </div>
     </div>
 
@@ -79,13 +80,6 @@
 
       <!-- Plano Grid -->
       <div class="col-12">
-
-        <div class="alert alert-light border py-1 px-3 mb-2 small text-muted d-flex justify-content-between align-items-center flex-wrap gap-2">
-          <span>💡 <strong>Gestión Cuentas:</strong> Pulsá <strong>"Cuentas"</strong> en el menú de abajo o el badge de cada mesa para administrar sus comandas.</span>
-          <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
-            <i class="bi bi-database-check me-1"></i> Base de Datos JSON Lista
-          </span>
-        </div>
 
         <!-- Contenedor con scroll propio (horizontal y vertical) para que
              el plano nunca se corte, sin importar cuántas mesas tenga -->
@@ -348,15 +342,18 @@
   <!-- (El antiguo modal "Usuarios / Personal" se eliminó: el acceso lo maneja
        el login único y el admin gestiona al personal desde "Personal · Accesos".) -->
 
-  <!-- MODAL 5: REPORTE DE VENTAS -->
+  <!-- MODAL 5: MIS VENTAS + CAJA DEL DÍA (unificados) -->
   <div class="modal fade" id="modalVentas" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header bg-primary text-white">
           <h5 class="modal-title"><i class="bi bi-graph-up-arrow me-2"></i> Mis Ventas</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
+          <!-- CAJA DEL DÍA: valor inicial / turno abierto (antes de las ventas) -->
+          <div id="ventasCajaSlot" class="mb-3"><!-- lo pinta renderCajaEnVentas() --></div>
+
           <div id="resumenVentasPorUsuario" class="d-flex flex-wrap gap-2 mb-3">
             <!-- Mi resumen -->
           </div>
@@ -365,6 +362,9 @@
           <div id="listaVentas" style="max-height: 340px; overflow-y: auto;">
             <!-- Filas de ventas dinámicas -->
           </div>
+
+          <!-- Botón de cierre de caja, abajo del todo -->
+          <div id="ventasCajaCerrarSlot" class="mt-3"><!-- lo pinta renderCajaEnVentas() --></div>
         </div>
       </div>
     </div>
@@ -426,21 +426,7 @@
   </div>
 
   <!-- (Proveedores y Cuentas por Pagar se movieron al Dashboard, /dashboard.html) -->
-
-  <!-- MODAL: FLUJO DE CAJA (POS) -->
-  <div class="modal fade" id="modalCaja" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-      <div class="modal-content">
-        <div class="modal-header bg-dark text-white">
-          <h5 class="modal-title"><i class="bi bi-cash-coin me-2"></i> Flujo de caja</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body" id="cajaContenido">
-          <!-- contenido dinámico (abrir caja / turno abierto) -->
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- (El "Flujo de caja" se unificó dentro del modal "Mis Ventas".) -->
 
   <!-- Menú Contextual Flotante -->
   <div id="context-menu" class="dropdown-menu shadow">
@@ -452,10 +438,10 @@
   </div>
 
   <!-- ===================== MENÚ INFERIOR (móvil + escritorio) =====================
-       Reemplaza los botones de la barra superior y los botones flotantes.
-       Orden: Piso · Cuentas · Caja · Inventario · Ventas · Clientes · Usuario -->
+       Orden: Piso · Cuentas · Inventario · Ventas · Clientes.
+       "Usuario" y "Edición" están arriba; "Caja" vive dentro de Ventas. -->
   <nav class="cdp-bottombar" id="cdpBottomBar" aria-label="Menú principal">
-    <button type="button" class="cdp-bb-item" id="bbPiso" onclick="cdpToggleMenu('piso')">
+    <button type="button" class="cdp-bb-item cdp-menu-trigger" id="bbPiso" onclick="cdpToggleMenu('piso')">
       <i class="bi bi-layers-half"></i>
       <span class="cdp-bb-label" id="bbPisoLabel">Piso</span>
     </button>
@@ -464,26 +450,18 @@
       <span class="cdp-bb-label">Cuentas</span>
       <span class="cdp-bb-badge d-none" id="bbCuentasBadge">0</span>
     </button>
-    <button type="button" class="cdp-bb-item" id="bbCaja" onclick="cdpCerrarMenus(); abrirModalCaja();">
-      <i class="bi bi-cash-coin"></i>
-      <span class="cdp-bb-label">Caja</span>
-      <span class="cdp-bb-dot d-none" id="bbCajaDot"></span>
-    </button>
     <button type="button" class="cdp-bb-item" onclick="cdpCerrarMenus(); abrirModalInventario();">
       <i class="bi bi-box-seam"></i>
       <span class="cdp-bb-label">Inventario</span>
     </button>
-    <button type="button" class="cdp-bb-item" onclick="cdpCerrarMenus(); abrirModalVentas();">
+    <button type="button" class="cdp-bb-item" id="bbVentas" onclick="cdpCerrarMenus(); abrirModalVentas();">
       <i class="bi bi-graph-up-arrow"></i>
       <span class="cdp-bb-label">Ventas</span>
+      <span class="cdp-bb-dot d-none" id="bbVentasDot" title="Caja abierta"></span>
     </button>
     <button type="button" class="cdp-bb-item" onclick="cdpCerrarMenus(); abrirModalClientes();">
       <i class="bi bi-people"></i>
       <span class="cdp-bb-label">Clientes</span>
-    </button>
-    <button type="button" class="cdp-bb-item" id="bbUsuario" onclick="cdpToggleMenu('usuario')">
-      <i class="bi bi-person-circle"></i>
-      <span class="cdp-bb-label">Usuario</span>
     </button>
   </nav>
 
@@ -496,10 +474,21 @@
     </button>
   </div>
 
-  <!-- Dropup: menú de usuario (auth-gate.js rellena #authUserSlot) -->
-  <div class="cdp-dropup" id="cdpMenuUsuario" hidden>
+  <!-- Dropdown (arriba): menú de usuario (auth-gate.js rellena #authUserSlot) -->
+  <div class="cdp-dropdown" id="cdpMenuUsuario" hidden>
     <div class="cdp-dropup-title"><i class="bi bi-person-circle me-1"></i> Usuario</div>
     <div id="authUserSlot" class="d-grid gap-2"></div>
+  </div>
+
+  <!-- Dropdown (arriba): edición del plano -->
+  <div class="cdp-dropdown" id="cdpMenuAjustes" hidden>
+    <div class="cdp-dropup-title"><i class="bi bi-sliders me-1"></i> Edición del plano</div>
+    <div class="d-grid gap-2">
+      <button type="button" class="btn btn-sm btn-outline-primary edit-toggle" id="btn-editar" onclick="toggleModoEdicion(); cdpCerrarMenus();" title="Activar edición del plano">
+        <i class="bi bi-pencil-square me-1"></i> Editar plano
+      </button>
+      <span class="edit-status" id="edit-status"><i class="bi bi-lock me-1"></i> Edición desactivada</span>
+    </div>
   </div>
 
   <!-- Notificación flotante genérica (producto agregado, sin stock, avisos varios) -->

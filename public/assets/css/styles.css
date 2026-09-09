@@ -371,8 +371,8 @@ body {
 }
 
 /* ===================== MENÚ INFERIOR (móvil + escritorio) =====================
-   Barra fija abajo con: Piso · Cuentas · Caja · Inventario · Ventas · Clientes
-   · Usuario. Sustituye a los botones de la barra superior y a los FAB. */
+   Barra fija abajo con: Piso · Cuentas · Inventario · Ventas · Clientes.
+   "Usuario" y "Edición" son menús de la barra superior. */
 body[class]{ padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
 
 .cdp-bottombar{
@@ -416,7 +416,7 @@ body[class]{ padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
   .cdp-bb-label{ font-size:.7rem; }
 }
 
-/* Dropups del menú inferior (Piso y Usuario) */
+/* Dropup del menú inferior (Piso) */
 .cdp-dropup{
   position:fixed; left:12px; right:12px; bottom:70px; z-index:1002;
   max-width:420px; margin:0 auto;
@@ -428,7 +428,18 @@ body[class]{ padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
 .cdp-dropup .btn-piso-item{ text-align:left; }
 @media (min-width:576px){
   #cdpMenuPiso{ right:auto; left:12px; margin:0; }
-  #cdpMenuUsuario{ left:auto; right:12px; margin:0; }
+}
+
+/* Dropdowns de la barra SUPERIOR (Usuario y Edición) */
+.cdp-dropdown{
+  position:fixed; top:52px; right:12px; z-index:1003;
+  width:min(320px, calc(100vw - 24px));
+  background:#fff; border:1px solid rgba(15,23,42,.10); border-radius:14px;
+  box-shadow:0 16px 44px rgba(15,23,42,.22);
+  padding:12px 14px; max-height:70vh; overflow-y:auto;
+}
+.cdp-menu-trigger.activo{
+  background:#0d6efd; color:#fff; border-color:#0d6efd;
 }
 
 /* Contenedor con scroll propio: así el plano nunca queda "cortado"
