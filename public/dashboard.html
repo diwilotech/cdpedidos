@@ -114,9 +114,10 @@
             </div>
             <div class="bd">
               <div class="row g-2 mb-2">
-                <div class="col-6"><input id="nvCliNombre" class="form-control form-control-sm" placeholder="Nombre del cliente"></div>
-                <div class="col-4"><input id="nvCliTel" class="form-control form-control-sm" placeholder="Teléfono (opcional)"></div>
-                <div class="col-2 d-grid"><button class="btn btn-sm btn-danger" onclick="cliNuevo()"><i class="bi bi-plus-lg"></i></button></div>
+                <div class="col-12 col-sm-4"><input id="nvCliNombre" class="form-control form-control-sm" placeholder="Nombre del cliente"></div>
+                <div class="col-6 col-sm-3"><input id="nvCliTel" class="form-control form-control-sm" placeholder="Teléfono"></div>
+                <div class="col-6 col-sm-3"><input id="nvCliDesc" class="form-control form-control-sm" placeholder="Descripción / nota"></div>
+                <div class="col-12 col-sm-2 d-grid"><button class="btn btn-sm btn-danger" onclick="cliNuevo()"><i class="bi bi-plus-lg"></i> Crear</button></div>
               </div>
               <div id="listaCli" class="tabla-scroll"></div>
             </div>
@@ -132,10 +133,11 @@
             </div>
             <div class="bd">
               <div class="row g-2 mb-2">
-                <div class="col-12 col-sm-4"><input id="nvProvNombre" class="form-control form-control-sm" placeholder="Nombre / razón social"></div>
-                <div class="col-6 col-sm-3"><input id="nvProvNit" class="form-control form-control-sm" placeholder="NIT"></div>
-                <div class="col-6 col-sm-3"><input id="nvProvCel" class="form-control form-control-sm" placeholder="Celular"></div>
-                <div class="col-12 col-sm-2 d-grid"><button class="btn btn-sm btn-dark" onclick="provNuevo()"><i class="bi bi-plus-lg"></i> Crear</button></div>
+                <div class="col-12 col-sm-3"><input id="nvProvNombre" class="form-control form-control-sm" placeholder="Nombre / razón social"></div>
+                <div class="col-6 col-sm-2"><input id="nvProvNit" class="form-control form-control-sm" placeholder="NIT"></div>
+                <div class="col-6 col-sm-2"><input id="nvProvCel" class="form-control form-control-sm" placeholder="Celular"></div>
+                <div class="col-9 col-sm-3"><input id="nvProvDesc" class="form-control form-control-sm" placeholder="Descripción / nota"></div>
+                <div class="col-3 col-sm-2 d-grid"><button class="btn btn-sm btn-dark" onclick="provNuevo()"><i class="bi bi-plus-lg"></i></button></div>
               </div>
               <div id="listaProv" class="tabla-scroll"></div>
             </div>
@@ -239,10 +241,35 @@
         <label class="form-label small fw-bold mb-1">NIT</label>
         <input id="peNit" class="form-control form-control-sm mb-2" maxlength="25" onkeydown="if(event.key==='Enter')provEditarGuardar()">
         <label class="form-label small fw-bold mb-1">Celular</label>
-        <input id="peCel" class="form-control form-control-sm mb-3" maxlength="25" onkeydown="if(event.key==='Enter')provEditarGuardar()">
+        <input id="peCel" class="form-control form-control-sm mb-2" maxlength="25" onkeydown="if(event.key==='Enter')provEditarGuardar()">
+        <label class="form-label small fw-bold mb-1">Descripción / nota</label>
+        <textarea id="peDesc" class="form-control form-control-sm mb-3" rows="2" maxlength="240"></textarea>
         <div class="d-flex justify-content-end gap-2">
           <button class="btn btn-sm btn-outline-secondary" onclick="provEditarCerrar()">Cancelar</button>
           <button class="btn btn-sm btn-dark fw-bold" onclick="provEditarGuardar()"><i class="bi bi-check-lg me-1"></i> Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: editar cliente -->
+  <div id="modalCliEditar" class="dash-overlay" hidden onclick="if(event.target===this) cliEditarCerrar()">
+    <div class="dash-modal" style="max-width:420px">
+      <div class="dash-modal-hd">
+        <div class="fw-bold"><i class="bi bi-person-vcard me-2"></i>Editar cliente</div>
+        <button class="btn btn-sm btn-outline-secondary" onclick="cliEditarCerrar()"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="dash-modal-bd">
+        <input type="hidden" id="ceCliId">
+        <label class="form-label small fw-bold mb-1">Nombre</label>
+        <input id="ceNombre" class="form-control form-control-sm mb-2" maxlength="60" onkeydown="if(event.key==='Enter')cliEditarGuardar()">
+        <label class="form-label small fw-bold mb-1">Teléfono</label>
+        <input id="ceTel" class="form-control form-control-sm mb-2" maxlength="25" onkeydown="if(event.key==='Enter')cliEditarGuardar()">
+        <label class="form-label small fw-bold mb-1">Descripción / nota</label>
+        <textarea id="ceDesc" class="form-control form-control-sm mb-3" rows="2" maxlength="240"></textarea>
+        <div class="d-flex justify-content-end gap-2">
+          <button class="btn btn-sm btn-outline-secondary" onclick="cliEditarCerrar()">Cancelar</button>
+          <button class="btn btn-sm btn-dark fw-bold" onclick="cliEditarGuardar()"><i class="bi bi-check-lg me-1"></i> Guardar</button>
         </div>
       </div>
     </div>

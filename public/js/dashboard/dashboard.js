@@ -631,17 +631,23 @@ function renderClientes() {
   cont.innerHTML = [...D.clientes].sort((a, b) => saldoCli(b.id) - saldoCli(a.id)).map(c => {
     const s = saldoCli(c.id);
     const txt = s > 0 ? formatMoney(s) + ' por cobrar' : s < 0 ? formatMoney(-s) + ' a favor' : 'Al día';
+    const info = [
+      c.telefono ? '<i class="bi bi-telephone me-1"></i>' + c.telefono : '',
+      c.descripcion ? '<i class="bi bi-sticky me-1"></i>' + c.descripcion : ''
+    ].filter(Boolean).join(' · ');
     return `
       <div class="border rounded-3 p-2 mb-2">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
           <div>
             <div class="fw-bold"><i class="bi bi-person-vcard me-1 text-primary"></i>${c.nombre}</div>
+            ${info ? `<div class="small text-muted">${info}</div>` : ''}
             <div class="small ${s > 0 ? 'text-danger' : s < 0 ? 'text-success' : 'text-muted'} fw-bold">${txt}</div>
           </div>
           <div class="d-flex gap-1 flex-wrap">
             <button class="btn btn-sm btn-outline-secondary" onclick="cliDetalle(${c.id})" title="Ver consumos y pagos del cliente"><i class="bi bi-clock-history"></i> Ver cuenta</button>
             <button class="btn btn-sm btn-outline-danger" onclick="cliCargo(${c.id})" title="Anotar consumo / cargo"><i class="bi bi-cart-plus"></i> Cargo</button>
             <button class="btn btn-sm btn-outline-success" onclick="cliAbono(${c.id})" title="Registrar pago"><i class="bi bi-cash-coin"></i> Abono</button>
+            <button class="btn btn-sm btn-outline-primary" onclick="cliEditar(${c.id})" title="Editar nombre, teléfono y descripción"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="cliBorrar(${c.id})"><i class="bi bi-trash3"></i></button>
           </div>
         </div>
@@ -657,11 +663,44 @@ async function cliNuevo() {
   const nombre = document.getElementById('nvCliNombre').value.trim();
   if (!nombre) { alert('Poné el nombre del cliente.'); return; }
   D.contadorClientes++;
-  D.clientes.push({ id: D.contadorClientes, nombre, telefono: document.getElementById('nvCliTel').value.trim() });
+  D.clientes.push({
+    id: D.contadorClientes,
+    nombre,
+    telefono: document.getElementById('nvCliTel').value.trim(),
+    descripcion: document.getElementById('nvCliDesc').value.trim()
+  });
   await guardarClientesD();
   document.getElementById('nvCliNombre').value = '';
   document.getElementById('nvCliTel').value = '';
+  document.getElementById('nvCliDesc').value = '';
   renderClientes(); toast(`Cliente "${nombre}" agregado`);
+}
+
+function cliEditar(id) {
+  const c = D.clientes.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('ceCliId').value = String(c.id);
+  document.getElementById('ceNombre').value = c.nombre || '';
+  document.getElementById('ceTel').value = c.telefono || '';
+  document.getElementById('ceDesc').value = c.descripcion || '';
+  document.getElementById('modalCliEditar').hidden = false;
+  setTimeout(() => document.getElementById('ceNombre').focus(), 40);
+}
+function cliEditarCerrar() {
+  document.getElementById('modalCliEditar').hidden = true;
+}
+async function cliEditarGuardar() {
+  const c = D.clientes.find(x => x.id === parseInt(document.getElementById('ceCliId').value, 10));
+  if (!c) { cliEditarCerrar(); return; }
+  const nombre = document.getElementById('ceNombre').value.trim();
+  if (!nombre) { alert('El cliente necesita un nombre.'); return; }
+  c.nombre = nombre;
+  c.telefono = document.getElementById('ceTel').value.trim();
+  c.descripcion = document.getElementById('ceDesc').value.trim();
+  await guardarClientesD();
+  cliEditarCerrar();
+  renderClientes();
+  toast('Cliente actualizado');
 }
 async function cliBorrar(id) {
   const c = D.clientes.find(x => x.id === id);
@@ -707,8 +746,11 @@ function renderProveedores() {
   cont.innerHTML = [...D.proveedores].sort((a, b) => saldoProv(b.id) - saldoProv(a.id)).map(p => {
     const s = saldoProv(p.id);
     const txt = s > 0 ? formatMoney(s) + ' por pagar' : s < 0 ? formatMoney(-s) + ' a favor' : 'Al día';
-    const contacto = [p.nit ? 'NIT ' + p.nit : '', p.telefono ? '<i class="bi bi-telephone me-1"></i>' + p.telefono : '']
-      .filter(Boolean).join(' · ');
+    const contacto = [
+      p.nit ? 'NIT ' + p.nit : '',
+      p.telefono ? '<i class="bi bi-telephone me-1"></i>' + p.telefono : '',
+      p.descripcion ? '<i class="bi bi-sticky me-1"></i>' + p.descripcion : ''
+    ].filter(Boolean).join(' · ');
     return `
       <div class="border rounded-3 p-2 mb-2">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -721,7 +763,7 @@ function renderProveedores() {
             <button class="btn btn-sm btn-outline-danger" onclick="provFactura(${p.id})" title="Registrar una compra: abre Inventario (stock + forma de pago)"><i class="bi bi-box-arrow-up-right"></i> Factura</button>
             <button class="btn btn-sm btn-outline-success" onclick="provPago(${p.id})" title="Registrar un pago"><i class="bi bi-cash-coin"></i> Pago</button>
             <button class="btn btn-sm btn-outline-secondary" onclick="provDetalle(${p.id})" title="Ver compras y pagos"><i class="bi bi-clock-history"></i></button>
-            <button class="btn btn-sm btn-outline-primary" onclick="provEditar(${p.id})" title="Editar nombre, NIT y celular"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-primary" onclick="provEditar(${p.id})" title="Editar nombre, NIT, celular y descripción"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="provBorrar(${p.id})"><i class="bi bi-trash3"></i></button>
           </div>
         </div>
@@ -742,12 +784,14 @@ async function provNuevo() {
     id: D.contadorProveedores,
     nombre,
     nit: document.getElementById('nvProvNit').value.trim(),
-    telefono: document.getElementById('nvProvCel').value.trim()
+    telefono: document.getElementById('nvProvCel').value.trim(),
+    descripcion: document.getElementById('nvProvDesc').value.trim()
   });
   await guardarProv();
   document.getElementById('nvProvNombre').value = '';
   document.getElementById('nvProvNit').value = '';
   document.getElementById('nvProvCel').value = '';
+  document.getElementById('nvProvDesc').value = '';
   renderProveedores(); toast(`Proveedor "${nombre}" agregado`);
 }
 
@@ -758,6 +802,7 @@ function provEditar(id) {
   document.getElementById('peNombre').value = p.nombre || '';
   document.getElementById('peNit').value = p.nit || '';
   document.getElementById('peCel').value = p.telefono || '';
+  document.getElementById('peDesc').value = p.descripcion || '';
   document.getElementById('modalProvEditar').hidden = false;
   setTimeout(() => document.getElementById('peNombre').focus(), 40);
 }
@@ -772,6 +817,7 @@ async function provEditarGuardar() {
   p.nombre = nombre;
   p.nit = document.getElementById('peNit').value.trim();
   p.telefono = document.getElementById('peCel').value.trim();
+  p.descripcion = document.getElementById('peDesc').value.trim();
   await guardarProv();
   provEditarCerrar();
   renderProveedores();
