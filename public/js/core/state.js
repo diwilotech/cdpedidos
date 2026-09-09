@@ -65,6 +65,10 @@ let movimientosCxp = [];     // { id, fecha, proveedorId, tipo:'factura'|'pago',
 // "Guardar" en el footer. Sobreviven al cambio de pestaña de categoría.
 let cambiosStockPend = {};
 
+// Reposición en curso: { cambios, unidades } mientras está abierto el modal
+// "Guardar reposición" (proveedor + costo + forma de pago).
+let repoPendiente = null;
+
 // --- FLUJO DE CAJA (POS) ---
 let cajaActual = null;       // turno abierto: { id, fecha, usuarioNombre, montoInicial, movimientos:[{tipo:'entrada'|'salida',...}] }
 let cajaHist = [];           // cierres archivados
@@ -83,6 +87,7 @@ let modoEdicion = false;
 const modalCuentasBS = new bootstrap.Modal(document.getElementById('modalCuentas'));
 const modalCatalogoBS = new bootstrap.Modal(document.getElementById('modalCatalogoProductos'));
 const modalInventarioBS = new bootstrap.Modal(document.getElementById('modalInventario'));
+const modalReposicionBS = new bootstrap.Modal(document.getElementById('modalReposicion'));
 const modalVentasBS = new bootstrap.Modal(document.getElementById('modalVentas'));
 const modalMovimientosBS = new bootstrap.Modal(document.getElementById('modalMovimientos'));
 const toastNotificacionBS = new bootstrap.Toast(document.getElementById('toastNotificacion'), { delay: 2000 });

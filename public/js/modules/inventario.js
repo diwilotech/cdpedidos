@@ -290,21 +290,10 @@ function guardarInventarioAjuste() {
 }
 
 /* --- FOOTER: "Guardar reposición…" (mercadería de un proveedor) ---
-   Pregunta proveedor -> cuánto se pagó/pagará -> ¿ya se pagó?
+   Abre el modal #modalReposicion: listado de proveedores + alta de proveedor
+   nuevo (NIT, celular) + monto + forma de pago (ya pagado / a crédito).
      · pagado   -> factura + pago en cuentas por pagar + SALIDA de la caja.
      · crédito  -> factura en cuentas por pagar + línea informativa en la caja. */
-function resolverProveedor(nombre) {
-  const n = (nombre || '').trim();
-  let p = proveedoresData.find(x => (x.nombre || '').toLowerCase() === n.toLowerCase());
-  if (!p) {
-    contadorProveedores++;
-    p = { id: contadorProveedores, nombre: n || 'Proveedor', telefono: '' };
-    proveedoresData.push(p);
-    guardarProveedores();
-  }
-  return p;
-}
-
 function guardarInventarioReposicion() {
   const cambios = recolectarCambiosInv();
   if (!cambios.length) {
@@ -316,27 +305,81 @@ function guardarInventarioReposicion() {
     mostrarNotificacion('Una reposición necesita al menos un ingreso de stock. Usá "Guardar ajuste".', 'warning', 'bi-info-circle');
     return;
   }
+  repoPendiente = { cambios, unidades };
+  abrirModalReposicion();
+}
 
-  const provDefault = (proveedoresData[0] && proveedoresData[0].nombre) || 'Proveedor';
-  pedirTexto('Proveedor de la mercadería:', provDefault, (nombreProv) => {
-    const prov = resolverProveedor(nombreProv);
-    setTimeout(() => {
-      pedirTexto('¿Cuánto se pagó o se pagará por esta mercadería? (COP):', '', (valorStr) => {
-        const monto = parseFloat(String(valorStr).replace(/[^\d.-]/g, ''));
-        if (isNaN(monto) || monto <= 0) {
-          mostrarNotificacion('Ingresá un monto válido.', 'danger', 'bi-exclamation-triangle-fill');
-          return;
-        }
-        setTimeout(() => {
-          pedirSiNo(
-            `Reposición de ${prov.nombre}\n${unidades} und · ${formatMoney(monto)}\n\n¿Ya se pagó en efectivo (sale de la caja)?\nAceptar = pagado  ·  Cancelar = a crédito`,
-            () => finalizarReposicionInv(cambios, prov, monto, unidades, true),
-            () => finalizarReposicionInv(cambios, prov, monto, unidades, false)
-          );
-        }, 350);
-      });
-    }, 350);
-  });
+function abrirModalReposicion() {
+  if (!repoPendiente) return;
+
+  document.getElementById('repoUndsTxt').textContent = repoPendiente.unidades + ' und.';
+
+  const sel = document.getElementById('repoProvSelect');
+  const opciones = proveedoresData
+    .map(p => `<option value="${p.id}">${p.nombre}${p.nit ? ' · NIT ' + p.nit : ''}</option>`)
+    .join('');
+  sel.innerHTML = opciones + `<option value="__nuevo__">➕ Registrar proveedor nuevo…</option>`;
+  // Si no hay proveedores, arrancar en "nuevo".
+  sel.value = proveedoresData.length ? String(proveedoresData[0].id) : '__nuevo__';
+
+  document.getElementById('repoValorInput').value = '';
+  document.getElementById('repoNvNombre').value = '';
+  document.getElementById('repoNvNit').value = '';
+  document.getElementById('repoNvCel').value = '';
+  const rp = document.getElementById('repoPagoYa');
+  if (rp) rp.checked = true;
+  repoProvSelectChange();
+
+  modalReposicionBS.show();
+}
+
+function repoProvSelectChange() {
+  const esNuevo = document.getElementById('repoProvSelect').value === '__nuevo__';
+  document.getElementById('repoProvNuevo').classList.toggle('d-none', !esNuevo);
+}
+
+function confirmarReposicionModal() {
+  if (!repoPendiente) { modalReposicionBS.hide(); return; }
+
+  const sel = document.getElementById('repoProvSelect');
+  let prov;
+
+  if (sel.value === '__nuevo__') {
+    const nombre = (document.getElementById('repoNvNombre').value || '').trim();
+    if (!nombre) {
+      mostrarNotificacion('Ponle nombre al proveedor nuevo.', 'danger', 'bi-exclamation-triangle-fill');
+      return;
+    }
+    contadorProveedores++;
+    prov = {
+      id: contadorProveedores,
+      nombre,
+      nit: (document.getElementById('repoNvNit').value || '').trim(),
+      telefono: (document.getElementById('repoNvCel').value || '').trim()
+    };
+    proveedoresData.push(prov);
+    guardarProveedores();
+  } else {
+    prov = proveedoresData.find(p => String(p.id) === sel.value);
+    if (!prov) {
+      mostrarNotificacion('Elegí un proveedor de la lista.', 'danger', 'bi-exclamation-triangle-fill');
+      return;
+    }
+  }
+
+  const monto = parseFloat(String(document.getElementById('repoValorInput').value).replace(/[^\d.-]/g, ''));
+  if (isNaN(monto) || monto <= 0) {
+    mostrarNotificacion('Indicá cuánto se pagó o se pagará.', 'danger', 'bi-exclamation-triangle-fill');
+    return;
+  }
+
+  const pagoSel = document.querySelector('input[name="repoPago"]:checked');
+  const pagado = !pagoSel || pagoSel.value === 'pagado';
+
+  const { cambios, unidades } = repoPendiente;
+  repoPendiente = null;
+  modalReposicionBS.hide();
+  finalizarReposicionInv(cambios, prov, monto, unidades, pagado);
 }
 
 function finalizarReposicionInv(cambios, prov, monto, unidades, pagado) {

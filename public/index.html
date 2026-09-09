@@ -300,6 +300,63 @@
     </div>
   </div>
 
+  <!-- MODAL: GUARDAR REPOSICIÓN (proveedor + costo + forma de pago) -->
+  <div class="modal fade" id="modalReposicion" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title"><i class="bi bi-truck me-2"></i> Guardar reposición</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-light border py-2 px-3 small mb-3">
+            <i class="bi bi-box-arrow-in-down me-1"></i> Vas a ingresar <strong id="repoUndsTxt">0 und.</strong> al inventario.
+          </div>
+
+          <label class="form-label small fw-bold mb-1">Proveedor</label>
+          <select id="repoProvSelect" class="form-select form-select-sm mb-2" onchange="repoProvSelectChange()">
+            <!-- opciones dinámicas -->
+          </select>
+
+          <div id="repoProvNuevo" class="border rounded-3 p-2 mb-2 bg-light d-none">
+            <div class="small fw-bold text-secondary mb-1"><i class="bi bi-person-plus me-1"></i> Datos del proveedor nuevo</div>
+            <div class="row g-2">
+              <div class="col-12">
+                <input type="text" id="repoNvNombre" class="form-control form-control-sm" placeholder="Nombre / razón social" maxlength="60">
+              </div>
+              <div class="col-6">
+                <input type="text" id="repoNvNit" class="form-control form-control-sm" placeholder="NIT" maxlength="25">
+              </div>
+              <div class="col-6">
+                <input type="text" id="repoNvCel" class="form-control form-control-sm" placeholder="Celular" maxlength="25">
+              </div>
+            </div>
+          </div>
+
+          <label class="form-label small fw-bold mb-1">¿Cuánto se pagó o se pagará? (COP)</label>
+          <div class="input-group input-group-sm mb-3">
+            <span class="input-group-text">$</span>
+            <input type="number" id="repoValorInput" class="form-control" min="0" step="1000" placeholder="Total de la compra">
+          </div>
+
+          <label class="form-label small fw-bold mb-1">Forma de pago</label>
+          <div class="d-flex gap-2">
+            <input type="radio" class="btn-check" name="repoPago" id="repoPagoYa" value="pagado" checked>
+            <label class="btn btn-outline-success btn-sm flex-fill" for="repoPagoYa"><i class="bi bi-cash-coin me-1"></i> Ya pagado<br><span class="small text-muted">sale de la caja</span></label>
+            <input type="radio" class="btn-check" name="repoPago" id="repoPagoCredito" value="credito">
+            <label class="btn btn-outline-danger btn-sm flex-fill" for="repoPagoCredito"><i class="bi bi-hourglass-split me-1"></i> A crédito<br><span class="small text-muted">queda por pagar</span></label>
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-success btn-sm fw-bold" onclick="confirmarReposicionModal()">
+            <i class="bi bi-check-lg me-1"></i> Guardar reposición
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- (El antiguo modal "Usuarios / Personal" se eliminó: el acceso lo maneja
        el login único y el admin gestiona al personal desde "Personal · Accesos".) -->
 
