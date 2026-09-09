@@ -1,11 +1,12 @@
 /* ============================================================================
-   js/modules/ventas.js — "Mis ventas" + Caja del día (módulo unificado)
+   js/modules/ventas.js — "Ventas del turno" + Caja del día (módulo unificado)
    ----------------------------------------------------------------------------
-   `registrarVenta()` se llama al liquidar una cuenta. El modal muestra SOLO
-   las ventas del usuario que tiene la sesión: su resumen y su lista, donde
-   cada venta se puede desplegar para ver qué vendió y editarla (agregar
-   productos, cambiar cantidades) — el stock se ajusta en consecuencia.
-   El panorama completo (todos los usuarios) está en el Dashboard.
+   `registrarVenta()` se llama al liquidar una cuenta. El modal muestra LAS
+   VENTAS DE LA CAJA: desde que el turno se abrió hasta que se cierra (de
+   cualquier persona, no solo del vendedor en sesión). Cada venta se puede
+   desplegar para ver qué se vendió y editarla (agregar productos, cambiar
+   cantidades) — el stock se ajusta en consecuencia. El panorama completo
+   (histórico, todos los turnos) está en el Dashboard.
 
    La CAJA DEL DÍA vive en la 2ª mitad de este archivo (antes estaba en
    js/modules/caja.js). Se opera desde este mismo modal y sigue esta lógica:
@@ -81,52 +82,73 @@ function sincronizarCargoFiado(v) {
 
 function abrirModalVentas() {
   renderCajaEnVentas();
-  renderResumenVentasPorUsuario();
+  renderResumenVentas();
   renderListaVentas();
   modalVentasBS.show();
 }
 
-// Solo MIS números: 3 tarjetas — vendido hoy (efectivo), cuentas por
-// cobrar (ventas a crédito) y mesas/comandas mías todavía abiertas.
-function renderResumenVentasPorUsuario() {
+// Alcance de "Mis Ventas": ahora NO es "las ventas del vendedor", sino
+// LAS VENTAS DE LA CAJA — desde que el turno se abrió hasta que se cierra.
+//   · caja abierta      -> ventas con fecha >= apertura (de cualquier persona).
+//   · sin caja abierta  -> el último turno cerrado (apertura..cierre).
+//   · nunca hubo caja   -> respaldo: ventas de hoy.
+function alcanceVentasActual() {
+  if (cajaActual) {
+    const desde = new Date(cajaActual.fecha).getTime();
+    return {
+      ventas: ventasData.filter(v => new Date(v.fecha).getTime() >= desde),
+      titulo: `Turno abierto · desde las ${horaCorta(cajaActual.fecha)}`,
+      abierto: true
+    };
+  }
+  if (Array.isArray(cajaHist) && cajaHist.length) {
+    const t = cajaHist[cajaHist.length - 1];
+    const ini = new Date(t.fecha).getTime();
+    const fin = t.cierre ? new Date(t.cierre.fecha).getTime() : Date.now();
+    return {
+      ventas: ventasData.filter(v => {
+        const ts = new Date(v.fecha).getTime();
+        return ts >= ini && ts <= fin;
+      }),
+      titulo: `Último turno cerrado · ${formatFecha(t.fecha)}`,
+      abierto: false
+    };
+  }
+  return {
+    ventas: ventasData.filter(v => esMismoDiaVenta(v.fecha)),
+    titulo: 'Caja sin abrir · ventas de hoy',
+    abierto: false
+  };
+}
+
+// Tarjetas del turno de caja actual (todas las personas): cobrado, por
+// cobrar y cuentas abiertas.
+function renderResumenVentas() {
   const cont = document.getElementById('resumenVentasPorUsuario');
-  const mio = obtenerNombreUsuarioActivo();
-  const mias = ventasData.filter(v => (v.usuarioNombre || 'Sin asignar') === mio);
+  const { ventas, titulo } = alcanceVentasActual();
 
-  // 1) Vendido hoy = ventas de hoy cobradas (sin cliente asociado)
-  const hoyCobrado = mias.filter(v => esMismoDiaVenta(v.fecha) && !v.clienteId);
-  const totalHoy = hoyCobrado.reduce((s, v) => s + v.total, 0);
-
-  // 2) Cuentas por cobrar = mis ventas asociadas a un cliente
-  const aCredito = mias.filter(v => v.clienteId);
-  const totalCredito = aCredito.reduce((s, v) => s + v.total, 0);
-
-  // 3) Abiertos = mis comandas sin liquidar y su total pendiente
-  let comandasAbiertas = 0, pendiente = 0;
-  Object.values(mesasData).forEach(cuentas => {
-    (cuentas || []).forEach(c => {
-      if ((c.usuarioNombre || 'Sin asignar') === mio && (c.productos || []).length) {
-        comandasAbiertas++;
-        pendiente += c.productos.reduce((s, p) => s + p.cant * p.precio, 0);
-      }
-    });
-  });
+  const cobrado = ventas.filter(v => !v.clienteId);
+  const totalCobrado = cobrado.reduce((s, v) => s + (v.total || 0), 0);
+  const credito = ventas.filter(v => v.clienteId);
+  const totalCredito = credito.reduce((s, v) => s + (v.total || 0), 0);
+  const abiertas = cuentasAbiertasResumen();
 
   cont.innerHTML = `
+    <div class="w-100 small fw-bold text-muted mb-1"><i class="bi bi-cash-coin me-1"></i>${titulo}</div>
     <div class="border rounded-3 p-2 px-3 bg-light">
-      <div class="small text-muted"><i class="bi bi-cash-stack me-1"></i>Vendido hoy</div>
-      <div class="fw-bold text-success fs-5">${formatMoney(totalHoy)}</div>
-      <div class="small text-muted">${hoyCobrado.length} ${hoyCobrado.length === 1 ? 'venta' : 'ventas'}</div>
+      <div class="small text-muted"><i class="bi bi-cash-stack me-1"></i>Vendido (cobrado)</div>
+      <div class="fw-bold text-success fs-5">${formatMoney(totalCobrado)}</div>
+      <div class="small text-muted">${cobrado.length} ${cobrado.length === 1 ? 'venta' : 'ventas'}</div>
     </div>
     <div class="border rounded-3 p-2 px-3 bg-light">
-      <div class="small text-muted"><i class="bi bi-hourglass-split me-1"></i>Cuentas por cobrar</div>
+      <div class="small text-muted"><i class="bi bi-hourglass-split me-1"></i>Por cobrar</div>
       <div class="fw-bold fs-6" style="color:#fd7e14">${formatMoney(totalCredito)}</div>
-      <div class="small text-muted">${aCredito.length} ${aCredito.length === 1 ? 'venta a crédito' : 'ventas a crédito'}</div>
+      <div class="small text-muted">${credito.length} ${credito.length === 1 ? 'a crédito' : 'a crédito'}</div>
     </div>
     <div class="border rounded-3 p-2 px-3 bg-light">
-      <div class="small text-muted"><i class="bi bi-receipt-cutoff me-1"></i>Abiertos</div>
-      <div class="fw-bold fs-5 text-primary">${comandasAbiertas}</div>
-      <div class="small text-muted">${formatMoney(pendiente)} sin liquidar</div>
+      <div class="small text-muted"><i class="bi bi-receipt-cutoff me-1"></i>Cuentas abiertas</div>
+      <div class="fw-bold fs-5 text-primary">${abiertas.n}</div>
+      <div class="small text-muted">${formatMoney(abiertas.total)} sin liquidar</div>
     </div>`;
 
   // La caja del día vive en el mismo modal: mantené sus tarjetas al día.
@@ -135,17 +157,19 @@ function renderResumenVentasPorUsuario() {
 
 function renderListaVentas() {
   const cont = document.getElementById('listaVentas');
-  const mio = obtenerNombreUsuarioActivo();
-  const mias = [...ventasData].reverse()
-    .filter(v => (v.usuarioNombre || 'Sin asignar') === mio)
-    .slice(0, 100);
+  const { ventas } = alcanceVentasActual();
+  const lista = [...ventas].reverse().slice(0, 200);
 
-  if (mias.length === 0) {
-    cont.innerHTML = `<div class="text-center text-muted py-4 small">Todavía no tenés ventas registradas.</div>`;
+  if (lista.length === 0) {
+    cont.innerHTML = `<div class="text-center text-muted py-4 small">${
+      cajaActual
+        ? 'Todavía no hay ventas en este turno de caja.'
+        : 'No hay ventas para mostrar. Abrí la caja para registrar el turno.'
+    }</div>`;
     return;
   }
 
-  cont.innerHTML = mias.map(v => {
+  cont.innerHTML = lista.map(v => {
     const abierta = ventasExpandidas.has(v.id);
     const unidades = v.productos.reduce((s, p) => s + p.cant, 0);
     const chipCliente = v.clienteNombre
@@ -156,7 +180,7 @@ function renderListaVentas() {
         <div class="d-flex justify-content-between align-items-center p-2" style="cursor:pointer" onclick="toggleVentaDetalle('${v.id}')">
           <div>
             <div class="fw-bold"><i class="bi ${abierta ? 'bi-chevron-down' : 'bi-chevron-right'} me-1"></i>${v.mesaNombre} · ${v.cuentaNombre}${chipCliente}</div>
-            <div class="small text-muted">${formatFecha(v.fecha)} · ${unidades} und.</div>
+            <div class="small text-muted">${formatFecha(v.fecha)} · ${unidades} und. · <i class="bi bi-person-fill"></i> ${v.usuarioNombre || 'Sin asignar'}</div>
           </div>
           <span class="fs-6 fw-bold text-success">${formatMoney(v.total)}</span>
         </div>
@@ -225,7 +249,7 @@ function agregarProductoAVenta(ventaId) {
   guardarVentas();
   sincronizarCargoFiado(v);
   refrescarVistasInventarioSiEstanAbiertas();
-  renderResumenVentasPorUsuario();
+  renderResumenVentas();
   renderListaVentas();
   mostrarNotificacion(`${prod.name} x${qty} agregado a la venta`, 'success', 'bi-check-circle-fill');
 }
@@ -243,7 +267,7 @@ function modificarLineaVenta(ventaId, idx, delta) {
   guardarVentas();
   sincronizarCargoFiado(v);
   refrescarVistasInventarioSiEstanAbiertas();
-  renderResumenVentasPorUsuario();
+  renderResumenVentas();
   renderListaVentas();
 }
 
@@ -258,7 +282,7 @@ function eliminarLineaVenta(ventaId, idx) {
   guardarVentas();
   sincronizarCargoFiado(v);
   refrescarVistasInventarioSiEstanAbiertas();
-  renderResumenVentasPorUsuario();
+  renderResumenVentas();
   renderListaVentas();
 }
 
@@ -448,7 +472,7 @@ function renderCajaEnVentas() {
 // Refresca la caja y el resto del modal "Mis Ventas".
 function refrescarVentasYCaja() {
   renderCajaEnVentas();
-  renderResumenVentasPorUsuario();
+  renderResumenVentas();
   renderListaVentas();
 }
 
