@@ -76,7 +76,11 @@ function renderListaClientes() {
       <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
         <div>
           <div class="fw-bold"><i class="bi bi-person-vcard me-1 text-primary"></i>${c.nombre}</div>
-          <div class="small text-muted">${c.telefono ? '<i class="bi bi-telephone me-1"></i>' + c.telefono + ' · ' : ''}<span class="${saldoClase} fw-bold">${saldoTxt}</span></div>
+          ${(c.telefono || c.descripcion) ? `<div class="small text-muted">${[
+            c.telefono ? '<i class="bi bi-telephone me-1"></i>' + c.telefono : '',
+            c.descripcion ? '<i class="bi bi-sticky me-1"></i>' + c.descripcion : ''
+          ].filter(Boolean).join(' · ')}</div>` : ''}
+          <div class="small"><span class="${saldoClase} fw-bold">${saldoTxt}</span></div>
         </div>
         <div class="d-flex gap-1 flex-wrap">
           ${fiadoModoSeleccion
@@ -85,7 +89,7 @@ function renderListaClientes() {
               <button class="btn btn-sm btn-outline-primary fw-bold" onclick="verCuentaCliente(${c.id})" title="Ver la cuenta / extracto del cliente"><i class="bi bi-journal-text me-1"></i> Ver cuenta</button>
               <button class="btn btn-sm btn-outline-danger" onclick="registrarCargoFiado(${c.id})" title="Anotar un consumo a la cuenta del cliente"><i class="bi bi-cart-plus"></i> Cargar</button>
               <button class="btn btn-sm btn-outline-success" onclick="registrarAbonoFiado(${c.id})" title="Registrar un pago / abono del cliente"><i class="bi bi-cash-coin"></i> Abono</button>
-              <button class="btn btn-sm btn-outline-secondary" onclick="renombrarCliente(${c.id})" title="Editar cliente"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="editarClienteModal(${c.id})" title="Editar nombre, teléfono y descripción"><i class="bi bi-pencil"></i></button>
               <button class="btn btn-sm btn-outline-danger" onclick="eliminarCliente(${c.id})" title="Eliminar cliente"><i class="bi bi-trash3"></i></button>
             `}
         </div>
@@ -98,27 +102,48 @@ function renderListaClientes() {
 function agregarCliente() {
   const nombre = document.getElementById('nuevoClienteNombre').value.trim();
   const telefono = document.getElementById('nuevoClienteTelefono').value.trim();
+  const descripcion = document.getElementById('nuevoClienteDescripcion').value.trim();
   if (!nombre) {
     mostrarNotificacion('Ponle un nombre al cliente.', 'danger', 'bi-exclamation-triangle-fill');
     return;
   }
   contadorClientes++;
-  clientesData.push({ id: contadorClientes, nombre, telefono });
+  clientesData.push({ id: contadorClientes, nombre, telefono, descripcion });
   guardarClientes();
   document.getElementById('nuevoClienteNombre').value = '';
   document.getElementById('nuevoClienteTelefono').value = '';
+  document.getElementById('nuevoClienteDescripcion').value = '';
   renderListaClientes();
   mostrarNotificacion(`Cliente "${nombre}" agregado`, 'success', 'bi-person-plus-fill');
 }
 
-function renombrarCliente(id) {
+// Editar toda la ficha del cliente (nombre, teléfono, descripción).
+function editarClienteModal(id) {
   const c = clientesData.find(x => x.id === id);
   if (!c) return;
-  pedirTexto('Nombre del cliente:', c.nombre, (nuevo) => {
-    c.nombre = nuevo;
-    guardarClientes();
-    renderListaClientes();
-  });
+  document.getElementById('editCliId').value = String(id);
+  document.getElementById('editCliNombre').value = c.nombre || '';
+  document.getElementById('editCliTel').value = c.telefono || '';
+  document.getElementById('editCliDesc').value = c.descripcion || '';
+  modalClienteEditarBS.show();
+}
+
+function guardarEdicionCliente() {
+  const c = clientesData.find(x => x.id === parseInt(document.getElementById('editCliId').value, 10));
+  if (!c) { modalClienteEditarBS.hide(); return; }
+  const nombre = document.getElementById('editCliNombre').value.trim();
+  if (!nombre) {
+    mostrarNotificacion('El cliente necesita un nombre.', 'danger', 'bi-exclamation-triangle-fill');
+    return;
+  }
+  c.nombre = nombre;
+  c.telefono = document.getElementById('editCliTel').value.trim();
+  c.descripcion = document.getElementById('editCliDesc').value.trim();
+  guardarClientes();
+  modalClienteEditarBS.hide();
+  renderListaClientes();
+  refrescarCuentaClienteSiAbierta();
+  mostrarNotificacion('Cliente actualizado', 'success', 'bi-check-circle-fill');
 }
 
 function eliminarCliente(id) {
@@ -198,7 +223,10 @@ function verCuentaCliente(clienteId) {
   if (!c) return;
   cuentaClienteAbiertaId = clienteId;
   document.getElementById('ccNombre').textContent = c.nombre;
-  document.getElementById('ccTel').innerHTML = c.telefono ? `<i class="bi bi-telephone me-1"></i>${c.telefono}` : '';
+  document.getElementById('ccTel').innerHTML = [
+    c.telefono ? `<i class="bi bi-telephone me-1"></i>${c.telefono}` : '',
+    c.descripcion ? `<i class="bi bi-sticky me-1"></i>${c.descripcion}` : ''
+  ].filter(Boolean).join(' · ');
   document.getElementById('ccBtnCargar').onclick = () => registrarCargoFiado(clienteId);
   document.getElementById('ccBtnAbono').onclick = () => registrarAbonoFiado(clienteId);
   renderCuentaCliente();

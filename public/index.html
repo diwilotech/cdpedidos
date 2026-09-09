@@ -449,13 +449,16 @@
           </div>
 
           <div class="row g-2 mb-3">
-            <div class="col-12 col-md-6">
+            <div class="col-12 col-md-4">
               <input type="text" id="nuevoClienteNombre" class="form-control form-control-sm" placeholder="Nombre del cliente" maxlength="50">
             </div>
-            <div class="col-8 col-md-4">
-              <input type="text" id="nuevoClienteTelefono" class="form-control form-control-sm" placeholder="Teléfono (opcional)" maxlength="25">
+            <div class="col-6 col-md-3">
+              <input type="text" id="nuevoClienteTelefono" class="form-control form-control-sm" placeholder="Teléfono" maxlength="25">
             </div>
-            <div class="col-4 col-md-2 d-grid">
+            <div class="col-6 col-md-3">
+              <input type="text" id="nuevoClienteDescripcion" class="form-control form-control-sm" placeholder="Descripción / nota" maxlength="120">
+            </div>
+            <div class="col-12 col-md-2 d-grid">
               <button class="btn btn-sm btn-danger fw-bold" onclick="agregarCliente()">
                 <i class="bi bi-person-plus-fill me-1"></i> Agregar
               </button>
@@ -502,6 +505,31 @@
               </thead>
               <tbody id="ccBody"><!-- filas dinámicas --></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EDITAR CLIENTE (nombre / teléfono / descripción) -->
+  <div class="modal fade" id="modalClienteEditar" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <div class="modal-header py-2 bg-danger text-white">
+          <h6 class="modal-title mb-0"><i class="bi bi-person-vcard me-1"></i> Editar cliente</h6>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="editCliId">
+          <label class="form-label small fw-bold mb-1">Nombre</label>
+          <input type="text" id="editCliNombre" class="form-control form-control-sm mb-2" maxlength="50">
+          <label class="form-label small fw-bold mb-1">Teléfono</label>
+          <input type="text" id="editCliTel" class="form-control form-control-sm mb-2" maxlength="25">
+          <label class="form-label small fw-bold mb-1">Descripción / nota</label>
+          <textarea id="editCliDesc" class="form-control form-control-sm mb-3" rows="2" maxlength="240"></textarea>
+          <div class="d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-sm btn-danger fw-bold" onclick="guardarEdicionCliente()"><i class="bi bi-check-lg me-1"></i> Guardar</button>
           </div>
         </div>
       </div>

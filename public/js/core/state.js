@@ -101,6 +101,7 @@ const modalCatalogoBS = new bootstrap.Modal(document.getElementById('modalCatalo
 const modalInventarioBS = new bootstrap.Modal(document.getElementById('modalInventario'));
 const modalReposicionBS = new bootstrap.Modal(document.getElementById('modalReposicion'));
 const modalMedioPagoBS = new bootstrap.Modal(document.getElementById('modalMedioPago'));
+const modalClienteEditarBS = new bootstrap.Modal(document.getElementById('modalClienteEditar'));
 const modalVentasBS = new bootstrap.Modal(document.getElementById('modalVentas'));
 const modalMovimientosBS = new bootstrap.Modal(document.getElementById('modalMovimientos'));
 const toastNotificacionBS = new bootstrap.Toast(document.getElementById('toastNotificacion'), { delay: 2000 });
