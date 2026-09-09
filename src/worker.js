@@ -23,6 +23,7 @@
 const COOKIE = "cdp_sesion";
 const SESION_MS = 30 * 24 * 3600 * 1000; // 30 días
 const PBKDF2_ITER = 100000;
+const GRACIA_MS = 15 * 24 * 3600 * 1000; // período de prueba para negocios nuevos
 
 /* ---------- helpers HTTP ---------- */
 const json = (data, init = {}) =>
@@ -94,7 +95,7 @@ async function usuarioActual(request, env) {
   const tok = cookies(request)[COOKIE];
   if (!tok) return null;
   const row = await env.DB.prepare(
-    `SELECT u.id, u.org_id, u.email, u.nombre, u.rol, u.estado, s.expira_en, o.nombre AS negocio
+    `SELECT u.id, u.org_id, u.email, u.nombre, u.rol, u.es_super, u.estado, s.expira_en, o.nombre AS negocio
        FROM sessions s
        JOIN users u ON u.id = s.user_id
        JOIN organizations o ON o.id = u.org_id
@@ -108,7 +109,49 @@ async function usuarioActual(request, env) {
   if (row.estado !== "activo") return null;
   return row;
 }
-const publico = (u) => ({ email: u.email, nombre: u.nombre, rol: u.rol, negocio: u.negocio, orgId: u.org_id });
+const publico = (u) => ({ email: u.email, nombre: u.nombre, rol: u.rol, negocio: u.negocio, orgId: u.org_id, esSuper: !!u.es_super });
+
+/* ---------- suscripciones ---------- */
+async function precioMensual(env) {
+  const r = await env.DB.prepare("SELECT valor FROM plataforma_config WHERE clave='precio_mensual'").first();
+  return r ? (parseInt(r.valor, 10) || 0) : 0;
+}
+// Estado de la suscripción de un negocio: 'ok' (usa normal) | 'solo_lectura'.
+async function estadoSuscripcion(env, orgId, ahora) {
+  ahora = ahora || Date.now();
+  const o = await env.DB.prepare(
+    `SELECT o.gracia_hasta, o.bloqueo_manual_hasta,
+            (SELECT COUNT(*) FROM users u WHERE u.org_id = o.id AND u.es_super = 1) AS supers
+       FROM organizations o WHERE o.id = ?`
+  ).bind(orgId).first();
+  if (!o) return { estado: "ok" };
+  if (o.supers > 0) return { estado: "ok", exento: true };   // el negocio del super-admin no se cobra
+
+  const d = new Date(ahora);
+  const anio = d.getUTCFullYear(), mes = d.getUTCMonth() + 1;
+  const pago = await env.DB.prepare(
+    "SELECT 1 FROM suscripcion_pagos WHERE org_id = ? AND anio = ? AND mes = ?"
+  ).bind(orgId, anio, mes).first();
+
+  const enGracia = (o.gracia_hasta || 0) > ahora;
+  const desbloqueada = (o.bloqueo_manual_hasta || 0) > ahora;
+  const ok = !!pago || enGracia || desbloqueada;
+  return {
+    estado: ok ? "ok" : "solo_lectura",
+    mesActual: `${anio}-${String(mes).padStart(2, "0")}`,
+    pagadoMesActual: !!pago,
+    enGracia, graciaHasta: o.gracia_hasta || null,
+    desbloqueada, bloqueoManualHasta: o.bloqueo_manual_hasta || null,
+    precioMensual: await precioMensual(env)
+  };
+}
+// Corta escrituras cuando la suscripción está vencida (solo lectura).
+async function bloqueoEscritura(env, orgId) {
+  const s = await estadoSuscripcion(env, orgId);
+  return s.estado === "solo_lectura"
+    ? json({ error: "suscripcion-vencida" }, { status: 402 })
+    : null;
+}
 
 /* ---------- CRUD genérico /api/db/:tabla ----------
    Lista blanca: cada tabla declara sus columnas editables por el cliente y el
@@ -128,6 +171,11 @@ async function manejarDb(path, request, env, url) {
   const def = TABLAS[tabla];
   if (!def) return json({ error: "tabla no permitida" }, { status: 404 });
   const m = request.method;
+
+  if (m !== "GET") {
+    const cortar = await bloqueoEscritura(env, org);
+    if (cortar) return cortar;
+  }
 
   if (m === "GET" && !id) {
     const where = ["org_id = ?"];
@@ -191,8 +239,8 @@ async function manejarApi(path, request, env, url) {
     const salt = randHex(16);
     const now = Date.now();
     await env.DB.batch([
-      env.DB.prepare("INSERT INTO organizations (id, nombre, creado_en) VALUES (?, ?, ?)")
-        .bind(orgId, String(negocio).trim(), now),
+      env.DB.prepare("INSERT INTO organizations (id, nombre, creado_en, gracia_hasta) VALUES (?, ?, ?, ?)")
+        .bind(orgId, String(negocio).trim(), now, now + GRACIA_MS),
       env.DB.prepare(
         `INSERT INTO users (id, org_id, email, nombre, rol, pin_hash, pin_salt, estado, creado_en, registrado_en)
          VALUES (?, ?, ?, ?, 'admin', ?, ?, 'activo', ?, ?)`
@@ -200,7 +248,10 @@ async function manejarApi(path, request, env, url) {
     ]);
     const tok = await crearSesion(env, userId);
     return json(
-      { user: { email: norm(email), nombre: String(negocio).trim(), rol: "admin", negocio: String(negocio).trim(), orgId } },
+      {
+        user: { email: norm(email), nombre: String(negocio).trim(), rol: "admin", negocio: String(negocio).trim(), orgId, esSuper: false },
+        suscripcion: await estadoSuscripcion(env, orgId),
+      },
       { headers: { "Set-Cookie": setCookie(tok) } }
     );
   }
@@ -228,7 +279,10 @@ async function manejarApi(path, request, env, url) {
     }
     await env.DB.prepare("UPDATE users SET fallos=0, bloqueado_hasta=NULL WHERE id=?").bind(u.id).run();
     const tok = await crearSesion(env, u.id);
-    return json({ user: publico(u) }, { headers: { "Set-Cookie": setCookie(tok) } });
+    return json(
+      { user: publico(u), suscripcion: await estadoSuscripcion(env, u.org_id) },
+      { headers: { "Set-Cookie": setCookie(tok) } }
+    );
   }
 
   /* ---- logout ---- */
@@ -241,7 +295,8 @@ async function manejarApi(path, request, env, url) {
   /* ---- me ---- */
   if (path === "/api/me" && m === "GET") {
     const u = await usuarioActual(request, env);
-    return u ? json({ user: publico(u) }) : json({ error: "no-auth" }, { status: 401 });
+    if (!u) return json({ error: "no-auth" }, { status: 401 });
+    return json({ user: publico(u), suscripcion: await estadoSuscripcion(env, u.org_id) });
   }
 
   /* ---- registro por invitación (auto-registro del personal) ---- */
@@ -326,6 +381,89 @@ async function manejarApi(path, request, env, url) {
     }
   }
 
+  /* ---- panel del super-admin: suscripciones ---- */
+  if (path === "/api/admin" || path.startsWith("/api/admin/")) {
+    const u = await usuarioActual(request, env);
+    if (!u) return json({ error: "no-auth" }, { status: 401 });
+    if (!u.es_super) return json({ error: "solo el super-admin" }, { status: 403 });
+
+    if (path === "/api/admin/config" && m === "GET") {
+      return json({ precio_mensual: await precioMensual(env) });
+    }
+    if (path === "/api/admin/config" && m === "POST") {
+      const { precio_mensual } = await leerBody(request);
+      const v = String(Math.max(0, parseInt(precio_mensual, 10) || 0));
+      await env.DB.prepare(
+        "INSERT INTO plataforma_config (clave, valor) VALUES ('precio_mensual', ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor"
+      ).bind(v).run();
+      return json({ precio_mensual: parseInt(v, 10) });
+    }
+
+    if (path === "/api/admin/negocios" && m === "GET") {
+      const ahora = Date.now();
+      const dNow = new Date(ahora);
+      const anioActual = dNow.getUTCFullYear(), mesActual = dNow.getUTCMonth() + 1;
+      const anio = parseInt(url.searchParams.get("anio"), 10) || anioActual;
+      const precio = await precioMensual(env);
+
+      const { results: orgs } = await env.DB.prepare(
+        `SELECT o.id, o.nombre, o.creado_en, o.gracia_hasta, o.bloqueo_manual_hasta,
+                (SELECT COUNT(*) FROM users u WHERE u.org_id = o.id AND u.es_super = 1) AS supers,
+                (SELECT COUNT(*) FROM users u WHERE u.org_id = o.id) AS usuarios
+           FROM organizations o ORDER BY o.creado_en`
+      ).all();
+      const { results: pagos } = await env.DB.prepare(
+        "SELECT org_id, mes, monto, fecha_pago FROM suscripcion_pagos WHERE anio = ?"
+      ).bind(anio).all();
+
+      const negocios = orgs.map((o) => {
+        const mapa = {};
+        pagos.filter((p) => p.org_id === o.id).forEach((p) => { mapa[p.mes] = { monto: p.monto, fecha_pago: p.fecha_pago }; });
+        const esSuper = o.supers > 0;
+        const pagadoMesActual = anio === anioActual ? !!mapa[mesActual] : true;
+        const enGracia = (o.gracia_hasta || 0) > ahora;
+        const desbloqueada = (o.bloqueo_manual_hasta || 0) > ahora;
+        let estado = "al_dia";
+        if (esSuper) estado = "exento";
+        else if (!pagadoMesActual && !enGracia && !desbloqueada) estado = "solo_lectura";
+        else if (!pagadoMesActual && desbloqueada) estado = "desbloqueada";
+        else if (!pagadoMesActual && enGracia) estado = "gracia";
+        return {
+          id: o.id, nombre: o.nombre, creado_en: o.creado_en, usuarios: o.usuarios,
+          gracia_hasta: o.gracia_hasta, bloqueo_manual_hasta: o.bloqueo_manual_hasta,
+          esSuper, estado, pagos: mapa,
+        };
+      });
+      return json({ anio, anio_actual: anioActual, mes_actual: mesActual, precio_mensual: precio, negocios });
+    }
+
+    if (path === "/api/admin/pago" && m === "POST") {
+      const { org_id, anio, mes, pagado, monto, nota } = await leerBody(request);
+      if (!org_id || !anio || !mes) return json({ error: "faltan datos" }, { status: 400 });
+      if (pagado) {
+        const mm = monto == null ? await precioMensual(env) : (parseInt(monto, 10) || 0);
+        await env.DB.prepare(
+          `INSERT INTO suscripcion_pagos (org_id, anio, mes, monto, fecha_pago, nota) VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(org_id, anio, mes) DO UPDATE SET monto = excluded.monto, fecha_pago = excluded.fecha_pago, nota = excluded.nota`
+        ).bind(String(org_id), parseInt(anio, 10), parseInt(mes, 10), mm, new Date().toISOString(), String(nota || "")).run();
+      } else {
+        await env.DB.prepare("DELETE FROM suscripcion_pagos WHERE org_id = ? AND anio = ? AND mes = ?")
+          .bind(String(org_id), parseInt(anio, 10), parseInt(mes, 10)).run();
+      }
+      return noContent();
+    }
+
+    if (path === "/api/admin/bloqueo" && m === "POST") {
+      const { org_id, hasta } = await leerBody(request);
+      if (!org_id) return json({ error: "falta org_id" }, { status: 400 });
+      await env.DB.prepare("UPDATE organizations SET bloqueo_manual_hasta = ? WHERE id = ?")
+        .bind(hasta == null ? null : parseInt(hasta, 10), String(org_id)).run();
+      return noContent();
+    }
+
+    return json({ error: "ruta admin no encontrada" }, { status: 404 });
+  }
+
   /* ---- CRUD relacional genérico ---- */
   if (path.startsWith("/api/db/")) {
     return manejarDb(path, request, env, url);
@@ -336,6 +474,11 @@ async function manejarApi(path, request, env, url) {
     const u = await usuarioActual(request, env);
     if (!u) return json({ error: "no-auth" }, { status: 401 });
     const org = u.org_id;
+
+    if (m !== "GET") {
+      const cortar = await bloqueoEscritura(env, org);
+      if (cortar) return cortar;
+    }
 
     if (m === "GET") {
       const k = url.searchParams.get("key");

@@ -18,9 +18,11 @@ PRAGMA foreign_keys = ON;
 --  NEGOCIOS (restaurantes / tenants)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS organizations (
-  id        TEXT PRIMARY KEY,        -- uuid
-  nombre    TEXT NOT NULL,           -- nombre del restaurante
-  creado_en INTEGER NOT NULL
+  id                   TEXT PRIMARY KEY,   -- uuid
+  nombre               TEXT NOT NULL,      -- nombre del restaurante
+  creado_en            INTEGER NOT NULL,
+  gracia_hasta         INTEGER,            -- epoch ms; hasta cuándo puede usar sin pagar (signup: +15 días)
+  bloqueo_manual_hasta INTEGER             -- epoch ms; si > ahora, el super-admin la mantiene habilitada aunque deba
 );
 
 -- ---------------------------------------------------------------------------
@@ -36,6 +38,7 @@ CREATE TABLE IF NOT EXISTS users (
   email           TEXT NOT NULL UNIQUE,        -- login global (una persona = un negocio)
   nombre          TEXT NOT NULL,
   rol             TEXT NOT NULL DEFAULT 'personal',
+  es_super        INTEGER NOT NULL DEFAULT 0,  -- 1 = super-admin de la plataforma (ve /admin, cobra)
   pin_hash        TEXT,                        -- NULL hasta que la persona se registra
   pin_salt        TEXT,
   estado          TEXT NOT NULL DEFAULT 'pendiente',
@@ -69,6 +72,29 @@ CREATE TABLE IF NOT EXISTS bloques (
   valor  TEXT NOT NULL,                        -- JSON serializado
   ts     INTEGER NOT NULL,                     -- Date.now() de la última escritura
   PRIMARY KEY (org_id, clave)
+);
+
+-- ---------------------------------------------------------------------------
+--  SUSCRIPCIONES (panel /admin del super-admin)
+--  · precio mensual global en plataforma_config
+--  · un pago por (negocio, año, mes): la FILA existe = ese mes está pagado
+--  · negocio "al día" si el mes en curso está pagado, o está en gracia, o el
+--    super-admin puso bloqueo_manual_hasta en el futuro. Si no -> SOLO LECTURA.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS plataforma_config (
+  clave TEXT PRIMARY KEY,
+  valor TEXT NOT NULL
+);
+INSERT OR IGNORE INTO plataforma_config (clave, valor) VALUES ('precio_mensual', '0');
+
+CREATE TABLE IF NOT EXISTS suscripcion_pagos (
+  org_id     TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  anio       INTEGER NOT NULL,
+  mes        INTEGER NOT NULL,                 -- 1..12
+  monto      INTEGER,                          -- COP cobrado ese mes
+  fecha_pago TEXT,                             -- ISO 8601
+  nota       TEXT,
+  PRIMARY KEY (org_id, anio, mes)
 );
 
 

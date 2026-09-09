@@ -29,11 +29,27 @@
       if (!window.__CDP_RELOAD_LOCK__) { window.__CDP_RELOAD_LOCK__ = true; location.reload(); }
       throw new Error('sesión caída');
     }
+    if (r.status === 402) {
+      avisarSuscripcion();
+      throw new Error('suscripcion-vencida');
+    }
     const txt = await r.text();
     let data = null;
     try { data = txt ? JSON.parse(txt) : null; } catch (e) { /* 204 */ }
     if (!r.ok) throw new Error((data && data.error) || (metodo + ' ' + ruta + ' → ' + r.status));
     return data;
+  }
+
+  // La suscripción del negocio venció: el Worker rechaza toda escritura con 402.
+  // Un solo aviso cada 20 s para no floodear si el usuario insiste.
+  let ultimoAviso = 0;
+  function avisarSuscripcion() {
+    const ahora = Date.now();
+    if (ahora - ultimoAviso < 20000) return;
+    ultimoAviso = ahora;
+    const msg = 'Suscripción vencida: la app está en solo lectura, no se guardaron los cambios.';
+    if (typeof mostrarNotificacion === 'function') mostrarNotificacion(msg, 'danger', 'bi-lock-fill');
+    else alert(msg);
   }
 
   function qs(filtros) {

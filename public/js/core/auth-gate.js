@@ -71,7 +71,7 @@
         method: 'POST',
         body: JSON.stringify({ email: val('cdpEmail'), pin: val('cdpPin') }),
       });
-      if (ok) return iniciarSesion(data.user);
+      if (ok) return iniciarSesion(data.user, data.suscripcion);
       b.disabled = false;
       pantallaLogin(data.error || 'No se pudo entrar');
     };
@@ -104,7 +104,7 @@
         method: 'POST',
         body: JSON.stringify({ email: val('cdpEmail'), pin: val('cdpPin'), negocio: val('cdpNegocio') }),
       });
-      if (ok) return iniciarSesion(data.user);
+      if (ok) return iniciarSesion(data.user, data.suscripcion);
       b.disabled = false;
       pantallaSignup(data.error || 'No se pudo crear la cuenta');
     };
@@ -149,15 +149,17 @@
   async function arrancarRemoto() {
     const { ok, data } = await api('/api/me');
     if (!ok) return pantallaLogin();
-    iniciarSesion(data.user);
+    iniciarSesion(data.user, data.suscripcion);
   }
 
-  async function iniciarSesion(user) {
+  async function iniciarSesion(user, suscripcion) {
     window.__CDP_USER__ = user;
+    window.__CDP_SUSCRIPCION__ = suscripcion || null;
     window.__CDP_BACKEND__ = 'remote';
     document.body.dataset.rol = user.rol;
     cerrarVista();
     pintarChip(user);
+    pintarBannerSuscripcion(suscripcion);
     if (typeof window.__cdpArrancar === 'function') await window.__cdpArrancar();
 
     // Vengo del Dashboard ("Factura" de un proveedor) -> abrir Inventario
@@ -186,8 +188,30 @@
         ? `<a class="btn btn-sm btn-outline-dark" href="/dashboard.html" title="Panel de administración"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
            <button class="btn btn-sm btn-outline-primary" onclick="cdpCerrarMenus(); abrirModalPersonal()" title="Gestionar accesos del personal"><i class="bi bi-people-fill me-1"></i>Personal</button>`
         : `<button class="btn btn-sm btn-outline-dark" onclick="cdpCerrarMenus(); abrirModalMovimientos()" title="Ver mis movimientos de inventario"><i class="bi bi-arrow-down-up me-1"></i>Mis movimientos</button>`}
+      ${user.esSuper
+        ? `<a class="btn btn-sm btn-outline-success" href="/admin.html" title="Panel de suscripciones"><i class="bi bi-cash-coin me-1"></i>Suscripciones</a>`
+        : ''}
       <button class="btn btn-sm btn-outline-danger" onclick="cdpCerrarSesion()" title="Cerrar sesión"><i class="bi bi-box-arrow-right me-1"></i>Cerrar sesión</button>
     `;
+  }
+
+  // Barra fija arriba cuando la suscripción del negocio está vencida: la app
+  // sigue abriendo pero en SOLO LECTURA (el Worker rechaza las escrituras con
+  // 402). El super-admin la desbloquea desde /admin.
+  function pintarBannerSuscripcion(s) {
+    const previo = document.getElementById('cdpBannerSusc');
+    if (previo) previo.remove();
+    if (!s || s.estado !== 'solo_lectura') return;
+
+    const admin = window.__CDP_USER__ && window.__CDP_USER__.rol === 'admin';
+    const b = document.createElement('div');
+    b.id = 'cdpBannerSusc';
+    b.style.cssText = 'background:#dc3545;color:#fff;padding:8px 14px;font-size:.85rem;font-weight:600;' +
+      'text-align:center;position:relative;z-index:1080';
+    b.innerHTML =
+      `<i class="bi bi-lock-fill me-1"></i>Suscripción vencida — la app quedó en <u>solo lectura</u>. ` +
+      (admin ? 'Ponete al día para reactivar los cambios.' : 'Avisale al administrador.');
+    document.body.insertAdjacentElement('afterbegin', b);
   }
 
   window.cdpCerrarSesion = async function () {
@@ -202,7 +226,7 @@
     try {
       if (token) return await pantallaRegistro(token);
       const { ok, status, data } = await api('/api/me');
-      if (ok) return iniciarSesion(data.user);
+      if (ok) return iniciarSesion(data.user, data.suscripcion);
       if (status === 401) return pantallaLogin();
       throw new Error('me ' + status);
     } catch (e) {

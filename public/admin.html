@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suscripciones — Control de Pedidos</title>
+  <link rel="icon" href="/assets/img/icon.svg">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    body { background: #f6f7f9; }
+    .card-adm { border: 1px solid #e6e8eb; border-radius: 14px; background: #fff; }
+    .card-adm > .hd { padding: 12px 16px; border-bottom: 1px solid #eef0f2; }
+    .card-adm > .bd { padding: 14px 16px; }
+    .mapa { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; }
+    .mes {
+      border: 1px solid #dee2e6; border-radius: 8px; padding: 6px 2px; text-align: center;
+      cursor: pointer; user-select: none; font-size: .72rem; line-height: 1.15; background: #fff;
+      transition: filter .12s ease, transform .12s ease;
+    }
+    .mes:hover { filter: brightness(.97); transform: translateY(-1px); }
+    .mes .m-nom { font-weight: 700; color: #6c757d; }
+    .mes .m-ico { font-size: 1.1rem; display: block; }
+    .mes.pagado  { background: #e8f6ee; border-color: #b7e4c7; }
+    .mes.pagado  .m-ico { color: #198754; }
+    .mes.debe    { background: #fdecea; border-color: #f5c2c7; }
+    .mes.debe    .m-ico { color: #dc3545; }
+    .mes.futuro  { background: #f8f9fa; color: #adb5bd; }
+    .mes.futuro  .m-ico { color: #ced4da; }
+    .mes.actual  { box-shadow: 0 0 0 2px rgba(13,110,253,.45); }
+    #admToast { position: fixed; right: 16px; bottom: 16px; z-index: 3000; min-width: 220px; }
+  </style>
+</head>
+<body>
+  <nav class="navbar bg-white border-bottom sticky-top">
+    <div class="container-fluid px-3 px-md-4">
+      <span class="navbar-brand fw-bold"><i class="bi bi-cash-coin me-2 text-primary"></i>Suscripciones</span>
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge text-bg-primary"><i class="bi bi-person-fill me-1"></i><span id="admUser">…</span></span>
+        <a href="/" class="btn btn-sm btn-outline-dark"><i class="bi bi-arrow-left me-1"></i>Salir</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid px-3 px-md-4 py-3" style="max-width: 1100px;">
+
+    <div id="admCargando" class="text-center text-muted py-5">
+      <div class="spinner-border text-primary" role="status"></div>
+      <div class="mt-2 small">Cargando…</div>
+    </div>
+
+    <div id="admContenido" class="d-none">
+
+      <!-- Precio + año -->
+      <div class="card-adm mb-3">
+        <div class="bd d-flex flex-wrap align-items-end gap-3">
+          <div>
+            <label class="form-label small fw-bold mb-1">Precio mensual (COP)</label>
+            <div class="input-group input-group-sm" style="width: 200px;">
+              <span class="input-group-text">$</span>
+              <input type="number" id="admPrecio" class="form-control" min="0" step="1000">
+              <button class="btn btn-primary" onclick="admGuardarPrecio()"><i class="bi bi-check-lg"></i></button>
+            </div>
+          </div>
+          <div class="ms-auto d-flex align-items-center gap-2">
+            <button class="btn btn-sm btn-outline-secondary" onclick="admCambiarAnio(-1)"><i class="bi bi-chevron-left"></i></button>
+            <span class="fw-bold fs-5" id="admAnio">—</span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="admCambiarAnio(1)"><i class="bi bi-chevron-right"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="small text-muted mb-2">
+        <i class="bi bi-info-circle me-1"></i> Tocá un mes para marcarlo pagado / sin pagar.
+        Verde = pagado · rojo = debe · gris = mes futuro. Si el mes en curso no está pagado (y no hay prueba ni desbloqueo), la app del negocio queda en <strong>solo lectura</strong>.
+      </div>
+
+      <div id="admLista"></div>
+
+    </div>
+  </div>
+
+  <div id="admToast" class="toast align-items-center text-white bg-dark border-0" role="alert">
+    <div class="d-flex"><div class="toast-body" id="admToastTxt"></div></div>
+  </div>
+
+  <script src="js/admin/admin.js"></script>
+  <script src="js/admin/admin-gate.js"></script>
+</body>
+</html>

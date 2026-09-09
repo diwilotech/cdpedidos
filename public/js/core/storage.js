@@ -62,6 +62,20 @@
     }
   }
 
+  // La suscripción del negocio venció (HTTP 402): el Worker rechaza escrituras.
+  // No reventamos el autosave con throw; avisamos una vez y seguimos (la app
+  // ya arrancó en solo lectura, con su banner rojo arriba).
+  var avisadoSusc = 0;
+  function suscripcionVencida() {
+    var ahora = Date.now();
+    if (ahora - avisadoSusc < 20000) return;
+    avisadoSusc = ahora;
+    console.warn('[storage] suscripción vencida: cambios NO guardados (solo lectura)');
+    if (typeof window.mostrarNotificacion === 'function') {
+      window.mostrarNotificacion('Suscripción vencida: la app está en solo lectura, no se guardaron los cambios.', 'danger', 'bi-lock-fill');
+    }
+  }
+
   var remote = {
     get: async function (k) {
       var r = await fetch('/api/bloque?key=' + encodeURIComponent(k), { credentials: 'same-origin' });
@@ -78,6 +92,7 @@
         body: JSON.stringify({ key: k, value: String(value) })
       });
       if (r.status === 401) { sesionCaida(); return; }
+      if (r.status === 402) { suscripcionVencida(); return; }
       if (!r.ok) throw new Error('POST /api/bloque ' + r.status);
     },
     remove: async function (k) {
@@ -85,6 +100,7 @@
         method: 'DELETE', credentials: 'same-origin'
       });
       if (r.status === 401) { sesionCaida(); return; }
+      if (r.status === 402) { suscripcionVencida(); return; }
       if (!r.ok) throw new Error('DELETE /api/bloque ' + r.status);
     }
   };
