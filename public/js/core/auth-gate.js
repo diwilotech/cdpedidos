@@ -62,7 +62,7 @@
       <input id="cdpEmail" type="email" class="form-control mb-2" placeholder="correo@ejemplo.com" autocomplete="username">
       <input id="cdpPin" type="password" inputmode="numeric" maxlength="8" class="form-control cdp-pin mb-3" placeholder="PIN" autocomplete="current-password">
       <button id="cdpEntrar" class="btn btn-primary w-100 fw-bold">Entrar</button>
-      <button id="cdpIrSetup" class="btn btn-link btn-sm w-100 mt-2 text-muted text-decoration-none">Primera vez · configurar administrador</button>
+      <button id="cdpIrSignup" class="btn btn-link btn-sm w-100 mt-2 text-muted text-decoration-none">¿Restaurante nuevo? · Crear mi cuenta</button>
     `);
     const entrar = async () => {
       const b = document.getElementById('cdpEntrar');
@@ -77,34 +77,39 @@
     };
     document.getElementById('cdpEntrar').onclick = entrar;
     document.getElementById('cdpPin').addEventListener('keydown', (e) => { if (e.key === 'Enter') entrar(); });
-    document.getElementById('cdpIrSetup').onclick = () => pantallaSetup();
+    document.getElementById('cdpIrSignup').onclick = () => pantallaSignup();
     setTimeout(() => document.getElementById('cdpEmail').focus(), 60);
   }
 
-  function pantallaSetup(msg) {
+  // Auto-registro: crea el restaurante + su administrador.
+  function pantallaSignup(msg) {
     vista(`
-      <h5 class="fw-bold mb-1"><i class="bi bi-shield-lock me-2 text-primary"></i>Configurar administrador</h5>
-      <p class="text-muted small mb-3">Solo funciona la primera vez, con el correo del administrador.</p>
+      <h5 class="fw-bold mb-1"><i class="bi bi-shop me-2 text-primary"></i>Crear mi restaurante</h5>
+      <p class="text-muted small mb-3">Con esto quedás como administrador y ya podés invitar a tu personal.</p>
       ${msg ? `<div class="alert alert-danger py-2 small mb-3">${msg}</div>` : ''}
-      <input id="cdpEmail" type="email" class="form-control mb-2" placeholder="correo del administrador">
-      <input id="cdpPin" type="password" inputmode="numeric" maxlength="8" class="form-control cdp-pin mb-1" placeholder="PIN nuevo (4 a 8 dígitos)">
-      <input id="cdpPin2" type="password" inputmode="numeric" maxlength="8" class="form-control cdp-pin mb-3" placeholder="Repetir PIN">
-      <button id="cdpGuardar" class="btn btn-primary w-100 fw-bold">Guardar y entrar</button>
+      <label class="form-label small mb-1">Nombre del restaurante</label>
+      <input id="cdpNegocio" type="text" class="form-control mb-2" maxlength="60" placeholder="Ej. La Esquina">
+      <label class="form-label small mb-1">Tu correo</label>
+      <input id="cdpEmail" type="email" class="form-control mb-2" placeholder="correo@ejemplo.com" autocomplete="username">
+      <input id="cdpPin" type="password" inputmode="numeric" maxlength="8" class="form-control cdp-pin mb-1" placeholder="PIN (4 a 8 dígitos)" autocomplete="new-password">
+      <input id="cdpPin2" type="password" inputmode="numeric" maxlength="8" class="form-control cdp-pin mb-3" placeholder="Repetir PIN" autocomplete="new-password">
+      <button id="cdpCrearNeg" class="btn btn-primary w-100 fw-bold">Crear y entrar</button>
       <button id="cdpVolver" class="btn btn-link btn-sm w-100 mt-2 text-muted text-decoration-none">Volver</button>
     `);
-    document.getElementById('cdpGuardar').onclick = async () => {
-      if (val('cdpPin') !== val('cdpPin2')) return pantallaSetup('Los PIN no coinciden');
-      const b = document.getElementById('cdpGuardar');
+    document.getElementById('cdpCrearNeg').onclick = async () => {
+      if (val('cdpPin') !== val('cdpPin2')) return pantallaSignup('Los PIN no coinciden');
+      const b = document.getElementById('cdpCrearNeg');
       b.disabled = true;
-      const { ok, data } = await api('/api/setup', {
+      const { ok, data } = await api('/api/signup', {
         method: 'POST',
-        body: JSON.stringify({ email: val('cdpEmail'), pin: val('cdpPin') }),
+        body: JSON.stringify({ email: val('cdpEmail'), pin: val('cdpPin'), negocio: val('cdpNegocio') }),
       });
-      if (ok) return arrancarRemoto();
+      if (ok) return iniciarSesion(data.user);
       b.disabled = false;
-      pantallaSetup(data.error || 'No se pudo configurar');
+      pantallaSignup(data.error || 'No se pudo crear la cuenta');
     };
     document.getElementById('cdpVolver').onclick = () => pantallaLogin();
+    setTimeout(() => document.getElementById('cdpNegocio').focus(), 60);
   }
 
   async function pantallaRegistro(token) {
@@ -112,7 +117,7 @@
     if (!ok) return pantallaLogin(data.error || 'Invitación inválida');
     vista(`
       <h5 class="fw-bold mb-1"><i class="bi bi-person-badge me-2 text-primary"></i>Crear tu acceso</h5>
-      <p class="text-muted small mb-3">Invitación para <strong>${data.email}</strong>. Elegí tu PIN.</p>
+      <p class="text-muted small mb-3">Invitación para <strong>${data.email}</strong>${data.negocio ? ` · <span class="text-primary">${data.negocio}</span>` : ''}. Elegí tu PIN.</p>
       <div id="cdpMsg"></div>
       <label class="form-label small mb-1">Tu nombre</label>
       <input id="cdpNombre" type="text" class="form-control mb-2" value="${(data.nombre || '').replace(/"/g, '&quot;')}">
@@ -173,6 +178,7 @@
     if (!slot) return;
     const admin = user.rol === 'admin';
     slot.innerHTML = `
+      ${user.negocio ? `<div class="small fw-bold text-primary"><i class="bi bi-shop me-1"></i>${user.negocio}</div>` : ''}
       <span class="badge ${admin ? 'text-bg-primary' : 'text-bg-secondary'} py-2">
         <i class="bi bi-person-fill me-1"></i>${user.nombre}${admin ? ' · admin' : ''}
       </span>

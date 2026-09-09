@@ -6,7 +6,7 @@
 
    Dos backends, elegidos por `window.__CDP_BACKEND__` (lo fija auth-gate.js):
 
-     'remote'  -> datos COMPARTIDOS (shared:true) van al Worker: /api/estado,
+     'remote'  -> datos COMPARTIDOS (shared:true) van al Worker: /api/bloque,
                   que guarda en la base D1 `cdpedidos-db`. Todos los
                   dispositivos con sesión ven lo mismo.
      'local' / (sin definir)
@@ -53,7 +53,7 @@
     }
   };
 
-  // ── Backend REMOTO (Worker + D1 vía /api/estado) ────────────────────────
+  // ── Backend REMOTO (Worker + D1 vía /api/bloque) ────────────────────────
   function sesionCaida() {
     // El token venció o se cerró en otra pestaña: recargar para mostrar login.
     if (!window.__CDP_RELOAD_LOCK__) {
@@ -64,28 +64,28 @@
 
   var remote = {
     get: async function (k) {
-      var r = await fetch('/api/estado?key=' + encodeURIComponent(k), { credentials: 'same-origin' });
+      var r = await fetch('/api/bloque?key=' + encodeURIComponent(k), { credentials: 'same-origin' });
       if (r.status === 401) { sesionCaida(); return null; }
-      if (!r.ok) throw new Error('GET /api/estado ' + r.status);
+      if (!r.ok) throw new Error('GET /api/bloque ' + r.status);
       var j = await r.json();
       return (j && j.value != null) ? { value: j.value } : null;
     },
     set: async function (k, value) {
-      var r = await fetch('/api/estado', {
+      var r = await fetch('/api/bloque', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ key: k, value: String(value) })
       });
       if (r.status === 401) { sesionCaida(); return; }
-      if (!r.ok) throw new Error('POST /api/estado ' + r.status);
+      if (!r.ok) throw new Error('POST /api/bloque ' + r.status);
     },
     remove: async function (k) {
-      var r = await fetch('/api/estado?key=' + encodeURIComponent(k), {
+      var r = await fetch('/api/bloque?key=' + encodeURIComponent(k), {
         method: 'DELETE', credentials: 'same-origin'
       });
       if (r.status === 401) { sesionCaida(); return; }
-      if (!r.ok) throw new Error('DELETE /api/estado ' + r.status);
+      if (!r.ok) throw new Error('DELETE /api/bloque ' + r.status);
     }
   };
 
