@@ -82,6 +82,11 @@ let mesaActivaId = null;
 let cuentaActivaIndex = 0;
 let categoriaSeleccionada = "cat-all";
 
+// Destino del "Catálogo de Productos":
+//   null                       -> la cuenta activa de la mesa (comportamiento normal)
+//   { tipo:'venta', ventaId }   -> una venta ya registrada (editar desde Caja)
+let catalogoDestino = null;
+
 let elementosSeleccionados = new Set();
 let itemMenuContextual = null;
 let modoEdicion = false;

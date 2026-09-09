@@ -38,6 +38,7 @@ function registrarVenta(mesaId, cuenta) {
     id: 'venta-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
     fecha: new Date().toISOString(),
     mesaId, mesaNombre,
+    cuentaId: cuenta.idCuenta || null,     // trazabilidad hacia la cuenta de origen
     cuentaNombre: cuenta.nombreCuenta,
     usuarioNombre: cuenta.usuarioNombre || obtenerNombreUsuarioActivo(),
     total,
@@ -178,46 +179,27 @@ function renderVentaDetalle(v) {
         <td class="text-center"><button class="btn btn-sm btn-link text-danger p-0" onclick="eliminarLineaVenta('${v.id}',${i})" title="Quitar de la venta"><i class="bi bi-trash"></i></button></td>
       </tr>`).join('');
 
-  const opciones = [...dbJSON.products]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map(p => `<option value="${p.id}">${p.name} — ${formatMoney(p.price)}</option>`).join('');
-
   return `
     <div class="border-top p-2 bg-light">
-      <div class="table-responsive">
-        <table class="table table-sm align-middle mb-2"><tbody>${filas}</tbody></table>
+      <div class="d-flex justify-content-between align-items-center bg-white border rounded p-2 mb-2">
+        <span class="small text-muted fw-bold">Editá los productos de esta venta</span>
+        <button class="btn btn-sm btn-primary fw-bold" onclick="abrirCatalogoDesdeVenta('${v.id}')">
+          <i class="bi bi-grid-3x3-gap-fill me-1"></i> Catálogo de Productos
+        </button>
       </div>
-      <div class="d-flex gap-1 align-items-center flex-wrap">
-        <span class="small text-muted fw-bold">Agregar:</span>
-        <select id="addProdSel-${v.id}" class="form-select form-select-sm" style="max-width:230px">${opciones}</select>
-        <input id="addProdQty-${v.id}" type="number" min="1" value="1" class="form-control form-control-sm" style="width:64px">
-        <button class="btn btn-sm btn-success fw-bold" onclick="agregarProductoAVenta('${v.id}')"><i class="bi bi-plus-lg me-1"></i>Agregar producto</button>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0"><tbody>${filas}</tbody></table>
       </div>
     </div>`;
 }
 
-function agregarProductoAVenta(ventaId) {
-  const v = ventasData.find(x => x.id === ventaId);
-  if (!v) return;
-  const productId = document.getElementById('addProdSel-' + ventaId).value;
-  const qty = Math.max(1, parseInt(document.getElementById('addProdQty-' + ventaId).value, 10) || 1);
-  const prod = dbJSON.products.find(p => p.id === productId);
-  if (!prod) return;
-  if (obtenerStock(productId) < qty) { notificarSinStock(prod.name); return; }
-
-  const linea = v.productos.find(p => p.productId === productId);
-  if (linea) linea.cant += qty;
-  else v.productos.push({ productId, categoryId: prod.categoryId, nombre: prod.name, cant: qty, precio: prod.price });
-
-  ajustarStock(productId, -qty, 'Venta (agregado a venta)');
-  v.total = v.productos.reduce((s, p) => s + p.cant * p.precio, 0);
-  guardarVentas();
-  sincronizarCargoFiado(v);
-  refrescarVistasInventarioSiEstanAbiertas();
-  renderCajaEnVentas();
-  renderListaVentas();
-  mostrarNotificacion(`${prod.name} x${qty} agregado a la venta`, 'success', 'bi-check-circle-fill');
+// Abre el mismo "Catálogo de Productos" que las cuentas, pero apuntando a
+// esta venta (agregar producto = descuenta stock y actualiza el total).
+function abrirCatalogoDesdeVenta(ventaId) {
+  abrirCatalogoProductos({ tipo: 'venta', ventaId });
 }
+// (Agregar productos a una venta se hace ahora con el "Catálogo de Productos"
+//  -> ver abrirCatalogoDesdeVenta() y agregarProductoDesdeCatalogo().)
 
 function modificarLineaVenta(ventaId, idx, delta) {
   const v = ventasData.find(x => x.id === ventaId);

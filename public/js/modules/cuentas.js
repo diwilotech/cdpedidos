@@ -6,6 +6,11 @@
    y liquidación de la cuenta (que registra la venta a nombre del operador).
    ========================================================================== */
 
+// Identificador único y estable de cada cuenta / comanda.
+function nuevoIdCuenta() {
+  return 'cta-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+}
+
 function abrirModalCuentas(mesaId, cuentaIdxTarget = 0) {
   if (!mesasData[mesaId]) mesasData[mesaId] = [];
 
@@ -15,7 +20,7 @@ function abrirModalCuentas(mesaId, cuentaIdxTarget = 0) {
   if (mesasData[mesaId].length === 0) {
     pedirTexto('¿Cómo quieres llamar a esta nueva cuenta?', 'Cuenta #1', (nombre) => {
       mesasData[mesaId].push({
-        idCuenta: Date.now(),
+        idCuenta: nuevoIdCuenta(),
         nombreCuenta: nombre,
         productos: [],
         usuarioNombre: obtenerNombreUsuarioActivo()
@@ -78,7 +83,7 @@ function crearNuevaCuentaEnModal() {
 
   pedirTexto('¿Cómo quieres llamar a esta nueva cuenta?', nombreSugerido, (nombre) => {
     cuentas.push({
-      idCuenta: Date.now(),
+      idCuenta: nuevoIdCuenta(),
       nombreCuenta: nombre,
       productos: [],
       usuarioNombre: obtenerNombreUsuarioActivo()   // queda a nombre de quien la abre

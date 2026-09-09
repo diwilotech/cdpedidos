@@ -135,6 +135,21 @@ window.__cdpArrancar = async function arrancarApp() {
     guardarEstado();
   }
 
+  // Toda cuenta debe tener un identificador único y estable (las guardadas
+  // por versiones anteriores pueden no tenerlo, o traer un Date.now() suelto).
+  let idsBackfilleados = false;
+  Object.values(mesasData).forEach(cuentas => {
+    (cuentas || []).forEach(c => {
+      if (!c.idCuenta || typeof c.idCuenta === 'number') {
+        c.idCuenta = (typeof nuevoIdCuenta === 'function')
+          ? nuevoIdCuenta()
+          : 'cta-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+        idsBackfilleados = true;
+      }
+    });
+  });
+  if (idsBackfilleados) guardarEstado();
+
   // Ajuste automático de zoom para ver el plano COMPLETO al cargar.
   requestAnimationFrame(() => requestAnimationFrame(autoAjustarZoomSiCorresponde));
 };

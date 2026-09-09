@@ -5,19 +5,49 @@
    de productos con stock en vivo y alta de consumos a la cuenta activa.
    ========================================================================== */
 
-function abrirCatalogoProductos() {
+// `destino` opcional:
+//   omitido / null            -> la cuenta activa de la mesa (comportamiento normal).
+//   { tipo:'venta', ventaId } -> una venta ya registrada (editar desde Caja).
+function abrirCatalogoProductos(destino) {
+  catalogoDestino = destino || null;
+
+  const obj = catalogoObjetivo();
+  const titulo = document.getElementById('catalogoModalTitulo');
+  const btnVolver = document.getElementById('catalogoVolverBtn');
+  if (titulo) titulo.innerHTML = `<i class="bi bi-journal-album me-2"></i> Seleccionar Producto para ${obj && obj.esVenta ? 'la Venta' : 'la Cuenta'}`;
+  if (btnVolver) btnVolver.textContent = obj && obj.esVenta ? 'Volver a la venta' : 'Volver a la Cuenta';
+
   renderCategoriasTabs();
   renderGridProductos();
   actualizarEncabezadoCatalogo();
   modalCatalogoBS.show();
 }
 
-function actualizarEncabezadoCatalogo() {
+// Objetivo actual del catálogo: la venta apuntada o la cuenta activa.
+function catalogoObjetivo() {
+  if (catalogoDestino && catalogoDestino.tipo === 'venta') {
+    const v = (typeof ventasData !== 'undefined' ? ventasData : []).find(x => x.id === catalogoDestino.ventaId);
+    if (!v) return null;
+    return {
+      esVenta: true, venta: v, productos: v.productos,
+      nombre: `${v.mesaNombre} · ${v.cuentaNombre}`,
+      total: v.productos.reduce((s, p) => s + p.cant * p.precio, 0)
+    };
+  }
   const cuenta = (mesaActivaId && mesasData[mesaActivaId]) ? mesasData[mesaActivaId][cuentaActivaIndex] : null;
-  if (!cuenta) return;
-  const total = cuenta.productos.reduce((acc, p) => acc + (p.cant * p.precio), 0);
-  document.getElementById('catalogoCuentaNombre').innerHTML = `<i class="bi bi-receipt me-1"></i> ${cuenta.nombreCuenta}`;
-  document.getElementById('catalogoSaldoTexto').innerText = formatMoney(total);
+  if (!cuenta) return null;
+  return {
+    esVenta: false, cuenta, productos: cuenta.productos,
+    nombre: cuenta.nombreCuenta,
+    total: cuenta.productos.reduce((s, p) => s + p.cant * p.precio, 0)
+  };
+}
+
+function actualizarEncabezadoCatalogo() {
+  const obj = catalogoObjetivo();
+  if (!obj) return;
+  document.getElementById('catalogoCuentaNombre').innerHTML = `<i class="bi bi-receipt me-1"></i> ${obj.nombre}`;
+  document.getElementById('catalogoSaldoTexto').innerText = formatMoney(obj.total);
 }
 
 function renderCategoriasTabs() {
@@ -50,18 +80,21 @@ function renderGridProductos() {
     ? dbJSON.products
     : dbJSON.products.filter(p => p.categoryId === categoriaSeleccionada);
 
-  const cuenta = (mesaActivaId && mesasData[mesaActivaId]) ? mesasData[mesaActivaId][cuentaActivaIndex] : null;
+  const obj = catalogoObjetivo();
+  const lineas = obj ? obj.productos : [];
 
   filtrados.forEach(prod => {
     const col = document.createElement('div');
     col.className = 'col-6 col-md-4';
 
-    const enCuenta = cuenta ? cuenta.productos.find(p => p.productId === prod.id) : null;
+    const enCuenta = lineas.find(p => p.productId === prod.id);
     const badgeCantidad = enCuenta
-      ? `<span class="badge bg-success position-absolute top-0 end-0 m-1 shadow-sm">En cuenta: x${enCuenta.cant}</span>`
+      ? `<span class="badge bg-success position-absolute top-0 end-0 m-1 shadow-sm">${obj && obj.esVenta ? 'En venta' : 'En cuenta'}: x${enCuenta.cant}</span>`
       : '';
 
-    const disp = disponibleParaAgregar(prod.id);   // stock físico − lo reservado en comandas abiertas
+    // En una venta el stock ya se descontó al liquidar: la disponibilidad es
+    // el stock físico. En una cuenta abierta se descuenta lo reservado.
+    const disp = (obj && obj.esVenta) ? obtenerStock(prod.id) : disponibleParaAgregar(prod.id);
     const agotado = disp <= 0;
     const stockBadgeClase = agotado ? 'bg-danger' : disp <= 5 ? 'bg-warning text-dark' : 'bg-light text-secondary border';
 
@@ -82,10 +115,38 @@ function renderGridProductos() {
 }
 
 function agregarProductoDesdeCatalogo(productId) {
-  if (!mesaActivaId || cuentaActivaIndex === null) return;
-
   const prodObj = dbJSON.products.find(p => p.id === productId);
   if (!prodObj) return;
+
+  // --- Destino = una VENTA ya registrada (editar desde Caja) ---
+  if (catalogoDestino && catalogoDestino.tipo === 'venta') {
+    const v = ventasData.find(x => x.id === catalogoDestino.ventaId);
+    if (!v) return;
+    if (obtenerStock(productId) <= 0) { notificarSinStock(prodObj.name); return; }
+
+    const linea = v.productos.find(p => p.productId === productId);
+    let cant;
+    if (linea) { linea.cant += 1; cant = linea.cant; }
+    else {
+      v.productos.push({ productId, categoryId: prodObj.categoryId, nombre: prodObj.name, cant: 1, precio: prodObj.price });
+      cant = 1;
+    }
+    ajustarStock(productId, -1, 'Venta (agregado a venta)');
+    v.total = v.productos.reduce((s, p) => s + p.cant * p.precio, 0);
+    guardarVentas();
+    if (typeof sincronizarCargoFiado === 'function') sincronizarCargoFiado(v);
+
+    notificarProductoAgregado(prodObj.name, cant);
+    refrescarVistasInventarioSiEstanAbiertas();
+    if (typeof renderCajaEnVentas === 'function') renderCajaEnVentas();
+    if (typeof renderListaVentas === 'function') renderListaVentas();
+    renderGridProductos();
+    actualizarEncabezadoCatalogo();
+    return;
+  }
+
+  // --- Destino = la cuenta activa de la mesa (comportamiento normal) ---
+  if (!mesaActivaId || cuentaActivaIndex === null) return;
 
   // El stock NO se descuenta acá: se reserva en la comanda y se descuenta
   // TODO junto al liquidar (ver registrarVenta). Solo se controla que no se
