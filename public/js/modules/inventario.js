@@ -326,7 +326,7 @@ function abrirModalReposicion() {
   document.getElementById('repoNvNombre').value = '';
   document.getElementById('repoNvNit').value = '';
   document.getElementById('repoNvCel').value = '';
-  const rp = document.getElementById('repoPagoYa');
+  const rp = document.getElementById('repoPagoEfectivo');
   if (rp) rp.checked = true;
   repoProvSelectChange();
 
@@ -374,15 +374,19 @@ function confirmarReposicionModal() {
   }
 
   const pagoSel = document.querySelector('input[name="repoPago"]:checked');
-  const pagado = !pagoSel || pagoSel.value === 'pagado';
+  const formaPago = pagoSel ? pagoSel.value : 'efectivo';   // 'efectivo' | 'otro' | 'credito'
 
   const { cambios, unidades } = repoPendiente;
   repoPendiente = null;
   modalReposicionBS.hide();
-  finalizarReposicionInv(cambios, prov, monto, unidades, pagado);
+  finalizarReposicionInv(cambios, prov, monto, unidades, formaPago);
 }
 
-function finalizarReposicionInv(cambios, prov, monto, unidades, pagado) {
+// formaPago: 'efectivo' -> sale de la caja · 'otro' -> pagado sin tocar la
+// caja · 'credito' -> queda por pagar.
+function finalizarReposicionInv(cambios, prov, monto, unidades, formaPago) {
+  const pagado = formaPago !== 'credito';
+
   // 1) Stock (ingresos atribuidos al proveedor).
   aplicarCambiosInv(cambios, 'Reposición · ' + prov.nombre);
 
@@ -391,20 +395,25 @@ function finalizarReposicionInv(cambios, prov, monto, unidades, pagado) {
   const base = { fecha: new Date().toISOString(), proveedorId: prov.id, usuarioNombre: obtenerNombreUsuarioActivo() };
   movimientosCxp.push({ ...base, id: 'cxp-' + Date.now() + '-f' + rid, tipo: 'factura', monto: Math.abs(monto), concepto: `Reposición · ${unidades} und` });
   if (pagado) {
-    movimientosCxp.push({ ...base, id: 'cxp-' + Date.now() + '-p' + rid, tipo: 'pago', monto: Math.abs(monto), concepto: 'Pago desde caja' });
+    movimientosCxp.push({ ...base, id: 'cxp-' + Date.now() + '-p' + rid, tipo: 'pago', monto: Math.abs(monto), concepto: formaPago === 'efectivo' ? 'Pago desde caja' : 'Pago (otro medio)' });
   }
   if (movimientosCxp.length > MAX_MOV_CXP_GUARDADOS) {
     movimientosCxp.splice(0, movimientosCxp.length - MAX_MOV_CXP_GUARDADOS);
   }
   guardarCxp();
 
-  // 3) Caja: si se pagó -> SALIDA real; si es a crédito -> línea informativa
-  //    (no descuenta la caja, se muestra en rojo en el flujo del turno).
+  // 3) Caja (si hay turno abierto):
+  //    efectivo -> SALIDA real (descuenta la caja).
+  //    otro     -> compra pagada por fuera: solo informativa, NO descuenta.
+  //    credito  -> compra a crédito: informativa "por pagar", NO descuenta.
   if (typeof cajaActual !== 'undefined' && cajaActual) {
+    const tipo = formaPago === 'efectivo' ? 'salida'
+      : formaPago === 'otro' ? 'compra_externa'
+      : 'compra_credito';
     cajaActual.movimientos.push({
       id: 'cm-' + Date.now() + rid,
       fecha: new Date().toISOString(),
-      tipo: pagado ? 'salida' : 'compra_credito',
+      tipo,
       categoria: 'pago_inventario',
       monto: Math.abs(monto),
       concepto: 'Reposición · ' + prov.nombre,
@@ -417,8 +426,11 @@ function finalizarReposicionInv(cambios, prov, monto, unidades, pagado) {
     mostrarNotificacion('Sin caja abierta: se registró como pagado en cuentas por pagar.', 'warning', 'bi-info-circle');
   }
 
+  const nota = formaPago === 'efectivo' ? '(pagado · sale de caja)'
+    : formaPago === 'otro' ? '(pagado · no sale de caja)'
+    : '(a crédito)';
   mostrarNotificacion(
-    `Reposición de ${prov.nombre}: +${unidades} und · ${formatMoney(monto)} ${pagado ? '(pagado · sale de caja)' : '(a crédito)'}`,
+    `Reposición de ${prov.nombre}: +${unidades} und · ${formatMoney(monto)} ${nota}`,
     'success', 'bi-truck'
   );
   cerrarModalInventarioTrasGuardar();

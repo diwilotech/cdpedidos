@@ -317,6 +317,13 @@ function comprasCreditoTurno() {
   return { total: items.reduce((s, m) => s + m.monto, 0), items };
 }
 
+// Compras del turno que NO tocan la caja: a crédito ('compra_credito') o
+// pagadas por otro medio ('compra_externa').
+function comprasNoCajaTurno() {
+  if (!cajaActual) return [];
+  return cajaActual.movimientos.filter(m => m.tipo === 'compra_credito' || m.tipo === 'compra_externa');
+}
+
 function esperadoEnCaja() {
   if (!cajaActual) return 0;
   return cajaActual.montoInicial
@@ -396,6 +403,7 @@ function renderCajaEnVentas() {
   const tCredGlobal = (typeof saldoTotalPorCobrar === 'function') ? saldoTotalPorCobrar() : tCred;
   const salidas     = cajaActual.movimientos.filter(m => m.tipo === 'salida');
   const compras     = comprasCreditoTurno();
+  const comprasNoCaja = comprasNoCajaTurno();
 
   const etiquetaCat = (m) => (m.categoria === 'pago_inventario')
     ? '<span class="badge text-bg-light border">Pago proveedor</span>'
@@ -411,13 +419,18 @@ function renderCajaEnVentas() {
         </div>`).join('')
     : `<div class="small text-muted fst-italic px-1">Sin salidas registradas.</div>`;
 
-  const listaCompras = compras.items.length
-    ? compras.items.slice().reverse().map(m => `
+  const listaCompras = comprasNoCaja.length
+    ? comprasNoCaja.slice().reverse().map(m => {
+        const badge = m.tipo === 'compra_externa'
+          ? '<span class="badge text-bg-light border">Pagado · otro medio</span>'
+          : '<span class="badge text-bg-light border">A crédito</span>';
+        return `
         <div class="d-flex justify-content-between align-items-center small border-bottom py-1">
-          <span><i class="bi bi-truck me-1 text-danger"></i>${m.concepto}${und(m)} <span class="text-muted">· ${formatFecha(m.fecha)} · ${m.usuarioNombre}</span></span>
+          <span>${badge} ${m.concepto}${und(m)} <span class="text-muted">· ${formatFecha(m.fecha)} · ${m.usuarioNombre}</span></span>
           <span class="fw-bold text-danger">−${formatMoney(m.monto)}</span>
-        </div>`).join('')
-    : `<div class="small text-muted fst-italic px-1">Sin compras a crédito en el turno.</div>`;
+        </div>`;
+      }).join('')
+    : `<div class="small text-muted fst-italic px-1">Sin compras fuera de caja en el turno.</div>`;
 
   const listaCredito = ventasCred.length
     ? ventasCred.slice().reverse().map(v => `
@@ -461,7 +474,7 @@ function renderCajaEnVentas() {
         <div class="small fw-bold text-danger mb-1"><i class="bi bi-arrow-up-circle me-1"></i>Salidas de dinero (sale de la caja)</div>
         ${listaSalidas}
 
-        <div class="small fw-bold mt-3 mb-1 text-danger"><i class="bi bi-truck me-1"></i>Compras a crédito del turno (por pagar)</div>
+        <div class="small fw-bold mt-3 mb-1 text-danger"><i class="bi bi-truck me-1"></i>Compras del turno que NO salen de la caja</div>
         ${listaCompras}
 
         <div class="small fw-bold mt-3 mb-1" style="color:#fd7e14"><i class="bi bi-person-vcard me-1"></i>Ventas a crédito del turno</div>

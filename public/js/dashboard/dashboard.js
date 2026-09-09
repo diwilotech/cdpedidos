@@ -670,17 +670,21 @@ function renderProveedores() {
   cont.innerHTML = [...D.proveedores].sort((a, b) => saldoProv(b.id) - saldoProv(a.id)).map(p => {
     const s = saldoProv(p.id);
     const txt = s > 0 ? formatMoney(s) + ' por pagar' : s < 0 ? formatMoney(-s) + ' a favor' : 'Al día';
+    const contacto = [p.nit ? 'NIT ' + p.nit : '', p.telefono ? '<i class="bi bi-telephone me-1"></i>' + p.telefono : '']
+      .filter(Boolean).join(' · ');
     return `
       <div class="border rounded-3 p-2 mb-2">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
           <div>
             <div class="fw-bold"><i class="bi bi-truck me-1 text-primary"></i>${p.nombre}</div>
+            ${contacto ? `<div class="small text-muted">${contacto}</div>` : ''}
             <div class="small ${s > 0 ? 'text-danger' : s < 0 ? 'text-success' : 'text-muted'} fw-bold">${txt}</div>
           </div>
           <div class="d-flex gap-1 flex-wrap">
             <button class="btn btn-sm btn-outline-danger" onclick="provFactura(${p.id})" title="Registrar una compra / factura"><i class="bi bi-receipt"></i> Factura</button>
             <button class="btn btn-sm btn-outline-success" onclick="provPago(${p.id})" title="Registrar un pago"><i class="bi bi-cash-coin"></i> Pago</button>
             <button class="btn btn-sm btn-outline-secondary" onclick="provDetalle(${p.id})" title="Ver compras y pagos"><i class="bi bi-clock-history"></i></button>
+            <button class="btn btn-sm btn-outline-primary" onclick="provEditar(${p.id})" title="Editar nombre, NIT y celular"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="provBorrar(${p.id})"><i class="bi bi-trash3"></i></button>
           </div>
         </div>
@@ -697,11 +701,34 @@ async function provNuevo() {
   const nombre = document.getElementById('nvProvNombre').value.trim();
   if (!nombre) { alert('Poné el nombre del proveedor.'); return; }
   D.contadorProveedores++;
-  D.proveedores.push({ id: D.contadorProveedores, nombre, telefono: document.getElementById('nvProvTel').value.trim() });
+  D.proveedores.push({
+    id: D.contadorProveedores,
+    nombre,
+    nit: document.getElementById('nvProvNit').value.trim(),
+    telefono: document.getElementById('nvProvCel').value.trim()
+  });
   await guardarProv();
   document.getElementById('nvProvNombre').value = '';
-  document.getElementById('nvProvTel').value = '';
+  document.getElementById('nvProvNit').value = '';
+  document.getElementById('nvProvCel').value = '';
   renderProveedores(); toast(`Proveedor "${nombre}" agregado`);
+}
+
+async function provEditar(id) {
+  const p = D.proveedores.find(x => x.id === id);
+  if (!p) return;
+  const nombre = prompt('Nombre / razón social:', p.nombre);
+  if (nombre === null) return;
+  const nit = prompt('NIT:', p.nit || '');
+  if (nit === null) return;
+  const tel = prompt('Celular:', p.telefono || '');
+  if (tel === null) return;
+  p.nombre = nombre.trim() || p.nombre;
+  p.nit = nit.trim();
+  p.telefono = tel.trim();
+  await guardarProv();
+  renderProveedores();
+  toast('Proveedor actualizado');
 }
 async function provBorrar(id) {
   const p = D.proveedores.find(x => x.id === id);

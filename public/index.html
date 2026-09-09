@@ -340,11 +340,15 @@
           </div>
 
           <label class="form-label small fw-bold mb-1">Forma de pago</label>
-          <div class="d-flex gap-2">
-            <input type="radio" class="btn-check" name="repoPago" id="repoPagoYa" value="pagado" checked>
-            <label class="btn btn-outline-success btn-sm flex-fill" for="repoPagoYa"><i class="bi bi-cash-coin me-1"></i> Ya pagado<br><span class="small text-muted">sale de la caja</span></label>
+          <div class="d-flex flex-column gap-2">
+            <input type="radio" class="btn-check" name="repoPago" id="repoPagoEfectivo" value="efectivo" checked>
+            <label class="btn btn-outline-success btn-sm text-start" for="repoPagoEfectivo"><i class="bi bi-cash-coin me-1"></i> Pagado en efectivo <span class="text-muted">— sale de la caja</span></label>
+
+            <input type="radio" class="btn-check" name="repoPago" id="repoPagoOtro" value="otro">
+            <label class="btn btn-outline-primary btn-sm text-start" for="repoPagoOtro"><i class="bi bi-bank me-1"></i> Pagado por otro medio <span class="text-muted">— no sale de la caja</span></label>
+
             <input type="radio" class="btn-check" name="repoPago" id="repoPagoCredito" value="credito">
-            <label class="btn btn-outline-danger btn-sm flex-fill" for="repoPagoCredito"><i class="bi bi-hourglass-split me-1"></i> A crédito<br><span class="small text-muted">queda por pagar</span></label>
+            <label class="btn btn-outline-danger btn-sm text-start" for="repoPagoCredito"><i class="bi bi-hourglass-split me-1"></i> A crédito <span class="text-muted">— queda por pagar</span></label>
           </div>
         </div>
         <div class="modal-footer py-2">
