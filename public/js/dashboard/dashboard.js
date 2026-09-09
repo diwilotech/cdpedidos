@@ -34,14 +34,9 @@ let chartCategoria = null;
 let chartGanancias = null;
 
 /* ---------- helpers de datos ---------- */
-async function leer(key) {
-  const r = await window.storage.get(key, true);
-  if (!r || r.value == null) return null;
-  try { return JSON.parse(r.value); } catch (e) { return null; }
-}
-async function escribir(key, valor) {
-  await window.storage.set(key, JSON.stringify(valor), true);
-}
+// leerBloque / escribirBloque viven en js/core/repo.js (compartidos con la app).
+const leer = leerBloque;
+const escribir = escribirBloque;
 
 let catById = {};
 // Reconstruye dbJSON.categories = [Todos, ...D.categorias] y el índice catById.

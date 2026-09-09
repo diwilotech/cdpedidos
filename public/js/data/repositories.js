@@ -1,15 +1,19 @@
 /* ============================================================================
-   js/data/repositories.js — Repositorios (lectura/escritura vía window.storage)
+   js/data/repositories.js — Repositorios por dominio
    ----------------------------------------------------------------------------
-   Única capa que toca `window.storage`. Cada dominio tiene su par
-   "guardar" / "cargar". Los guardados son "debounced" para agrupar ráfagas
-   de cambios (p.ej. mientras se arrastra una mesa) en una sola escritura.
-   Las claves y límites viven en js/core/config.js.
+   Cada dominio del negocio es un `crearRepo(CLAVES.x)` (ver js/core/repo.js).
+   Se conservan los nombres `guardarX() / cargarXGuardado()` que usa el resto
+   del código; internamente ya no hay boilerplate repetido.
+   Todos los datos son COMPARTIDOS (shared:true): mismos para cualquier
+   dispositivo con sesión del mismo negocio.
    ========================================================================== */
 
 /* ---------------------------------------------------------------------------
-   PLANO (pisos, posiciones, colores, mesas y cuentas) — dato COMPARTIDO
+   PLANO (pisos, geometría, colores, mesas y comandas abiertas)
+   Caso especial: el payload NO es una variable estática sino que se arma
+   desde GridStack en el momento de guardar.
    --------------------------------------------------------------------------- */
+const _repoPlano = crearRepo(CLAVES.plano, { debounce: 0 });
 let guardarEstadoTimeout = null;
 
 function construirListaMesasParaGuardar() {
@@ -22,8 +26,8 @@ function construirListaMesasParaGuardar() {
       if (!content) return;
       const mesaId = content.dataset.mesaid;
       const labelEl = node.el.querySelector('.nombre-label');
-      // Posición: la "de confianza" (mesasLayout), NO la que GridStack tenga
-      // ahora mismo en pantalla (que puede haber derivado en otro dispositivo).
+      // Posición "de confianza" (mesasLayout), no la que GridStack tenga ahora
+      // en pantalla (que puede haber derivado en otro dispositivo).
       const L = mesasLayout[mesaId] || { x: node.x, y: node.y, w: node.w, h: node.h };
       lista.push({
         id: mesaId,
@@ -40,274 +44,61 @@ function construirListaMesasParaGuardar() {
 
 function guardarEstado() {
   clearTimeout(guardarEstadoTimeout);
-  guardarEstadoTimeout = setTimeout(async () => {
-    try {
-      const payload = {
-        mesas: construirListaMesasParaGuardar(),
-        contadorMesas,
-        pisos: pisosData,
-        contadorPisos
-      };
-      await window.storage.set(STORAGE_KEY, JSON.stringify(payload), true);
-    } catch (e) {
-      console.error('No se pudo guardar el plano:', e);
-    }
+  guardarEstadoTimeout = setTimeout(() => {
+    _repoPlano.guardar({
+      mesas: construirListaMesasParaGuardar(),
+      contadorMesas,
+      pisos: pisosData,
+      contadorPisos
+    });
   }, 350);
 }
-
-async function cargarEstadoGuardado() {
-  try {
-    const resultado = await window.storage.get(STORAGE_KEY, true);
-    if (resultado && resultado.value) {
-      return JSON.parse(resultado.value);
-    }
-  } catch (e) {
-    // Primera vez o error de lectura: se sigue con los datos de ejemplo.
-  }
-  return null;
-}
+function cargarEstadoGuardado() { return _repoPlano.cargar(); }
 
 /* ---------------------------------------------------------------------------
-   INVENTARIO (stock por producto) — dato COMPARTIDO
+   Dominios "simples": un repo + un par guardar/cargar sobre una variable.
    --------------------------------------------------------------------------- */
-let guardarInventarioTimeout = null;
+const _repoInventario  = crearRepo(CLAVES.inventario);
+const _repoProductos   = crearRepo(CLAVES.productos);
+const _repoCategorias  = crearRepo(CLAVES.categorias);
+const _repoVentas      = crearRepo(CLAVES.ventas);
+const _repoMovimientos = crearRepo(CLAVES.movimientos);
+const _repoClientes    = crearRepo(CLAVES.clientes);
+const _repoFiados      = crearRepo(CLAVES.fiados);
+const _repoProveedores = crearRepo(CLAVES.proveedores);
+const _repoCxp         = crearRepo(CLAVES.cxp);
+const _repoCaja        = crearRepo(CLAVES.caja, { debounce: 0 });      // cambios puntuales -> persistir ya
+const _repoCajaHist    = crearRepo(CLAVES.cajaHist, { debounce: 0 });
 
-function guardarInventario() {
-  clearTimeout(guardarInventarioTimeout);
-  guardarInventarioTimeout = setTimeout(async () => {
-    try {
-      await window.storage.set(STORAGE_KEY_INVENTARIO, JSON.stringify(inventario), true);
-    } catch (e) {
-      console.error('No se pudo guardar el inventario:', e);
-    }
-  }, 350);
-}
+function guardarInventario()  { _repoInventario.guardar(inventario); }
+function cargarInventarioGuardado() { return _repoInventario.cargar(); }
 
-async function cargarInventarioGuardado() {
-  try {
-    const resultado = await window.storage.get(STORAGE_KEY_INVENTARIO, true);
-    if (resultado && resultado.value) {
-      return JSON.parse(resultado.value);
-    }
-  } catch (e) {
-    // Primera vez o error de lectura.
-  }
-  return null;
-}
+function guardarProductosPersonalizados() { _repoProductos.guardar(productosPersonalizados); }
+function cargarProductosPersonalizadosGuardados() { return _repoProductos.cargar(); }
 
-/* ---------------------------------------------------------------------------
-   PRODUCTOS PERSONALIZADOS (creados desde Inventario) — dato COMPARTIDO
-   --------------------------------------------------------------------------- */
-let guardarProductosTimeout = null;
+// Las categorías se editan desde el Dashboard; la app solo las lee.
+function cargarCategoriasGuardadas() { return _repoCategorias.cargar(); }
 
-function guardarProductosPersonalizados() {
-  clearTimeout(guardarProductosTimeout);
-  guardarProductosTimeout = setTimeout(async () => {
-    try {
-      await window.storage.set(STORAGE_KEY_PRODUCTOS, JSON.stringify(productosPersonalizados), true);
-    } catch (e) {
-      console.error('No se pudo guardar los productos nuevos:', e);
-    }
-  }, 350);
-}
+function guardarVentas() { _repoVentas.guardar(ventasData); }
+function cargarVentasGuardadas() { return _repoVentas.cargar(); }
 
-async function cargarProductosPersonalizadosGuardados() {
-  try {
-    const resultado = await window.storage.get(STORAGE_KEY_PRODUCTOS, true);
-    if (resultado && resultado.value) {
-      return JSON.parse(resultado.value);
-    }
-  } catch (e) {
-    // Primera vez o error de lectura.
-  }
-  return null;
-}
+function guardarMovimientos() { _repoMovimientos.guardar(movimientosInventario); }
+function cargarMovimientosGuardados() { return _repoMovimientos.cargar(); }
 
-/* Los "usuarios" ya no son un dato de la app: el acceso lo maneja el Worker
-   (tablas users/sessions en D1) y el operador es quien inició sesión. */
+function guardarClientes() { _repoClientes.guardar({ clientes: clientesData, contadorClientes }); }
+function cargarClientesGuardados() { return _repoClientes.cargar(); }
 
-/* ---------------------------------------------------------------------------
-   CATEGORÍAS DEL CATÁLOGO — dato COMPARTIDO (se editan desde el Dashboard)
-   --------------------------------------------------------------------------- */
-async function cargarCategoriasGuardadas() {
-  try {
-    const resultado = await window.storage.get(STORAGE_KEY_CATEGORIAS, true);
-    if (resultado && resultado.value) return JSON.parse(resultado.value);
-  } catch (e) { /* primera vez */ }
-  return null;
-}
+function guardarFiados() { _repoFiados.guardar(movimientosFiado); }
+function cargarFiadosGuardados() { return _repoFiados.cargar(); }
 
-/* ---------------------------------------------------------------------------
-   VENTAS (cuentas liquidadas) — dato COMPARTIDO
-   --------------------------------------------------------------------------- */
-let guardarVentasTimeout = null;
+function guardarProveedores() { _repoProveedores.guardar({ proveedores: proveedoresData, contadorProveedores }); }
+function cargarProveedoresGuardados() { return _repoProveedores.cargar(); }
 
-function guardarVentas() {
-  clearTimeout(guardarVentasTimeout);
-  guardarVentasTimeout = setTimeout(async () => {
-    try {
-      await window.storage.set(STORAGE_KEY_VENTAS, JSON.stringify(ventasData), true);
-    } catch (e) {
-      console.error('No se pudo guardar las ventas:', e);
-    }
-  }, 350);
-}
+function guardarCxp() { _repoCxp.guardar(movimientosCxp); }
+function cargarCxpGuardadas() { return _repoCxp.cargar(); }
 
-async function cargarVentasGuardadas() {
-  try {
-    const resultado = await window.storage.get(STORAGE_KEY_VENTAS, true);
-    if (resultado && resultado.value) {
-      return JSON.parse(resultado.value);
-    }
-  } catch (e) {
-    // Primera vez o error de lectura.
-  }
-  return null;
-}
+function guardarCaja() { _repoCaja.guardar(cajaActual); }
+function cargarCajaGuardada() { return _repoCaja.cargar(); }
 
-/* ---------------------------------------------------------------------------
-   MOVIMIENTOS DE INVENTARIO — dato COMPARTIDO
-   --------------------------------------------------------------------------- */
-let guardarMovimientosTimeout = null;
-
-function guardarMovimientos() {
-  clearTimeout(guardarMovimientosTimeout);
-  guardarMovimientosTimeout = setTimeout(async () => {
-    try {
-      await window.storage.set(STORAGE_KEY_MOVIMIENTOS, JSON.stringify(movimientosInventario), true);
-    } catch (e) {
-      console.error('No se pudo guardar los movimientos de inventario:', e);
-    }
-  }, 350);
-}
-
-async function cargarMovimientosGuardados() {
-  try {
-    const resultado = await window.storage.get(STORAGE_KEY_MOVIMIENTOS, true);
-    if (resultado && resultado.value) {
-      return JSON.parse(resultado.value);
-    }
-  } catch (e) {
-    // Primera vez o error de lectura.
-  }
-  return null;
-}
-
-/* ---------------------------------------------------------------------------
-   CLIENTES + FIADOS (cuentas por cobrar) — dato COMPARTIDO
-   --------------------------------------------------------------------------- */
-let guardarClientesTimeout = null;
-
-function guardarClientes() {
-  clearTimeout(guardarClientesTimeout);
-  guardarClientesTimeout = setTimeout(async () => {
-    try {
-      const payload = { clientes: clientesData, contadorClientes };
-      await window.storage.set(STORAGE_KEY_CLIENTES, JSON.stringify(payload), true);
-    } catch (e) {
-      console.error('No se pudo guardar los clientes:', e);
-    }
-  }, 350);
-}
-
-async function cargarClientesGuardados() {
-  try {
-    const resultado = await window.storage.get(STORAGE_KEY_CLIENTES, true);
-    if (resultado && resultado.value) return JSON.parse(resultado.value);
-  } catch (e) { /* primera vez */ }
-  return null;
-}
-
-let guardarFiadosTimeout = null;
-
-function guardarFiados() {
-  clearTimeout(guardarFiadosTimeout);
-  guardarFiadosTimeout = setTimeout(async () => {
-    try {
-      await window.storage.set(STORAGE_KEY_FIADOS, JSON.stringify(movimientosFiado), true);
-    } catch (e) {
-      console.error('No se pudo guardar los fiados:', e);
-    }
-  }, 350);
-}
-
-async function cargarFiadosGuardados() {
-  try {
-    const resultado = await window.storage.get(STORAGE_KEY_FIADOS, true);
-    if (resultado && resultado.value) return JSON.parse(resultado.value);
-  } catch (e) { /* primera vez */ }
-  return null;
-}
-
-/* ---------------------------------------------------------------------------
-   PROVEEDORES + CUENTAS POR PAGAR — dato COMPARTIDO
-   --------------------------------------------------------------------------- */
-let guardarProveedoresTimeout = null;
-
-function guardarProveedores() {
-  clearTimeout(guardarProveedoresTimeout);
-  guardarProveedoresTimeout = setTimeout(async () => {
-    try {
-      const payload = { proveedores: proveedoresData, contadorProveedores };
-      await window.storage.set(STORAGE_KEY_PROVEEDORES, JSON.stringify(payload), true);
-    } catch (e) {
-      console.error('No se pudo guardar los proveedores:', e);
-    }
-  }, 350);
-}
-
-async function cargarProveedoresGuardados() {
-  try {
-    const resultado = await window.storage.get(STORAGE_KEY_PROVEEDORES, true);
-    if (resultado && resultado.value) return JSON.parse(resultado.value);
-  } catch (e) { /* primera vez */ }
-  return null;
-}
-
-let guardarCxpTimeout = null;
-
-function guardarCxp() {
-  clearTimeout(guardarCxpTimeout);
-  guardarCxpTimeout = setTimeout(async () => {
-    try {
-      await window.storage.set(STORAGE_KEY_CXP, JSON.stringify(movimientosCxp), true);
-    } catch (e) {
-      console.error('No se pudo guardar las cuentas por pagar:', e);
-    }
-  }, 350);
-}
-
-async function cargarCxpGuardadas() {
-  try {
-    const resultado = await window.storage.get(STORAGE_KEY_CXP, true);
-    if (resultado && resultado.value) return JSON.parse(resultado.value);
-  } catch (e) { /* primera vez */ }
-  return null;
-}
-
-/* ---------------------------------------------------------------------------
-   FLUJO DE CAJA (POS) — dato COMPARTIDO
-   --------------------------------------------------------------------------- */
-function guardarCaja() {
-  // sin debounce: los cambios de caja son puntuales y conviene que persistan ya
-  window.storage.set(STORAGE_KEY_CAJA, JSON.stringify(cajaActual), true)
-    .catch(e => console.error('No se pudo guardar la caja:', e));
-}
-async function cargarCajaGuardada() {
-  try {
-    const resultado = await window.storage.get(STORAGE_KEY_CAJA, true);
-    if (resultado && resultado.value) return JSON.parse(resultado.value);
-  } catch (e) { /* primera vez */ }
-  return null;
-}
-function guardarCajaHist() {
-  window.storage.set(STORAGE_KEY_CAJA_HIST, JSON.stringify(cajaHist), true)
-    .catch(e => console.error('No se pudo guardar el historial de caja:', e));
-}
-async function cargarCajaHistGuardado() {
-  try {
-    const resultado = await window.storage.get(STORAGE_KEY_CAJA_HIST, true);
-    if (resultado && resultado.value) return JSON.parse(resultado.value);
-  } catch (e) { /* primera vez */ }
-  return null;
-}
+function guardarCajaHist() { _repoCajaHist.guardar(cajaHist); }
+function cargarCajaHistGuardado() { return _repoCajaHist.cargar(); }
