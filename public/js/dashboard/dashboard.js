@@ -625,19 +625,67 @@ function renderClientes() {
             <div class="small ${s > 0 ? 'text-danger' : s < 0 ? 'text-success' : 'text-muted'} fw-bold">${txt}</div>
           </div>
           <div class="d-flex gap-1 flex-wrap">
+            <button class="btn btn-sm btn-outline-primary fw-bold" onclick="cliVerCuenta(${c.id})" title="Ver la cuenta / extracto del cliente"><i class="bi bi-journal-text"></i> Ver cuenta</button>
             <button class="btn btn-sm btn-outline-danger" onclick="cliCargo(${c.id})" title="Anotar consumo / cargo"><i class="bi bi-cart-plus"></i> Cargo</button>
             <button class="btn btn-sm btn-outline-success" onclick="cliAbono(${c.id})" title="Registrar pago"><i class="bi bi-cash-coin"></i> Abono</button>
-            <button class="btn btn-sm btn-outline-secondary" onclick="cliDetalle(${c.id})" title="Ver detalle / cuentas"><i class="bi bi-clock-history"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="cliBorrar(${c.id})"><i class="bi bi-trash3"></i></button>
           </div>
         </div>
-        <div id="cliHist-${c.id}" class="mt-2 d-none">${extractoHtml(D.fiados.filter(m => m.clienteId === c.id), 'cargo', 'abono')}</div>
       </div>`;
   }).join('');
 }
-function cliDetalle(id) {
-  const el = document.getElementById('cliHist-' + id);
-  if (el) el.classList.toggle('d-none');
+
+/* ---------- cuenta / extracto de un cliente (#modalCuentaCli) ---------- */
+let ccliAbiertaId = null;
+
+function cliVerCuenta(id) {
+  const c = D.clientes.find(x => x.id === id);
+  if (!c) return;
+  ccliAbiertaId = id;
+  document.getElementById('ccliNombre').textContent = c.nombre;
+  document.getElementById('ccliTel').textContent = c.telefono || '';
+  document.getElementById('ccliBtnCargo').onclick = () => cliCargo(id);
+  document.getElementById('ccliBtnAbono').onclick = () => cliAbono(id);
+  renderCuentaCli();
+  document.getElementById('modalCuentaCli').hidden = false;
+}
+function cliCuentaCerrar() {
+  document.getElementById('modalCuentaCli').hidden = true;
+}
+function refrescarCuentaCliSiAbierta() {
+  const el = document.getElementById('modalCuentaCli');
+  if (ccliAbiertaId != null && el && !el.hidden) renderCuentaCli();
+}
+function renderCuentaCli() {
+  const id = ccliAbiertaId;
+  if (id == null) return;
+  const s = saldoCli(id);
+  const badge = document.getElementById('ccliSaldo');
+  badge.textContent = s > 0 ? formatMoney(s) + ' por cobrar' : s < 0 ? formatMoney(-s) + ' a favor' : 'Al día';
+  badge.className = 'badge ' + (s > 0 ? 'text-bg-danger' : s < 0 ? 'text-bg-success' : 'text-bg-secondary');
+
+  const movs = D.fiados.filter(m => m.clienteId === id)
+    .slice().sort((a, b) => new Date(a.fecha) - new Date(b.fecha));   // cronológico
+  const tb = document.getElementById('ccliBody');
+  if (!movs.length) {
+    tb.innerHTML = '<tr><td colspan="5" class="text-center text-muted small py-4">Sin movimientos en la cuenta todavía.</td></tr>';
+    return;
+  }
+  let run = 0;
+  tb.innerHTML = movs.map(m => {
+    const cargo = m.tipo === 'cargo';
+    run += cargo ? m.monto : -m.monto;
+    return `<tr>
+      <td class="small text-nowrap">${formatFecha(m.fecha)}</td>
+      <td>
+        ${cargo ? '<i class="bi bi-arrow-down-circle text-danger me-1"></i>' : '<i class="bi bi-arrow-up-circle text-success me-1"></i>'}${m.concepto || (cargo ? 'Cargo' : 'Abono')}
+        <div class="small text-muted"><i class="bi bi-person-fill"></i> ${m.usuarioNombre || '—'}</div>
+      </td>
+      <td class="text-end ${cargo ? 'text-danger fw-bold' : 'text-muted'}">${cargo ? formatMoney(m.monto) : ''}</td>
+      <td class="text-end ${!cargo ? 'text-success fw-bold' : 'text-muted'}">${!cargo ? formatMoney(m.monto) : ''}</td>
+      <td class="text-end fw-bold ${run > 0 ? 'text-danger' : run < 0 ? 'text-success' : ''}">${formatMoney(run)}</td>
+    </tr>`;
+  }).join('');
 }
 async function cliNuevo() {
   const nombre = document.getElementById('nvCliNombre').value.trim();
@@ -662,14 +710,14 @@ async function cliCargo(id) {
   if (isNaN(m) || m <= 0) return;
   const desc = (prompt('Descripción (qué consumió / concepto):', '') || '').trim();
   movFiado(id, 'cargo', m, desc || 'Cargo manual');
-  await guardarFiadosD(); renderClientes(); renderKPIs(); toast('Cargo registrado');
+  await guardarFiadosD(); renderClientes(); renderKPIs(); refrescarCuentaCliSiAbierta(); toast('Cargo registrado');
 }
 async function cliAbono(id) {
   const m = parseFloat(String(prompt('Monto del pago / abono (COP):', '')).replace(/[^\d.-]/g, ''));
   if (isNaN(m) || m <= 0) return;
   const desc = (prompt('Nota del pago (opcional):', '') || '').trim();
   movFiado(id, 'abono', m, desc || 'Abono');
-  await guardarFiadosD(); renderClientes(); renderKPIs(); toast('Abono registrado');
+  await guardarFiadosD(); renderClientes(); renderKPIs(); refrescarCuentaCliSiAbierta(); toast('Abono registrado');
 }
 
 /* ---------- proveedores ---------- */
