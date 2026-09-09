@@ -203,27 +203,58 @@ function eliminarProducto(prodIndex) {
 }
 
 function cerrarCuentaActual() {
-  pedirConfirmacion('¿Deseas liquidar y cerrar esta cuenta?', () => {
-    const cuentas = mesasData[mesaActivaId];
-    const cuenta = cuentas[cuentaActivaIndex];
+  const cuentas = mesasData[mesaActivaId];
+  const cuenta = cuentas && cuentas[cuentaActivaIndex];
+  if (!cuenta) return;
+  const total = cuenta.productos.reduce((s, p) => s + p.cant * p.precio, 0);
 
-    registrarVenta(mesaActivaId, cuenta);
+  // Cuenta vacía: no hay pago, se cierra directo.
+  if (total <= 0) {
+    pedirConfirmacion('La cuenta está vacía. ¿Cerrarla igual?', () => {
+      hacerLiquidacion(mesaActivaId, cuentaActivaIndex, null);
+    });
+    return;
+  }
 
-    cuentas.splice(cuentaActivaIndex, 1);
+  // Con productos: se elige el medio de pago (efectivo / transferencia / tarjeta).
+  liquidacionPend = { mesaId: mesaActivaId, cuentaIndex: cuentaActivaIndex };
+  const el = document.getElementById('medioPagoTotal');
+  if (el) el.textContent = formatMoney(total);
+  modalMedioPagoBS.show();
+}
 
-    if (cuentaActivaIndex >= cuentas.length) {
-      cuentaActivaIndex = Math.max(0, cuentas.length - 1);
-    }
+function confirmarMedioPago(medio) {
+  modalMedioPagoBS.hide();
+  if (!liquidacionPend) return;
+  const { mesaId, cuentaIndex } = liquidacionPend;
+  liquidacionPend = null;
+  hacerLiquidacion(mesaId, cuentaIndex, medio);
+}
 
-    actualizarBadgeMesa(mesaActivaId);
-    actualizarSidebar();
+function hacerLiquidacion(mesaId, cuentaIndex, medio) {
+  const cuentas = mesasData[mesaId];
+  const cuenta = cuentas && cuentas[cuentaIndex];
+  if (!cuenta) return;
 
-    if (cuentas.length === 0) {
-      modalCuentasBS.hide();
-    } else {
-      renderModalTabs();
-      renderAtendidoPor();
-      renderModalContenidoCuenta();
-    }
-  });
+  registrarVenta(mesaId, cuenta, medio);
+
+  cuentas.splice(cuentaIndex, 1);
+  if (cuentaActivaIndex >= cuentas.length) {
+    cuentaActivaIndex = Math.max(0, cuentas.length - 1);
+  }
+
+  actualizarBadgeMesa(mesaId);
+  actualizarSidebar();
+
+  if (cuentas.length === 0) {
+    modalCuentasBS.hide();
+  } else {
+    renderModalTabs();
+    renderAtendidoPor();
+    renderModalContenidoCuenta();
+  }
+
+  if (medio) {
+    mostrarNotificacion('Cuenta liquidada · ' + rotuloMedioPago(medio), 'success', 'bi-check-circle-fill');
+  }
 }

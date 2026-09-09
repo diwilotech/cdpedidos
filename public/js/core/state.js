@@ -87,6 +87,9 @@ let categoriaSeleccionada = "cat-all";
 //   { tipo:'venta', ventaId }   -> una venta ya registrada (editar desde Caja)
 let catalogoDestino = null;
 
+// Liquidación en curso mientras se elige el medio de pago: { mesaId, cuentaIndex }.
+let liquidacionPend = null;
+
 let elementosSeleccionados = new Set();
 let itemMenuContextual = null;
 let modoEdicion = false;
@@ -97,6 +100,7 @@ const modalCuentasBS = new bootstrap.Modal(document.getElementById('modalCuentas
 const modalCatalogoBS = new bootstrap.Modal(document.getElementById('modalCatalogoProductos'));
 const modalInventarioBS = new bootstrap.Modal(document.getElementById('modalInventario'));
 const modalReposicionBS = new bootstrap.Modal(document.getElementById('modalReposicion'));
+const modalMedioPagoBS = new bootstrap.Modal(document.getElementById('modalMedioPago'));
 const modalVentasBS = new bootstrap.Modal(document.getElementById('modalVentas'));
 const modalMovimientosBS = new bootstrap.Modal(document.getElementById('modalMovimientos'));
 const toastNotificacionBS = new bootstrap.Toast(document.getElementById('toastNotificacion'), { delay: 2000 });

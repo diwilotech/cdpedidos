@@ -26,7 +26,20 @@ function esMismoDiaVenta(iso) {
   return d.getFullYear() === h.getFullYear() && d.getMonth() === h.getMonth() && d.getDate() === h.getDate();
 }
 
-function registrarVenta(mesaId, cuenta) {
+// Medio de pago de una venta liquidada.
+function rotuloMedioPago(m) {
+  return m === 'transferencia' ? 'Transferencia'
+    : m === 'tarjeta' ? 'Tarjeta'
+    : m === 'efectivo' ? 'Efectivo'
+    : '';
+}
+// Una venta cobrada cuenta como EFECTIVO si su medio es 'efectivo' o si no
+// tiene medio (ventas de versiones anteriores).
+function ventaEsEfectivo(v) {
+  return !v.medioPago || v.medioPago === 'efectivo';
+}
+
+function registrarVenta(mesaId, cuenta, medioPago) {
   if (!cuenta) return;
   const total = cuenta.productos.reduce((s, p) => s + (p.cant * p.precio), 0);
   if (total <= 0) return; // no tiene sentido registrar una cuenta vacía
@@ -41,6 +54,7 @@ function registrarVenta(mesaId, cuenta) {
     cuentaId: cuenta.idCuenta || null,     // trazabilidad hacia la cuenta de origen
     cuentaNombre: cuenta.nombreCuenta,
     usuarioNombre: cuenta.usuarioNombre || obtenerNombreUsuarioActivo(),
+    medioPago: medioPago || null,          // 'efectivo' | 'transferencia' | 'tarjeta'
     total,
     productos: cuenta.productos.map(p => {
       const prod = dbJSON.products.find(x => x.id === p.productId);
@@ -141,11 +155,14 @@ function renderListaVentas() {
     const chipCliente = v.clienteNombre
       ? `<span class="badge text-bg-warning ms-1" title="Esta venta está en la cuenta por cobrar del cliente: al editarla cambia lo que debe"><i class="bi bi-person-vcard me-1"></i>${v.clienteNombre} · por cobrar</span>`
       : '';
+    const chipMedio = (!v.clienteNombre && v.medioPago)
+      ? `<span class="badge ms-1 ${v.medioPago === 'efectivo' ? 'text-bg-success' : v.medioPago === 'transferencia' ? 'text-bg-primary' : 'text-bg-dark'}">${rotuloMedioPago(v.medioPago)}</span>`
+      : '';
     return `
       <div class="border rounded-3 mb-2 ${v.clienteNombre ? 'border-warning' : ''}">
         <div class="d-flex justify-content-between align-items-center p-2" style="cursor:pointer" onclick="toggleVentaDetalle('${v.id}')">
           <div>
-            <div class="fw-bold"><i class="bi ${abierta ? 'bi-chevron-down' : 'bi-chevron-right'} me-1"></i>${v.mesaNombre} · ${v.cuentaNombre}${chipCliente}</div>
+            <div class="fw-bold"><i class="bi ${abierta ? 'bi-chevron-down' : 'bi-chevron-right'} me-1"></i>${v.mesaNombre} · ${v.cuentaNombre}${chipCliente}${chipMedio}</div>
             <div class="small text-muted">${formatFecha(v.fecha)} · ${unidades} und. · <i class="bi bi-person-fill"></i> ${v.usuarioNombre || 'Sin asignar'}</div>
           </div>
           <span class="fs-6 fw-bold text-success">${formatMoney(v.total)}</span>
@@ -277,6 +294,15 @@ function totalVentasTurno(soloCredito) {
 }
 function ventasCobradasDelTurno() { return totalVentasTurno(false); } // compat
 
+// Ventas cobradas del turno separadas por medio de pago. Solo el EFECTIVO
+// entra físicamente a la caja; transferencia y tarjeta no.
+function totalEfectivoTurno() {
+  return ventasDelTurno(false).filter(ventaEsEfectivo).reduce((s, v) => s + (v.total || 0), 0);
+}
+function totalOtroMedioTurno() {
+  return ventasDelTurno(false).filter(v => !ventaEsEfectivo(v)).reduce((s, v) => s + (v.total || 0), 0);
+}
+
 // Cuentas (comandas) abiertas en TODAS las mesas y su total pendiente.
 function cuentasAbiertasResumen() {
   let n = 0, total = 0;
@@ -309,7 +335,7 @@ function comprasNoCajaTurno() {
 function esperadoEnCaja() {
   if (!cajaActual) return 0;
   return cajaActual.montoInicial
-    + totalVentasTurno(false)
+    + totalEfectivoTurno()           // solo lo cobrado EN EFECTIVO va al cajón
     + totalMovsCaja('entrada')       // compat: turnos viejos
     - totalSalidasCaja();
 }
@@ -375,6 +401,8 @@ function renderCajaEnVentas() {
   /* ---------- CAJA abierta ---------- */
   const inicial     = cajaActual.montoInicial;
   const tCobradas   = totalVentasTurno(false);
+  const efvo        = totalEfectivoTurno();
+  const otros       = totalOtroMedioTurno();
   const nCobradas   = ventasDelTurno(false).length;
   const tSinJust    = totalSalidasCaja('sin_justificar');
   const tPagoInv    = totalSalidasCaja('pago_inventario');
@@ -430,7 +458,7 @@ function renderCajaEnVentas() {
       </div>
 
       ${kpiCard('kpi-gris',  'Inicial', formatMoney(inicial))}
-      ${kpiCard('kpi-verde', 'Vendido', formatMoney(tCobradas), `${nCobradas} · cobrado`)}
+      ${kpiCard('kpi-verde', 'Vendido', formatMoney(tCobradas), `${nCobradas} vtas · efvo ${formatMoney(efvo)}`)}
       ${kpiCard('kpi-rojo',  'Salidas', '−' + formatMoney(tSalidas), `sin just. ${formatMoney(tSinJust)} · prov. ${formatMoney(tPagoInv)}`)}
 
       <div class="col-12">
@@ -440,9 +468,10 @@ function renderCajaEnVentas() {
         </div>
       </div>
 
-      ${kpiCard('kpi-naranja', 'Por cobrar', formatMoney(tCred), 'clientes · no entra', 'col-4')}
-      ${kpiCard('kpi-rojo',    'Por pagar',  formatMoney(compras.total), 'a crédito · no entra', 'col-4')}
-      ${kpiCard('kpi-azul',    'Abiertas',   String(abiertas.n), `${formatMoney(abiertas.total)} · no entra`, 'col-4')}
+      ${kpiCard('kpi-azul',    'Otros medios', formatMoney(otros), 'transf/tarjeta · no entra', 'col-6')}
+      ${kpiCard('kpi-naranja', 'Por cobrar', formatMoney(tCred), 'clientes · no entra', 'col-6')}
+      ${kpiCard('kpi-rojo',    'Por pagar',  formatMoney(compras.total), 'a crédito · no entra', 'col-6')}
+      ${kpiCard('kpi-azul',    'Abiertas',   String(abiertas.n), `${formatMoney(abiertas.total)} · no entra`, 'col-6')}
     </div>
 
     <div class="d-flex gap-2 mt-2 flex-wrap">
@@ -453,7 +482,12 @@ function renderCajaEnVentas() {
     <details class="mt-2">
       <summary class="small text-muted" style="cursor:pointer">Ver movimientos del turno</summary>
       <div class="mt-2">
-        <div class="small fw-bold text-danger mb-1"><i class="bi bi-arrow-up-circle me-1"></i>Salidas de dinero (sale de la caja)</div>
+        <div class="small fw-bold text-success mb-1"><i class="bi bi-cash-coin me-1"></i>Ventas cobradas del turno por medio</div>
+        <div class="d-flex justify-content-between small px-1"><span><i class="bi bi-cash me-1"></i>Efectivo (entra a la caja)</span><span class="fw-bold text-success">${formatMoney(efvo)}</span></div>
+        <div class="d-flex justify-content-between small px-1"><span><i class="bi bi-arrow-left-right me-1"></i>Transferencia</span><span>${formatMoney(ventasDelTurno(false).filter(v => v.medioPago === 'transferencia').reduce((s, v) => s + (v.total || 0), 0))}</span></div>
+        <div class="d-flex justify-content-between small px-1"><span><i class="bi bi-credit-card me-1"></i>Tarjeta</span><span>${formatMoney(ventasDelTurno(false).filter(v => v.medioPago === 'tarjeta').reduce((s, v) => s + (v.total || 0), 0))}</span></div>
+
+        <div class="small fw-bold text-danger mt-3 mb-1"><i class="bi bi-arrow-up-circle me-1"></i>Salidas de dinero (sale de la caja)</div>
         ${listaSalidas}
 
         <div class="small fw-bold mt-3 mb-1 text-danger"><i class="bi bi-truck me-1"></i>Compras del turno que NO salen de la caja</div>
@@ -548,6 +582,8 @@ function cerrarCaja() {
             usuarioNombre: obtenerNombreUsuarioActivo(),
             esperado, contado, diferencia,
             ventasCobradasTurno: totalVentasTurno(false),
+            cobradoEfectivo: totalEfectivoTurno(),
+            cobradoOtroMedio: totalOtroMedioTurno(),
             ventasPorCobrarTurno: totalVentasTurno(true),
             salidaSinJustificar: totalSalidasCaja('sin_justificar'),
             salidaPagoInventario: totalSalidasCaja('pago_inventario'),
