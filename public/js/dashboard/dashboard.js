@@ -737,19 +737,29 @@ async function provNuevo() {
   renderProveedores(); toast(`Proveedor "${nombre}" agregado`);
 }
 
-async function provEditar(id) {
+function provEditar(id) {
   const p = D.proveedores.find(x => x.id === id);
   if (!p) return;
-  const nombre = prompt('Nombre / razón social:', p.nombre);
-  if (nombre === null) return;
-  const nit = prompt('NIT:', p.nit || '');
-  if (nit === null) return;
-  const tel = prompt('Celular:', p.telefono || '');
-  if (tel === null) return;
-  p.nombre = nombre.trim() || p.nombre;
-  p.nit = nit.trim();
-  p.telefono = tel.trim();
+  document.getElementById('peProvId').value = String(p.id);
+  document.getElementById('peNombre').value = p.nombre || '';
+  document.getElementById('peNit').value = p.nit || '';
+  document.getElementById('peCel').value = p.telefono || '';
+  document.getElementById('modalProvEditar').hidden = false;
+  setTimeout(() => document.getElementById('peNombre').focus(), 40);
+}
+function provEditarCerrar() {
+  document.getElementById('modalProvEditar').hidden = true;
+}
+async function provEditarGuardar() {
+  const p = D.proveedores.find(x => x.id === parseInt(document.getElementById('peProvId').value, 10));
+  if (!p) { provEditarCerrar(); return; }
+  const nombre = document.getElementById('peNombre').value.trim();
+  if (!nombre) { alert('El proveedor necesita un nombre.'); return; }
+  p.nombre = nombre;
+  p.nit = document.getElementById('peNit').value.trim();
+  p.telefono = document.getElementById('peCel').value.trim();
   await guardarProv();
+  provEditarCerrar();
   renderProveedores();
   toast('Proveedor actualizado');
 }
