@@ -470,6 +470,44 @@
     </div>
   </div>
 
+  <!-- MODAL: CUENTA / EXTRACTO DE UN CLIENTE -->
+  <div class="modal fade" id="modalCuentaCliente" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white d-flex justify-content-between align-items-start flex-nowrap">
+          <div class="me-2 text-truncate">
+            <h5 class="modal-title mb-0 text-truncate" id="ccNombre">Cuenta del cliente</h5>
+            <div class="small" id="ccTel"></div>
+          </div>
+          <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            <span class="badge bg-light text-danger fw-bold" id="ccSaldo">$0</span>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+        </div>
+        <div class="modal-body">
+          <div class="d-flex gap-2 mb-3">
+            <button type="button" class="btn btn-sm btn-outline-danger" id="ccBtnCargar"><i class="bi bi-cart-plus me-1"></i> Cargar consumo</button>
+            <button type="button" class="btn btn-sm btn-outline-success" id="ccBtnAbono"><i class="bi bi-cash-coin me-1"></i> Registrar abono</button>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Fecha</th>
+                  <th>Movimiento</th>
+                  <th class="text-end">Cargo</th>
+                  <th class="text-end">Abono</th>
+                  <th class="text-end">Saldo</th>
+                </tr>
+              </thead>
+              <tbody id="ccBody"><!-- filas dinámicas --></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- (Proveedores y Cuentas por Pagar se movieron al Dashboard, /dashboard.html) -->
   <!-- (El "Flujo de caja" se unificó dentro del modal "Mis Ventas".) -->
 

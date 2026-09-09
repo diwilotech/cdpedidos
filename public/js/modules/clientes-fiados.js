@@ -9,6 +9,10 @@
    ========================================================================== */
 
 const modalFiadosBS = new bootstrap.Modal(document.getElementById('modalFiados'));
+const modalCuentaClienteBS = new bootstrap.Modal(document.getElementById('modalCuentaCliente'));
+
+// Cliente cuya cuenta/extracto está abierta en #modalCuentaCliente (o null).
+let cuentaClienteAbiertaId = null;
 
 // Al entrar desde "Guardar para pago después" se deja aquí el monto y el
 // concepto pendientes; cada ficha de cliente muestra un botón "Guardar aquí".
@@ -78,15 +82,14 @@ function renderListaClientes() {
           ${fiadoModoSeleccion
             ? `<button class="btn btn-sm btn-danger fw-bold" onclick="confirmarCargoDesdeSeleccion(${c.id})"><i class="bi bi-arrow-down-circle me-1"></i>Guardar aquí</button>`
             : `
+              <button class="btn btn-sm btn-outline-primary fw-bold" onclick="verCuentaCliente(${c.id})" title="Ver la cuenta / extracto del cliente"><i class="bi bi-journal-text me-1"></i> Ver cuenta</button>
               <button class="btn btn-sm btn-outline-danger" onclick="registrarCargoFiado(${c.id})" title="Anotar un consumo a la cuenta del cliente"><i class="bi bi-cart-plus"></i> Cargar</button>
               <button class="btn btn-sm btn-outline-success" onclick="registrarAbonoFiado(${c.id})" title="Registrar un pago / abono del cliente"><i class="bi bi-cash-coin"></i> Abono</button>
-              <button class="btn btn-sm btn-outline-secondary" onclick="verHistorialFiado(${c.id})" title="Ver historial"><i class="bi bi-clock-history"></i></button>
               <button class="btn btn-sm btn-outline-secondary" onclick="renombrarCliente(${c.id})" title="Editar cliente"><i class="bi bi-pencil"></i></button>
               <button class="btn btn-sm btn-outline-danger" onclick="eliminarCliente(${c.id})" title="Eliminar cliente"><i class="bi bi-trash3"></i></button>
             `}
         </div>
       </div>
-      <div id="histFiado-${c.id}" class="mt-2 d-none"></div>
     `;
     cont.appendChild(row);
   });
@@ -165,6 +168,7 @@ function registrarCargoFiado(clienteId) {
       pedirTexto('Descripción del cargo (qué consumió):', 'Cargo manual', (desc) => {
         registrarMovimientoFiado(clienteId, 'cargo', monto, desc.trim() || 'Cargo manual');
         renderListaClientes();
+        refrescarCuentaClienteSiAbierta();
         mostrarNotificacion('Cargo registrado', 'success', 'bi-cart-plus');
       });
     }, 350);
@@ -181,29 +185,69 @@ function registrarAbonoFiado(clienteId) {
     }
     registrarMovimientoFiado(clienteId, 'abono', monto, 'Abono');
     renderListaClientes();
+    refrescarCuentaClienteSiAbierta();
     mostrarNotificacion('Abono registrado', 'success', 'bi-cash-coin');
   });
 }
 
-function verHistorialFiado(clienteId) {
-  const cont = document.getElementById('histFiado-' + clienteId);
-  if (!cont) return;
-  if (!cont.classList.contains('d-none')) { cont.classList.add('d-none'); return; }
+/* --- CUENTA / EXTRACTO DEL CLIENTE (#modalCuentaCliente) ---
+   Estado de cuenta con todos los movimientos en orden cronológico y el
+   saldo acumulado después de cada uno. */
+function verCuentaCliente(clienteId) {
+  const c = clientesData.find(x => x.id === clienteId);
+  if (!c) return;
+  cuentaClienteAbiertaId = clienteId;
+  document.getElementById('ccNombre').textContent = c.nombre;
+  document.getElementById('ccTel').innerHTML = c.telefono ? `<i class="bi bi-telephone me-1"></i>${c.telefono}` : '';
+  document.getElementById('ccBtnCargar').onclick = () => registrarCargoFiado(clienteId);
+  document.getElementById('ccBtnAbono').onclick = () => registrarAbonoFiado(clienteId);
+  renderCuentaCliente();
+  modalCuentaClienteBS.show();
+}
+
+function renderCuentaCliente() {
+  const id = cuentaClienteAbiertaId;
+  if (id == null) return;
+
+  const saldo = saldoCliente(id);
+  const sEl = document.getElementById('ccSaldo');
+  sEl.textContent = saldo > 0 ? formatMoney(saldo) + ' por cobrar'
+    : saldo < 0 ? formatMoney(-saldo) + ' a favor' : 'Al día';
+  sEl.className = 'badge fw-bold bg-light ' + (saldo > 0 ? 'text-danger' : saldo < 0 ? 'text-success' : 'text-secondary');
 
   const movs = movimientosFiado
-    .filter(m => m.clienteId === clienteId)
+    .filter(m => m.clienteId === id)
     .slice()
-    .reverse();
+    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));   // del más viejo al más nuevo
 
-  cont.innerHTML = movs.length === 0
-    ? `<div class="small text-muted fst-italic">Sin movimientos.</div>`
-    : movs.map(m => `
-        <div class="d-flex justify-content-between align-items-center small border-top py-1">
-          <span>${m.tipo === 'cargo' ? '<i class="bi bi-arrow-down-circle text-danger me-1"></i>' : '<i class="bi bi-arrow-up-circle text-success me-1"></i>'}${m.concepto} <span class="text-muted">· ${formatFecha(m.fecha)} · ${m.usuarioNombre}</span></span>
-          <span class="fw-bold ${m.tipo === 'cargo' ? 'text-danger' : 'text-success'}">${m.tipo === 'cargo' ? '+' : '-'}${formatMoney(m.monto)}</span>
-        </div>
-      `).join('');
-  cont.classList.remove('d-none');
+  const tb = document.getElementById('ccBody');
+  if (movs.length === 0) {
+    tb.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4 small">Sin movimientos en la cuenta todavía.</td></tr>`;
+    return;
+  }
+
+  let run = 0;
+  tb.innerHTML = movs.map(m => {
+    const cargo = m.tipo === 'cargo';
+    run += cargo ? m.monto : -m.monto;
+    return `<tr>
+      <td class="small text-nowrap">${formatFecha(m.fecha)}</td>
+      <td>
+        ${cargo ? '<i class="bi bi-arrow-down-circle text-danger me-1"></i>' : '<i class="bi bi-arrow-up-circle text-success me-1"></i>'}${m.concepto || (cargo ? 'Cargo' : 'Abono')}
+        <div class="small text-muted"><i class="bi bi-person-fill"></i> ${m.usuarioNombre || '—'}</div>
+      </td>
+      <td class="text-end ${cargo ? 'text-danger fw-bold' : 'text-muted'}">${cargo ? formatMoney(m.monto) : ''}</td>
+      <td class="text-end ${!cargo ? 'text-success fw-bold' : 'text-muted'}">${!cargo ? formatMoney(m.monto) : ''}</td>
+      <td class="text-end fw-bold ${run > 0 ? 'text-danger' : run < 0 ? 'text-success' : ''}">${formatMoney(run)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function refrescarCuentaClienteSiAbierta() {
+  const el = document.getElementById('modalCuentaCliente');
+  if (cuentaClienteAbiertaId != null && el && el.classList.contains('show')) {
+    renderCuentaCliente();
+  }
 }
 
 /* --- PUENTE CON EL MODAL DE CUENTAS ---

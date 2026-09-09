@@ -93,6 +93,7 @@ function sincronizarCargoFiado(v) {
   if (modalFi && modalFi.classList.contains('show') && typeof renderListaClientes === 'function') {
     renderListaClientes();
   }
+  if (typeof refrescarCuentaClienteSiAbierta === 'function') refrescarCuentaClienteSiAbierta();
 }
 
 function abrirModalVentas() {
