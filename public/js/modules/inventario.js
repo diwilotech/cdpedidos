@@ -315,7 +315,13 @@ function guardarInventarioReposicion() {
     mostrarNotificacion('No hay cambios que guardar.', 'warning', 'bi-info-circle');
     return;
   }
-  const unidades = cambios.filter(x => x.dif > 0).reduce((s, x) => s + x.dif, 0);
+  // Una reposición es mercadería que ENTRA: no se aceptan bajas (−). Para
+  // pérdidas / correcciones hacia abajo está "Guardar ajuste".
+  if (cambios.some(x => x.dif < 0)) {
+    mostrarNotificacion('Una reposición no acepta bajas de stock (−). Sacá esos productos o usá "Guardar ajuste".', 'danger', 'bi-exclamation-triangle-fill');
+    return;
+  }
+  const unidades = cambios.reduce((s, x) => s + x.dif, 0);
   if (unidades <= 0) {
     mostrarNotificacion('Una reposición necesita al menos un ingreso de stock. Usá "Guardar ajuste".', 'warning', 'bi-info-circle');
     return;
@@ -328,6 +334,16 @@ function abrirModalReposicion() {
   if (!repoPendiente) return;
 
   document.getElementById('repoUndsTxt').textContent = repoPendiente.unidades + ' und.';
+
+  const lista = document.getElementById('repoItemsList');
+  if (lista) {
+    lista.innerHTML = repoPendiente.cambios
+      .filter(c => c.dif > 0)
+      .map(c => {
+        const prod = dbJSON.products.find(p => p.id === c.productId);
+        return `<div class="d-flex justify-content-between border-top py-1"><span>${prod ? prod.name : c.productId}</span><span class="text-success fw-bold">+${c.dif}</span></div>`;
+      }).join('') || '<div class="text-muted fst-italic">Sin ingresos.</div>';
+  }
 
   const sel = document.getElementById('repoProvSelect');
   const opciones = proveedoresData
@@ -409,10 +425,16 @@ function finalizarReposicionInv(cambios, prov, monto, unidades, formaPago) {
   // 1) Stock (ingresos atribuidos al proveedor).
   aplicarCambiosInv(cambios, 'Reposición · ' + prov.nombre);
 
+  // Detalle de lo que entró, para el registro del proveedor (extracto).
+  const items = cambios.filter(c => c.dif > 0).map(c => {
+    const prod = dbJSON.products.find(p => p.id === c.productId);
+    return { nombre: prod ? prod.name : c.productId, cant: c.dif };
+  });
+
   // 2) Cuentas por pagar: factura de compra (+ pago si ya se pagó).
   const rid = Math.random().toString(36).slice(2, 6);
   const base = { fecha: new Date().toISOString(), proveedorId: prov.id, usuarioNombre: obtenerNombreUsuarioActivo() };
-  movimientosCxp.push({ ...base, id: 'cxp-' + Date.now() + '-f' + rid, tipo: 'factura', monto: Math.abs(monto), concepto: `Reposición · ${unidades} und` });
+  movimientosCxp.push({ ...base, id: 'cxp-' + Date.now() + '-f' + rid, tipo: 'factura', monto: Math.abs(monto), concepto: `Reposición · ${unidades} und`, items });
   if (pagado) {
     movimientosCxp.push({ ...base, id: 'cxp-' + Date.now() + '-p' + rid, tipo: 'pago', monto: Math.abs(monto), concepto: formaPago === 'efectivo' ? 'Pago desde caja' : 'Pago (otro medio)' });
   }

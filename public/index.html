@@ -309,8 +309,13 @@
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <div class="alert alert-light border py-2 px-3 small mb-3">
+          <div class="alert alert-light border py-2 px-3 small mb-2">
             <i class="bi bi-box-arrow-in-down me-1"></i> Vas a ingresar <strong id="repoUndsTxt">0 und.</strong> al inventario.
+          </div>
+
+          <div class="border rounded-3 p-2 mb-3 small" style="max-height:150px;overflow-y:auto">
+            <div class="fw-bold text-secondary mb-1"><i class="bi bi-list-check me-1"></i> Productos que ingresan</div>
+            <div id="repoItemsList"></div>
           </div>
 
           <label class="form-label small fw-bold mb-1">Proveedor</label>
