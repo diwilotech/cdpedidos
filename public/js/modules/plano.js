@@ -193,6 +193,11 @@ function cambiarPiso(pisoId) {
     btn.classList.toggle('btn-outline-primary', !activo);
   });
 
+  // Etiqueta del botón "Piso" en el menú inferior.
+  const pisoObj = pisosData.find(p => Number(p.id) === Number(pisoId));
+  const bbPisoLabel = document.getElementById('bbPisoLabel');
+  if (bbPisoLabel && pisoObj) bbPisoLabel.textContent = pisoObj.nombre;
+
   sincronizarFondoCuadricula();
   actualizarSidebar();
   requestAnimationFrame(autoAjustarZoomSiCorresponde);
@@ -208,7 +213,7 @@ function crearPisoDOM(piso) {
   btn.id = 'btn-piso' + piso.id;
   btn.dataset.pisoId = piso.id;
   btn.innerHTML = `<span class="piso-btn-label">${piso.nombre}</span>`;
-  btn.onclick = () => cambiarPiso(piso.id);
+  btn.onclick = () => { cambiarPiso(piso.id); cdpCerrarMenus(); };
   btnGroup.appendChild(btn);
 
   const panelsContainer = document.getElementById('pisosPanelsContainer');
@@ -270,6 +275,10 @@ function renombrarPiso(pisoId) {
     const titulo = document.querySelector(`#panel-piso${pisoId} .piso-titulo`);
     if (label) label.innerText = nuevoNombre;
     if (titulo) titulo.innerText = nuevoNombre;
+    if (Number(pisoId) === Number(pisoActual)) {
+      const bbPisoLabel = document.getElementById('bbPisoLabel');
+      if (bbPisoLabel) bbPisoLabel.textContent = nuevoNombre;
+    }
     guardarEstado();
   });
 }
@@ -499,13 +508,18 @@ function actualizarSidebar() {
     fabBadge.innerText = sumaTotalCuentas;
     fabBadge.classList.toggle('d-none', sumaTotalCuentas === 0);
   }
+  const bbCuentasBadge = document.getElementById('bbCuentasBadge');
+  if (bbCuentasBadge) {
+    bbCuentasBadge.textContent = sumaTotalCuentas;
+    bbCuentasBadge.classList.toggle('d-none', sumaTotalCuentas === 0);
+  }
 
   // actualizarSidebar() se llama tras casi cualquier cambio del plano,
   // así que es el punto ideal para disparar el guardado automático.
   guardarEstado();
 }
 
-// Oculto por defecto; se muestra/oculta con el botón flotante (FAB).
+// Oculto por defecto; se muestra/oculta con "Cuentas" en el menú inferior.
 function toggleCuentasFlotante() {
   const panel = document.getElementById('panelCuentasFlotante');
   if (!panel) return;
@@ -514,6 +528,31 @@ function toggleCuentasFlotante() {
     actualizarSidebar();
   }
 }
+
+/* --- MENÚ INFERIOR: dropups de "Piso" y "Usuario" --- */
+function cdpCerrarMenus() {
+  document.querySelectorAll('.cdp-dropup').forEach(m => { m.hidden = true; });
+  document.querySelectorAll('.cdp-bb-item.activo').forEach(b => b.classList.remove('activo'));
+}
+
+function cdpToggleMenu(cual) {
+  const idMenu = cual === 'piso' ? 'cdpMenuPiso' : 'cdpMenuUsuario';
+  const idBtn  = cual === 'piso' ? 'bbPiso' : 'bbUsuario';
+  const menu = document.getElementById(idMenu);
+  if (!menu) return;
+  const abrir = menu.hidden;      // estado al que vamos
+  cdpCerrarMenus();
+  menu.hidden = !abrir;
+  const btn = document.getElementById(idBtn);
+  if (btn) btn.classList.toggle('activo', abrir);
+}
+
+// Cerrar los dropups al tocar fuera o con Escape.
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.cdp-dropup') || e.target.closest('#bbPiso') || e.target.closest('#bbUsuario')) return;
+  cdpCerrarMenus();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cdpCerrarMenus(); });
 
 function resaltarMesaDesdeSidebar(nodeId) {
   const items = grids[pisoActual].engine.nodes;

@@ -71,7 +71,19 @@ window.__cdpArrancar = async function arrancarApp() {
   if (Array.isArray(cajaHistGuardado)) cajaHist = cajaHistGuardado;
   if (typeof actualizarBadgeCaja === 'function') actualizarBadgeCaja();
 
-  // (Proveedores / cuentas por pagar viven ahora en el Dashboard, no acá.)
+  // 1.f) Proveedores + cuentas por pagar: se cargan para el flujo
+  // "Reposición por proveedor" del modal de Inventario (declarar la compra
+  // y subir stock). La gestión a fondo (pagos, extractos, descripciones)
+  // sigue estando en el Dashboard.
+  const proveedoresGuardados = await cargarProveedoresGuardados();
+  if (proveedoresGuardados && Array.isArray(proveedoresGuardados.proveedores)) {
+    proveedoresData = proveedoresGuardados.proveedores;
+    if (typeof proveedoresGuardados.contadorProveedores === 'number') {
+      contadorProveedores = proveedoresGuardados.contadorProveedores;
+    }
+  }
+  const cxpGuardadas = await cargarCxpGuardadas();
+  if (Array.isArray(cxpGuardadas)) movimientosCxp = cxpGuardadas;
 
   // 2) Plano: pisos + mesas.
   const estadoGuardado = await cargarEstadoGuardado();

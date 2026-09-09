@@ -16,21 +16,38 @@ function abrirModalCaja() {
   modalCajaBS.show();
 }
 
+// Entradas / salidas MANUALES que cargó la persona (movimientos de efectivo
+// que no son ventas: propina, cambio, compra rápida, retiro, etc.).
 function totalMovsCaja(tipo) {
   if (!cajaActual) return 0;
   return cajaActual.movimientos.filter(m => m.tipo === tipo).reduce((s, m) => s + m.monto, 0);
 }
-function esperadoEnCaja() {
-  if (!cajaActual) return 0;
-  return cajaActual.montoInicial + totalMovsCaja('entrada') - totalMovsCaja('salida');
-}
-// Ventas cobradas (sin cliente asociado) desde que se abrió la caja — solo referencia.
-function ventasCobradasDelTurno() {
-  if (!cajaActual) return 0;
+
+// Ventas del turno abierto (desde la apertura).
+//   soloCredito = false -> ventas COBRADAS (entran a la caja como entrada).
+//   soloCredito = true  -> ventas a crédito (cuenta por cobrar de un cliente):
+//                          NO entran a la caja, se muestran aparte.
+function ventasDelTurno(soloCredito) {
+  if (!cajaActual) return [];
   const desde = new Date(cajaActual.fecha).getTime();
   return (typeof ventasData !== 'undefined' ? ventasData : [])
-    .filter(v => !v.clienteId && new Date(v.fecha).getTime() >= desde)
-    .reduce((s, v) => s + (v.total || 0), 0);
+    .filter(v => new Date(v.fecha).getTime() >= desde)
+    .filter(v => (soloCredito ? !!v.clienteId : !v.clienteId));
+}
+function totalVentasTurno(soloCredito) {
+  return ventasDelTurno(soloCredito).reduce((s, v) => s + (v.total || 0), 0);
+}
+// Compat: suma de ventas cobradas del turno.
+function ventasCobradasDelTurno() { return totalVentasTurno(false); }
+
+// Lo que debería haber en la caja:
+//   valor inicial + ventas cobradas del turno + entradas manuales − salidas.
+function esperadoEnCaja() {
+  if (!cajaActual) return 0;
+  return cajaActual.montoInicial
+    + totalVentasTurno(false)
+    + totalMovsCaja('entrada')
+    - totalMovsCaja('salida');
 }
 
 function actualizarBadgeCaja() {
@@ -38,6 +55,8 @@ function actualizarBadgeCaja() {
   if (b) b.classList.toggle('d-none', !cajaActual);
   const fab = document.getElementById('btnFabCaja');
   if (fab) fab.classList.toggle('caja-abierta', !!cajaActual);
+  const dot = document.getElementById('bbCajaDot');   // menú inferior
+  if (dot) dot.classList.toggle('d-none', !cajaActual);
 }
 
 function horaCorta(iso) {
@@ -45,7 +64,7 @@ function horaCorta(iso) {
 }
 
 function renderMovsCaja(list, cls, signo) {
-  if (!list.length) return `<div class="small text-muted fst-italic px-1">Sin movimientos.</div>`;
+  if (!list.length) return '';
   return list.slice().reverse().map(m => `
     <div class="d-flex justify-content-between align-items-center small border-bottom py-1">
       <span>${m.concepto} <span class="text-muted">· ${horaCorta(m.fecha)} · ${m.usuarioNombre}</span></span>
@@ -71,10 +90,31 @@ function renderCaja() {
     return;
   }
 
-  const ent = cajaActual.movimientos.filter(m => m.tipo === 'entrada');
-  const sal = cajaActual.movimientos.filter(m => m.tipo === 'salida');
-  const tEnt = totalMovsCaja('entrada');
-  const tSal = totalMovsCaja('salida');
+  const entManual = cajaActual.movimientos.filter(m => m.tipo === 'entrada');
+  const salManual = cajaActual.movimientos.filter(m => m.tipo === 'salida');
+  const tEntManual = totalMovsCaja('entrada');
+  const tSalManual = totalMovsCaja('salida');
+
+  const ventasCobradas = ventasDelTurno(false);
+  const ventasCredito  = ventasDelTurno(true);
+  const tVentasCobradas = ventasCobradas.reduce((s, v) => s + (v.total || 0), 0);
+  const tVentasCredito  = ventasCredito.reduce((s, v) => s + (v.total || 0), 0);
+  const tEntradas = tVentasCobradas + tEntManual;
+
+  const filaVentaCobrada = ventasCobradas.length
+    ? `<div class="d-flex justify-content-between align-items-center small border-bottom py-1">
+         <span><i class="bi bi-bag-check me-1 text-success"></i>Ventas cobradas del turno <span class="text-muted">· ${ventasCobradas.length}</span></span>
+         <span class="fw-bold text-success">+${formatMoney(tVentasCobradas)}</span>
+       </div>`
+    : '';
+
+  const listaCredito = ventasCredito.length
+    ? ventasCredito.slice().reverse().map(v => `
+        <div class="d-flex justify-content-between align-items-center small border-bottom py-1">
+          <span><i class="bi bi-person-vcard me-1" style="color:#fd7e14"></i>${v.clienteNombre || 'Cliente'} <span class="text-muted">· ${v.mesaNombre} · ${horaCorta(v.fecha)}</span></span>
+          <span class="fw-bold" style="color:#fd7e14">${formatMoney(v.total)}</span>
+        </div>`).join('')
+    : `<div class="small text-muted fst-italic px-1">Sin ventas a crédito en el turno.</div>`;
 
   cont.innerHTML = `
     <div class="d-flex justify-content-between align-items-center small text-muted mb-2">
@@ -87,22 +127,19 @@ function renderCaja() {
       <span class="fw-bold">${formatMoney(cajaActual.montoInicial)}</span>
     </div>
 
-    <div class="d-flex justify-content-between align-items-center mb-1">
-      <span class="small fw-bold text-success"><i class="bi bi-arrow-down-circle me-1"></i>Entradas · ${formatMoney(tEnt)}</span>
-      <button class="btn btn-sm btn-outline-success" onclick="agregarMovCaja('entrada')"><i class="bi bi-plus-lg"></i> Entrada</button>
-    </div>
-    <div class="mb-3">${renderMovsCaja(ent, 'text-success', '+')}</div>
+    <div class="small fw-bold text-success mb-1"><i class="bi bi-arrow-down-circle me-1"></i>Entradas · ${formatMoney(tEntradas)}</div>
+    ${filaVentaCobrada}
+    ${renderMovsCaja(entManual, 'text-success', '+')}
+    <button class="btn btn-sm btn-outline-success mt-1 mb-3" onclick="agregarMovCaja('entrada')"><i class="bi bi-plus-lg"></i> Entrada manual</button>
 
-    <div class="d-flex justify-content-between align-items-center mb-1">
-      <span class="small fw-bold text-danger"><i class="bi bi-arrow-up-circle me-1"></i>Salidas · ${formatMoney(tSal)}</span>
-      <button class="btn btn-sm btn-outline-danger" onclick="agregarMovCaja('salida')"><i class="bi bi-plus-lg"></i> Salida</button>
-    </div>
-    <div class="mb-3">${renderMovsCaja(sal, 'text-danger', '−')}</div>
+    <div class="small fw-bold text-danger mb-1"><i class="bi bi-arrow-up-circle me-1"></i>Salidas · ${formatMoney(tSalManual)}</div>
+    ${renderMovsCaja(salManual, 'text-danger', '−') || `<div class="small text-muted fst-italic px-1">Sin salidas.</div>`}
+    <button class="btn btn-sm btn-outline-danger mt-1 mb-3" onclick="agregarMovCaja('salida')"><i class="bi bi-plus-lg"></i> Salida</button>
 
-    <div class="d-flex justify-content-between small text-muted border-top pt-2 mb-1">
-      <span>Ventas cobradas del turno (referencia)</span>
-      <span>${formatMoney(ventasCobradasDelTurno())}</span>
-    </div>
+    <div class="small fw-bold mb-1" style="color:#fd7e14"><i class="bi bi-hourglass-split me-1"></i>Por cobrar del turno · ${formatMoney(tVentasCredito)}</div>
+    <div class="mb-1">${listaCredito}</div>
+    <div class="small text-muted mb-3"><i class="bi bi-info-circle me-1"></i>Las ventas a crédito no entran a la caja.</div>
+
     <div class="d-flex justify-content-between align-items-center bg-light rounded-3 p-2 mb-3">
       <span class="fw-bold">Esperado en caja</span>
       <span class="fs-5 fw-bold text-primary">${formatMoney(esperadoEnCaja())}</span>
@@ -173,8 +210,9 @@ function cerrarCaja() {
             fecha: new Date().toISOString(),
             usuarioNombre: obtenerNombreUsuarioActivo(),
             esperado, contado, diferencia,
-            ventasCobradasTurno: ventasCobradasDelTurno(),
-            totalEntradas: totalMovsCaja('entrada'),
+            ventasCobradasTurno: totalVentasTurno(false),
+            ventasPorCobrarTurno: totalVentasTurno(true),
+            totalEntradasManual: totalMovsCaja('entrada'),
             totalSalidas: totalMovsCaja('salida')
           };
           cajaHist.push(turno);

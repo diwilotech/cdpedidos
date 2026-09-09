@@ -289,8 +289,8 @@ body {
 .panel-cuentas-flotante{
   position:fixed;
   right:20px;
-  bottom:88px;
-  z-index:895;
+  bottom:74px;            /* justo por encima del menú inferior */
+  z-index:1001;
   width:360px;
   max-width:calc(100vw - 40px);
   max-height:70vh;
@@ -367,7 +367,68 @@ body {
   .zoom-toolbar-flotante{left:8px;}
   .btn-fab-cuentas{right:12px;bottom:12px;}
   .btn-fab-caja{left:12px;bottom:12px;}
-  .panel-cuentas-flotante{right:8px;left:8px;width:auto;bottom:80px;}
+  .panel-cuentas-flotante{right:8px;left:8px;width:auto;bottom:70px;}
+}
+
+/* ===================== MENÚ INFERIOR (móvil + escritorio) =====================
+   Barra fija abajo con: Piso · Cuentas · Caja · Inventario · Ventas · Clientes
+   · Usuario. Sustituye a los botones de la barra superior y a los FAB. */
+body[class]{ padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+
+.cdp-bottombar{
+  position:fixed; left:0; right:0; bottom:0; z-index:1000;
+  display:flex; align-items:stretch;
+  background:#fff; border-top:1px solid #dee2e6;
+  box-shadow:0 -4px 16px rgba(15,23,42,.10);
+  padding-bottom:env(safe-area-inset-bottom, 0px);
+  overflow-x:auto; -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+.cdp-bottombar::-webkit-scrollbar{ display:none; }
+.cdp-bb-item{
+  flex:1 0 auto; min-width:54px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:2px; padding:6px 4px 5px;
+  border:0; background:transparent; color:#6c757d;
+  position:relative; cursor:pointer; line-height:1;
+  transition:color .15s ease, background-color .15s ease;
+}
+.cdp-bb-item:hover{ color:#0d6efd; }
+.cdp-bb-item.activo{ color:#0d6efd; background:rgba(13,110,253,.06); }
+.cdp-bb-item i{ font-size:1.15rem; }
+.cdp-bb-label{
+  font-size:.6rem; font-weight:600; max-width:100%;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; letter-spacing:-.01em;
+}
+.cdp-bb-badge{
+  position:absolute; top:2px; left:calc(50% + 5px);
+  background:#dc3545; color:#fff; border-radius:999px;
+  font-size:.58rem; font-weight:700; padding:1px 5px; line-height:1.3;
+}
+.cdp-bb-dot{
+  position:absolute; top:5px; left:calc(50% + 8px);
+  width:8px; height:8px; border-radius:50%; background:#198754;
+  box-shadow:0 0 0 2px #fff;
+}
+@media (min-width:576px){
+  .cdp-bb-item{ min-width:0; }
+  .cdp-bb-item i{ font-size:1.2rem; }
+  .cdp-bb-label{ font-size:.7rem; }
+}
+
+/* Dropups del menú inferior (Piso y Usuario) */
+.cdp-dropup{
+  position:fixed; left:12px; right:12px; bottom:70px; z-index:1002;
+  max-width:420px; margin:0 auto;
+  background:#fff; border:1px solid rgba(15,23,42,.10); border-radius:14px;
+  box-shadow:0 16px 44px rgba(15,23,42,.22);
+  padding:12px 14px; max-height:60vh; overflow-y:auto;
+}
+.cdp-dropup-title{ font-size:.8rem; font-weight:700; color:#495057; margin-bottom:8px; }
+.cdp-dropup .btn-piso-item{ text-align:left; }
+@media (min-width:576px){
+  #cdpMenuPiso{ right:auto; left:12px; margin:0; }
+  #cdpMenuUsuario{ left:auto; right:12px; margin:0; }
 }
 
 /* Contenedor con scroll propio: así el plano nunca queda "cortado"

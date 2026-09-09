@@ -60,6 +60,12 @@ let proveedoresData = [];
 let contadorProveedores = 0;
 let movimientosCxp = [];     // { id, fecha, proveedorId, tipo:'factura'|'pago', monto, concepto, usuarioNombre }
 
+// --- REPOSICIÓN POR PROVEEDOR (modal de Inventario) ---
+// Turno de reposición activo: mientras exista, cada "Guardar total" que SUBE
+// stock cuenta como entrada de mercadería de ese proveedor. null = sin turno.
+// { proveedorId, proveedorNombre, valor, descripcion, fecha, cxpId, unidades }
+let reposicionActiva = null;
+
 // --- FLUJO DE CAJA (POS) ---
 let cajaActual = null;       // turno abierto: { id, fecha, usuarioNombre, montoInicial, movimientos:[{tipo:'entrada'|'salida',...}] }
 let cajaHist = [];           // cierres archivados

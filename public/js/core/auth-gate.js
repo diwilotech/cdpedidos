@@ -156,19 +156,21 @@
     if (typeof window.__cdpArrancar === 'function') await window.__cdpArrancar();
   }
 
+  // Rellena #authUserSlot, que ahora vive dentro del dropup "Usuario" del
+  // menú inferior. Se pinta como lista vertical (el contenedor es d-grid).
   function pintarChip(user) {
     const slot = document.getElementById('authUserSlot');
     if (!slot) return;
     const admin = user.rol === 'admin';
     slot.innerHTML = `
-      <span class="badge ${admin ? 'text-bg-primary' : 'text-bg-secondary'}">
+      <span class="badge ${admin ? 'text-bg-primary' : 'text-bg-secondary'} py-2">
         <i class="bi bi-person-fill me-1"></i>${user.nombre}${admin ? ' · admin' : ''}
       </span>
       ${admin
-        ? `<a class="btn btn-sm btn-outline-dark" href="/dashboard.html" title="Panel de administración"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>`
-        : `<button class="btn btn-sm btn-outline-dark" onclick="abrirModalMovimientos()" title="Ver mis movimientos de inventario"><i class="bi bi-arrow-down-up me-1"></i>Movimientos</button>`}
-      ${admin ? `<button class="btn btn-sm btn-outline-primary" onclick="abrirModalPersonal()" title="Gestionar accesos del personal"><i class="bi bi-people-fill me-1"></i>Personal</button>` : ''}
-      <button class="btn btn-sm btn-outline-danger" onclick="cdpCerrarSesion()" title="Cerrar sesión"><i class="bi bi-box-arrow-right"></i></button>
+        ? `<a class="btn btn-sm btn-outline-dark" href="/dashboard.html" title="Panel de administración"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+           <button class="btn btn-sm btn-outline-primary" onclick="cdpCerrarMenus(); abrirModalPersonal()" title="Gestionar accesos del personal"><i class="bi bi-people-fill me-1"></i>Personal</button>`
+        : `<button class="btn btn-sm btn-outline-dark" onclick="cdpCerrarMenus(); abrirModalMovimientos()" title="Ver mis movimientos de inventario"><i class="bi bi-arrow-down-up me-1"></i>Mis movimientos</button>`}
+      <button class="btn btn-sm btn-outline-danger" onclick="cdpCerrarSesion()" title="Cerrar sesión"><i class="bi bi-box-arrow-right me-1"></i>Cerrar sesión</button>
     `;
   }
 

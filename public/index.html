@@ -28,40 +28,19 @@
 
   <div class="container-fluid">
 
-    <!-- Barra Superior -->
-    <div class="row mb-2 align-items-center g-3">
-      <div class="col-12 col-md-auto d-flex align-items-center flex-wrap gap-2">
-        <div class="btn-group" role="group" id="pisoTabsGroup">
-          <!-- Botones de piso generados dinámicamente (ver crearPisoDOM) -->
-        </div>
-        <button type="button" class="btn btn-sm btn-outline-secondary edit-only" onclick="agregarPiso()" title="Agregar un nuevo piso al plano">
-          <i class="bi bi-plus-lg"></i> Piso
+    <!-- Barra Superior (mínima): marca + edición del plano.
+         Pisos · Inventario · Ventas · Clientes · Cuentas · Caja · Usuario
+         viven ahora en el MENÚ INFERIOR (#cdpBottomBar), para que la app se
+         use igual de cómoda en celular y en escritorio. -->
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2" id="cdpTopBar">
+      <span class="fw-bold text-primary d-flex align-items-center">
+        <i class="bi bi-box-seam me-2"></i> Control de Pedidos
+      </span>
+      <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-sm btn-outline-primary edit-toggle" id="btn-editar" onclick="toggleModoEdicion()" title="Activar edición del plano">
+          <i class="bi bi-pencil-square me-1"></i> Editar
         </button>
-
-        <div class="vr mx-1 d-none d-md-block" style="height: 30px;"></div>
-
-        <button type="button" class="btn btn-outline-success" id="btn-inventario" onclick="abrirModalInventario()" title="Ver y ajustar el inventario de productos">
-          <i class="bi bi-box-seam me-1"></i> Inventario
-        </button>
-        <button type="button" class="btn btn-outline-primary" id="btn-ventas" onclick="abrirModalVentas()" title="Ver reporte de ventas por usuario">
-          <i class="bi bi-graph-up-arrow me-1"></i> Ventas
-        </button>
-
-        <div class="vr mx-1 d-none d-md-block" style="height: 30px;"></div>
-
-        <button type="button" class="btn btn-outline-danger" id="btn-clientes" onclick="abrirModalClientes()" title="Clientes y cuentas por cobrar">
-          <i class="bi bi-people me-1"></i> Clientes
-        </button>
-      </div>
-
-      <div class="col-12 col-md d-flex justify-content-md-end">
-        <div class="d-flex gap-2 align-items-center flex-wrap">
-          <span id="authUserSlot" class="d-flex align-items-center gap-1 flex-wrap"></span>
-          <button class="btn btn-sm btn-outline-primary edit-toggle" id="btn-editar" onclick="toggleModoEdicion()" title="Activar edición del plano">
-            <i class="bi bi-pencil-square me-1"></i> Editar
-          </button>
-          <span class="edit-status" id="edit-status"><i class="bi bi-lock me-1"></i> Edición desactivada</span>
-        </div>
+        <span class="edit-status d-none d-md-inline" id="edit-status"><i class="bi bi-lock me-1"></i> Edición desactivada</span>
       </div>
     </div>
 
@@ -102,7 +81,7 @@
       <div class="col-12">
 
         <div class="alert alert-light border py-1 px-3 mb-2 small text-muted d-flex justify-content-between align-items-center flex-wrap gap-2">
-          <span>💡 <strong>Gestión Cuentas:</strong> Haz clic en el botón de cuentas (abajo a la derecha) o en el badge de cada mesa para administrar sus comandas.</span>
+          <span>💡 <strong>Gestión Cuentas:</strong> Pulsá <strong>"Cuentas"</strong> en el menú de abajo o el badge de cada mesa para administrar sus comandas.</span>
           <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
             <i class="bi bi-database-check me-1"></i> Base de Datos JSON Lista
           </span>
@@ -142,19 +121,9 @@
     </button>
   </div>
 
-  <!-- Botón Flotante para abrir/cerrar el panel de Cuentas Activas (derecha, abajo) -->
-  <button type="button" class="btn btn-primary btn-fab-cuentas" id="btnToggleCuentas" onclick="toggleCuentasFlotante()" title="Ver cuentas activas">
-    <i class="bi bi-receipt-cutoff"></i>
-    <span class="badge bg-danger rounded-pill fab-badge" id="fabCuentasBadge">0</span>
-  </button>
+  <!-- (Los botones flotantes de Cuentas y Caja se movieron al MENÚ INFERIOR.) -->
 
-  <!-- Botón Flotante: Flujo de caja (POS) (izquierda, abajo) -->
-  <button type="button" class="btn btn-dark btn-fab-caja" id="btnFabCaja" onclick="abrirModalCaja()" title="Flujo de caja (apertura, entradas, salidas, cierre)">
-    <i class="bi bi-cash-coin"></i>
-    <span class="badge bg-success rounded-pill fab-badge d-none" id="fabCajaBadge">•</span>
-  </button>
-
-  <!-- Panel Flotante de Cuentas Activas (derecha, abajo) — oculto hasta que se pulse el botón -->
+  <!-- Panel Flotante de Cuentas Activas (derecha, abajo) — oculto hasta que se pulse "Cuentas" -->
   <div class="panel-cuentas-flotante oculto" id="panelCuentasFlotante">
     <div class="panel-header">
       <div class="d-flex justify-content-between align-items-center mb-2">
@@ -310,6 +279,59 @@
             <i class="bi bi-info-circle me-1"></i> El stock baja/sube solo con las ventas. Para corregirlo o cargar mercadería nueva: escribí el <strong>total</strong> que debe quedar (o usá − / +), mirá la diferencia y pulsá <strong>"Guardar total"</strong>.
           </div>
 
+          <!-- REPOSICIÓN POR PROVEEDOR: antes de subir stock se declara de qué
+               proveedor llegó la mercadería y cuánto valió (queda como cuenta
+               por pagar). Mientras está activa, cada "Guardar total" que SUBE
+               stock cuenta como entrada de ese proveedor. -->
+          <div class="border rounded-3 mb-3" id="repoProveedorPanel">
+            <button class="btn btn-sm btn-outline-primary w-100 d-flex justify-content-between align-items-center border-0" type="button" onclick="toggleRepoPanel()">
+              <span><i class="bi bi-truck me-1"></i> Reposición por proveedor</span>
+              <i class="bi bi-chevron-down" id="repoChevron"></i>
+            </button>
+            <div id="repoProveedorBody" class="p-2 pt-0 d-none">
+
+              <div id="repoInactivo">
+                <div class="row g-2">
+                  <div class="col-12 col-md-6">
+                    <label class="form-label small mb-1 fw-bold">Proveedor</label>
+                    <select id="repoProvSel" class="form-select form-select-sm"></select>
+                  </div>
+                  <div class="col-7 col-md-4">
+                    <label class="form-label small mb-1 fw-bold">¿Cuánto valió?</label>
+                    <input type="number" id="repoValor" class="form-control form-control-sm" min="0" step="1000" placeholder="Total $">
+                  </div>
+                  <div class="col-5 col-md-2 d-grid align-self-end">
+                    <button class="btn btn-sm btn-primary fw-bold" onclick="iniciarReposicion()"><i class="bi bi-play-fill"></i> Iniciar</button>
+                  </div>
+                  <div class="col-12">
+                    <input type="text" id="repoDesc" class="form-control form-control-sm" maxlength="80" placeholder="Descripción / N° de factura (opcional)">
+                  </div>
+                  <div class="col-12">
+                    <div class="input-group input-group-sm">
+                      <input type="text" id="repoNuevoProv" class="form-control" maxlength="40" placeholder="… o escribí un proveedor nuevo">
+                      <button class="btn btn-outline-secondary" type="button" onclick="agregarProveedorReposicion()"><i class="bi bi-plus-lg"></i> Proveedor</button>
+                    </div>
+                    <div class="form-text small">La gestión a fondo (pagos, extractos) sigue en el Dashboard.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="repoActivo" class="d-none">
+                <div class="alert alert-primary py-2 px-3 small mb-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                  <span>
+                    <i class="bi bi-truck me-1"></i> Reposición activa ·
+                    <strong id="repoActivoProv">—</strong> ·
+                    <span id="repoActivoValor">$0</span> ·
+                    <strong id="repoActivoUnds">0</strong> und. ingresadas
+                  </span>
+                  <button class="btn btn-sm btn-outline-dark" onclick="finalizarReposicion()"><i class="bi bi-check-lg me-1"></i> Finalizar</button>
+                </div>
+                <div class="small text-muted"><i class="bi bi-info-circle me-1"></i> Cargá las unidades que llegaron: escribí el total en cada producto y pulsá <strong>Guardar total</strong>. Cada subida queda como <strong>entrada de este proveedor</strong>.</div>
+              </div>
+
+            </div>
+          </div>
+
           <ul class="nav nav-pills gap-2 pb-2 mb-2 flex-nowrap overflow-x-auto" id="categoriasInventarioTabs">
             <!-- Categorías dinámicas -->
           </ul>
@@ -427,6 +449,57 @@
     <a class="dropdown-item" onclick="accionCambiarColor()"><i class="bi bi-palette me-2"></i> Cambiar Color</a>
     <div class="dropdown-divider"></div>
     <a class="dropdown-item text-danger" onclick="accionEliminar()"><i class="bi bi-trash me-2"></i> Eliminar Mesa</a>
+  </div>
+
+  <!-- ===================== MENÚ INFERIOR (móvil + escritorio) =====================
+       Reemplaza los botones de la barra superior y los botones flotantes.
+       Orden: Piso · Cuentas · Caja · Inventario · Ventas · Clientes · Usuario -->
+  <nav class="cdp-bottombar" id="cdpBottomBar" aria-label="Menú principal">
+    <button type="button" class="cdp-bb-item" id="bbPiso" onclick="cdpToggleMenu('piso')">
+      <i class="bi bi-layers-half"></i>
+      <span class="cdp-bb-label" id="bbPisoLabel">Piso</span>
+    </button>
+    <button type="button" class="cdp-bb-item" id="bbCuentas" onclick="cdpCerrarMenus(); toggleCuentasFlotante();">
+      <i class="bi bi-receipt-cutoff"></i>
+      <span class="cdp-bb-label">Cuentas</span>
+      <span class="cdp-bb-badge d-none" id="bbCuentasBadge">0</span>
+    </button>
+    <button type="button" class="cdp-bb-item" id="bbCaja" onclick="cdpCerrarMenus(); abrirModalCaja();">
+      <i class="bi bi-cash-coin"></i>
+      <span class="cdp-bb-label">Caja</span>
+      <span class="cdp-bb-dot d-none" id="bbCajaDot"></span>
+    </button>
+    <button type="button" class="cdp-bb-item" onclick="cdpCerrarMenus(); abrirModalInventario();">
+      <i class="bi bi-box-seam"></i>
+      <span class="cdp-bb-label">Inventario</span>
+    </button>
+    <button type="button" class="cdp-bb-item" onclick="cdpCerrarMenus(); abrirModalVentas();">
+      <i class="bi bi-graph-up-arrow"></i>
+      <span class="cdp-bb-label">Ventas</span>
+    </button>
+    <button type="button" class="cdp-bb-item" onclick="cdpCerrarMenus(); abrirModalClientes();">
+      <i class="bi bi-people"></i>
+      <span class="cdp-bb-label">Clientes</span>
+    </button>
+    <button type="button" class="cdp-bb-item" id="bbUsuario" onclick="cdpToggleMenu('usuario')">
+      <i class="bi bi-person-circle"></i>
+      <span class="cdp-bb-label">Usuario</span>
+    </button>
+  </nav>
+
+  <!-- Dropup: selector de piso (plano.js genera los botones dentro de #pisoTabsGroup) -->
+  <div class="cdp-dropup" id="cdpMenuPiso" hidden>
+    <div class="cdp-dropup-title"><i class="bi bi-layers-half me-1"></i> Pisos</div>
+    <div class="d-flex flex-column gap-1" id="pisoTabsGroup"></div>
+    <button type="button" class="btn btn-sm btn-outline-secondary mt-2 edit-only" onclick="agregarPiso()" title="Agregar un nuevo piso al plano">
+      <i class="bi bi-plus-lg"></i> Agregar piso
+    </button>
+  </div>
+
+  <!-- Dropup: menú de usuario (auth-gate.js rellena #authUserSlot) -->
+  <div class="cdp-dropup" id="cdpMenuUsuario" hidden>
+    <div class="cdp-dropup-title"><i class="bi bi-person-circle me-1"></i> Usuario</div>
+    <div id="authUserSlot" class="d-grid gap-2"></div>
   </div>
 
   <!-- Notificación flotante genérica (producto agregado, sin stock, avisos varios) -->

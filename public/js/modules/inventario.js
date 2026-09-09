@@ -125,6 +125,7 @@ function renderListaMovimientos() {
 function abrirModalInventario() {
   renderCategoriasInventarioTabs();
   renderListaInventario();
+  renderRepoProveedor();
   modalInventarioBS.show();
 }
 
@@ -231,8 +232,25 @@ function guardarStockTotal(productId, nuevoTotal) {
   }
   inventario[productId] = nuevoTotal;
   guardarInventario();
-  // Bajar stock a mano desde inventario NO es una venta: queda como pérdida / merma.
-  registrarMovimientoInventario(productId, dif, dif > 0 ? 'Reposición / ajuste' : 'Ajuste de pérdida');
+
+  // Motivo del movimiento:
+  //  · dif < 0  -> ajuste de pérdida / merma
+  //  · dif > 0  -> reposición. Si hay una "reposición por proveedor" activa,
+  //    queda atribuida a ese proveedor y suma a sus unidades ingresadas.
+  let motivo;
+  if (dif < 0) {
+    motivo = 'Ajuste de pérdida';
+  } else if (reposicionActiva) {
+    motivo = 'Reposición · ' + reposicionActiva.proveedorNombre;
+  } else {
+    motivo = 'Reposición / ajuste';
+  }
+  registrarMovimientoInventario(productId, dif, motivo);
+
+  if (dif > 0 && reposicionActiva) {
+    reposicionActiva.unidades += dif;
+    actualizarRepoActivoUnds();
+  }
 
   const prod = dbJSON.products.find(p => p.id === productId);
   mostrarNotificacion(
@@ -241,4 +259,132 @@ function guardarStockTotal(productId, nuevoTotal) {
   );
   renderListaInventario();
   refrescarVistasInventarioSiEstanAbiertas();
+}
+
+/* ============================================================================
+   REPOSICIÓN POR PROVEEDOR
+   ----------------------------------------------------------------------------
+   Antes de subir stock se declara de qué proveedor llegó la mercadería y
+   cuánto valió: eso crea una cuenta por pagar (factura). Mientras la
+   reposición está "activa", cada "Guardar total" que SUBE stock se registra
+   como entrada atribuida a ese proveedor. Gestionar proveedores a fondo
+   (pagos, extractos) sigue siendo cosa del Dashboard.
+   ========================================================================== */
+function toggleRepoPanel() {
+  const body = document.getElementById('repoProveedorBody');
+  const chev = document.getElementById('repoChevron');
+  if (!body) return;
+  body.classList.toggle('d-none');
+  if (chev) chev.className = body.classList.contains('d-none') ? 'bi bi-chevron-down' : 'bi bi-chevron-up';
+}
+
+function renderRepoProveedor() {
+  const sel = document.getElementById('repoProvSel');
+  const inactivo = document.getElementById('repoInactivo');
+  const activo = document.getElementById('repoActivo');
+  if (!sel || !inactivo || !activo) return;
+
+  if (reposicionActiva) {
+    inactivo.classList.add('d-none');
+    activo.classList.remove('d-none');
+    const p = document.getElementById('repoActivoProv');
+    const v = document.getElementById('repoActivoValor');
+    if (p) p.textContent = reposicionActiva.proveedorNombre;
+    if (v) v.textContent = formatMoney(reposicionActiva.valor);
+    actualizarRepoActivoUnds();
+    // dejar el panel abierto para que se vea el estado activo
+    const body = document.getElementById('repoProveedorBody');
+    if (body && body.classList.contains('d-none')) toggleRepoPanel();
+    return;
+  }
+
+  inactivo.classList.remove('d-none');
+  activo.classList.add('d-none');
+  sel.innerHTML = proveedoresData.length
+    ? proveedoresData.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('')
+    : `<option value="">— sin proveedores —</option>`;
+}
+
+function actualizarRepoActivoUnds() {
+  const u = document.getElementById('repoActivoUnds');
+  if (u && reposicionActiva) u.textContent = reposicionActiva.unidades;
+}
+
+function agregarProveedorReposicion() {
+  const inp = document.getElementById('repoNuevoProv');
+  const nombre = (inp.value || '').trim();
+  if (!nombre) {
+    mostrarNotificacion('Escribí el nombre del proveedor.', 'danger', 'bi-exclamation-triangle-fill');
+    return;
+  }
+  contadorProveedores++;
+  const nuevo = { id: contadorProveedores, nombre, telefono: '' };
+  proveedoresData.push(nuevo);
+  guardarProveedores();
+  inp.value = '';
+  renderRepoProveedor();
+  const sel = document.getElementById('repoProvSel');
+  if (sel) sel.value = String(nuevo.id);
+  mostrarNotificacion(`Proveedor "${nombre}" agregado`, 'success', 'bi-truck');
+}
+
+function iniciarReposicion() {
+  const sel = document.getElementById('repoProvSel');
+  const provId = parseInt(sel.value, 10);
+  const prov = proveedoresData.find(p => p.id === provId);
+  if (!prov) {
+    mostrarNotificacion('Elegí un proveedor (o agregá uno).', 'danger', 'bi-exclamation-triangle-fill');
+    return;
+  }
+  const valor = Math.max(0, parseFloat(document.getElementById('repoValor').value) || 0);
+  if (valor <= 0) {
+    mostrarNotificacion('Indicá cuánto valió la mercancía.', 'danger', 'bi-exclamation-triangle-fill');
+    return;
+  }
+  const desc = (document.getElementById('repoDesc').value || '').trim();
+
+  // 1) Cuenta por pagar: le debemos esa plata al proveedor.
+  const cxpId = 'cxp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+  movimientosCxp.push({
+    id: cxpId,
+    fecha: new Date().toISOString(),
+    proveedorId: provId,
+    tipo: 'factura',
+    monto: valor,
+    concepto: desc || 'Compra de mercancía',
+    usuarioNombre: obtenerNombreUsuarioActivo()
+  });
+  if (movimientosCxp.length > MAX_MOV_CXP_GUARDADOS) {
+    movimientosCxp.splice(0, movimientosCxp.length - MAX_MOV_CXP_GUARDADOS);
+  }
+  guardarCxp();
+
+  // 2) Turno de reposición activo.
+  reposicionActiva = {
+    proveedorId: provId,
+    proveedorNombre: prov.nombre,
+    valor,
+    descripcion: desc || 'Compra de mercancía',
+    fecha: new Date().toISOString(),
+    cxpId,
+    unidades: 0
+  };
+  document.getElementById('repoValor').value = '';
+  document.getElementById('repoDesc').value = '';
+  renderRepoProveedor();
+  mostrarNotificacion(
+    `Reposición de ${prov.nombre} iniciada · ${formatMoney(valor)} a cuentas por pagar`,
+    'success', 'bi-truck'
+  );
+}
+
+function finalizarReposicion() {
+  if (!reposicionActiva) return;
+  const r = reposicionActiva;
+  reposicionActiva = null;
+  renderRepoProveedor();
+  mostrarNotificacion(
+    `Reposición de ${r.proveedorNombre}: ${r.unidades} und. ingresadas · ${formatMoney(r.valor)}`,
+    'success', 'bi-check-circle-fill'
+  );
 }
