@@ -578,21 +578,25 @@ function extractoHtml(movs, tCargo, tAbono) {
   return movs.slice().reverse().map(m => {
     const esCargo = m.tipo === tCargo;
     const icono = esCargo ? '<i class="bi bi-arrow-down-circle text-danger me-1"></i>' : '<i class="bi bi-arrow-up-circle text-success me-1"></i>';
-    const cab = `${icono}${m.concepto || (esCargo ? tCargo : tAbono)} <span class="text-muted">· ${formatFecha(m.fecha)}</span>`;
+    const medioTxt = m.medio ? ` <span class="badge text-bg-light border">${m.medio}</span>` : '';
+    const cab = `${icono}${m.concepto || (esCargo ? tCargo : tAbono)}${medioTxt} <span class="text-muted">· ${formatFecha(m.fecha)}</span>`;
     const monto = `<span class="fw-bold ${esCargo ? 'text-danger' : 'text-success'}">${esCargo ? '+' : '−'}${formatMoney(m.monto)}</span>`;
 
     // Facturas de reposición con detalle de ítems: fila desplegable.
     if (Array.isArray(m.items) && m.items.length) {
       const und = m.items.reduce((s, it) => s + (it.cant || 0), 0);
       const filas = m.items.map(it =>
-        `<div class="d-flex justify-content-between"><span>${it.nombre}</span><span class="text-muted">× ${it.cant}</span></div>`
+        `<div class="d-flex justify-content-between">
+          <span>${it.nombre} <span class="text-muted">× ${it.cant}</span></span>
+          <span>${it.valor != null ? formatMoney(it.valor) : ''}</span>
+        </div>`
       ).join('');
       return `<details class="small border-top py-1">
         <summary class="d-flex justify-content-between align-items-center" style="cursor:pointer">
           <span>${cab} <span class="badge text-bg-light border">${m.items.length} ítems · ${und} und</span></span>${monto}
         </summary>
         <div class="ps-3 pt-1 text-secondary">${filas}
-          <div class="d-flex justify-content-between fw-bold border-top mt-1 pt-1"><span>Valor de la compra</span><span>${formatMoney(m.monto)}</span></div>
+          <div class="d-flex justify-content-between fw-bold border-top mt-1 pt-1"><span>Total de la compra</span><span>${formatMoney(m.monto)}</span></div>
         </div>
       </details>`;
     }
@@ -757,8 +761,8 @@ async function provBorrar(id) {
   await guardarProv(); await guardarCxp();
   renderProveedores(); renderKPIs();
 }
-function movCxp(proveedorId, tipo, monto, concepto) {
-  D.cxp.push({ id: uid('cxp'), fecha: new Date().toISOString(), proveedorId, tipo, monto: Math.abs(monto), concepto, usuarioNombre: D.usuario ? D.usuario.nombre : 'admin' });
+function movCxp(proveedorId, tipo, monto, concepto, extra) {
+  D.cxp.push({ id: uid('cxp'), fecha: new Date().toISOString(), proveedorId, tipo, monto: Math.abs(monto), concepto, ...(extra || {}), usuarioNombre: D.usuario ? D.usuario.nombre : 'admin' });
 }
 // Registrar una compra = ajustar stock + proveedor + forma de pago. Ese
 // flujo vive en el modal de Inventario de la app principal, así que se
@@ -769,8 +773,9 @@ function provFactura(id) {
 async function provPago(id) {
   const m = parseFloat(String(prompt('Monto del pago al proveedor (COP):', '')).replace(/[^\d.-]/g, ''));
   if (isNaN(m) || m <= 0) return;
+  const medio = (prompt('Medio de pago (efectivo, transferencia, tarjeta…):', 'efectivo') || '').trim();
   const desc = (prompt('Nota del pago (opcional, p. ej. abono factura X):', '') || '').trim();
-  movCxp(id, 'pago', m, desc || 'Pago a proveedor');
+  movCxp(id, 'pago', m, desc || 'Pago a proveedor', medio ? { medio } : null);
   await guardarCxp(); renderProveedores(); renderKPIs(); toast('Pago registrado');
 }
 

@@ -341,9 +341,20 @@ function abrirModalReposicion() {
       .filter(c => c.dif > 0)
       .map(c => {
         const prod = dbJSON.products.find(p => p.id === c.productId);
-        return `<div class="d-flex justify-content-between border-top py-1"><span>${prod ? prod.name : c.productId}</span><span class="text-success fw-bold">+${c.dif}</span></div>`;
+        const nombre = prod ? prod.name : c.productId;
+        return `
+          <div class="d-flex justify-content-between align-items-center border-top py-1 gap-2">
+            <span class="text-truncate">${nombre} <span class="text-success fw-bold">+${c.dif}</span></span>
+            <div class="input-group input-group-sm flex-nowrap" style="width:132px">
+              <span class="input-group-text">$</span>
+              <input type="number" class="form-control repo-item-valor" min="0" step="1000" placeholder="0"
+                     data-cant="${c.dif}" data-nombre="${nombre.replace(/"/g, '&quot;')}"
+                     oninput="repoRecalcularTotal()">
+            </div>
+          </div>`;
       }).join('') || '<div class="text-muted fst-italic">Sin ingresos.</div>';
   }
+  repoRecalcularTotal();
 
   const sel = document.getElementById('repoProvSelect');
   const opciones = proveedoresData
@@ -357,7 +368,6 @@ function abrirModalReposicion() {
   sel.value = (pre && proveedoresData.some(p => String(p.id) === pre)) ? pre
     : (proveedoresData.length ? String(proveedoresData[0].id) : '__nuevo__');
 
-  document.getElementById('repoValorInput').value = '';
   document.getElementById('repoNvNombre').value = '';
   document.getElementById('repoNvNit').value = '';
   document.getElementById('repoNvCel').value = '';
@@ -371,6 +381,17 @@ function abrirModalReposicion() {
 function repoProvSelectChange() {
   const esNuevo = document.getElementById('repoProvSelect').value === '__nuevo__';
   document.getElementById('repoProvNuevo').classList.toggle('d-none', !esNuevo);
+}
+
+// Suma en vivo el valor de compra de cada producto de la reposición.
+function repoRecalcularTotal() {
+  let total = 0;
+  document.querySelectorAll('#repoItemsList .repo-item-valor').forEach(inp => {
+    total += Math.max(0, parseFloat(inp.value) || 0);
+  });
+  const el = document.getElementById('repoTotalCompra');
+  if (el) el.textContent = formatMoney(total);
+  return total;
 }
 
 function confirmarReposicionModal() {
@@ -402,9 +423,16 @@ function confirmarReposicionModal() {
     }
   }
 
-  const monto = parseFloat(String(document.getElementById('repoValorInput').value).replace(/[^\d.-]/g, ''));
-  if (isNaN(monto) || monto <= 0) {
-    mostrarNotificacion('Indicá cuánto se pagó o se pagará.', 'danger', 'bi-exclamation-triangle-fill');
+  // Valor de compra por producto -> ítems + total (= monto de la factura).
+  const items = [];
+  let monto = 0;
+  document.querySelectorAll('#repoItemsList .repo-item-valor').forEach(inp => {
+    const valor = Math.max(0, parseFloat(inp.value) || 0);
+    items.push({ nombre: inp.dataset.nombre || '', cant: parseInt(inp.dataset.cant, 10) || 0, valor });
+    monto += valor;
+  });
+  if (monto <= 0) {
+    mostrarNotificacion('Poné el valor de compra de al menos un producto.', 'danger', 'bi-exclamation-triangle-fill');
     return;
   }
 
@@ -414,29 +442,26 @@ function confirmarReposicionModal() {
   const { cambios, unidades } = repoPendiente;
   repoPendiente = null;
   modalReposicionBS.hide();
-  finalizarReposicionInv(cambios, prov, monto, unidades, formaPago);
+  finalizarReposicionInv(cambios, prov, monto, unidades, formaPago, items);
 }
 
 // formaPago: 'efectivo' -> sale de la caja · 'otro' -> pagado sin tocar la
 // caja · 'credito' -> queda por pagar.
-function finalizarReposicionInv(cambios, prov, monto, unidades, formaPago) {
+// items: [{ nombre, cant, valor }] con el valor de compra de cada producto.
+function finalizarReposicionInv(cambios, prov, monto, unidades, formaPago, items) {
   const pagado = formaPago !== 'credito';
+  items = Array.isArray(items) ? items : [];
 
   // 1) Stock (ingresos atribuidos al proveedor).
   aplicarCambiosInv(cambios, 'Reposición · ' + prov.nombre);
 
-  // Detalle de lo que entró, para el registro del proveedor (extracto).
-  const items = cambios.filter(c => c.dif > 0).map(c => {
-    const prod = dbJSON.products.find(p => p.id === c.productId);
-    return { nombre: prod ? prod.name : c.productId, cant: c.dif };
-  });
-
   // 2) Cuentas por pagar: factura de compra (+ pago si ya se pagó).
+  const medio = formaPago === 'efectivo' ? 'Efectivo (caja)' : 'Otro medio';
   const rid = Math.random().toString(36).slice(2, 6);
   const base = { fecha: new Date().toISOString(), proveedorId: prov.id, usuarioNombre: obtenerNombreUsuarioActivo() };
   movimientosCxp.push({ ...base, id: 'cxp-' + Date.now() + '-f' + rid, tipo: 'factura', monto: Math.abs(monto), concepto: `Reposición · ${unidades} und`, items });
   if (pagado) {
-    movimientosCxp.push({ ...base, id: 'cxp-' + Date.now() + '-p' + rid, tipo: 'pago', monto: Math.abs(monto), concepto: formaPago === 'efectivo' ? 'Pago desde caja' : 'Pago (otro medio)' });
+    movimientosCxp.push({ ...base, id: 'cxp-' + Date.now() + '-p' + rid, tipo: 'pago', monto: Math.abs(monto), concepto: 'Pago de reposición', medio });
   }
   if (movimientosCxp.length > MAX_MOV_CXP_GUARDADOS) {
     movimientosCxp.splice(0, movimientosCxp.length - MAX_MOV_CXP_GUARDADOS);
