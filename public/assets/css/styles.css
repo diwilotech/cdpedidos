@@ -462,12 +462,25 @@ body[class]{ padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
 .kpi-card.kpi-naranja .kpi-label,.kpi-card.kpi-naranja .kpi-valor{ color:#fd7e14; }
 .kpi-card.kpi-azul   { background:#e7f0ff; border-color:#b6d0fb; }
 .kpi-card.kpi-azul   .kpi-label,.kpi-card.kpi-azul   .kpi-valor{ color:#0d6efd; }
+.kpi-card.kpi-gris   { background:#f1f3f5; border-color:#dee2e6; }
+.kpi-card.kpi-gris   .kpi-label,.kpi-card.kpi-gris   .kpi-valor{ color:#495057; }
+.kpi-card.kpi-rojo   { background:#fdecea; border-color:#f5c2c7; }
+.kpi-card.kpi-rojo   .kpi-label,.kpi-card.kpi-rojo   .kpi-valor{ color:#dc3545; }
+
+/* Barra ancha destacada: "Esperado en caja" (etiqueta izq. / valor der.) */
+.kpi-card.kpi-xl{
+  flex-direction:row; justify-content:space-between; align-items:center;
+  padding:10px 16px; text-align:left;
+}
+.kpi-card.kpi-xl .kpi-label{ font-size:.8rem; }
+.kpi-card.kpi-xl .kpi-valor{ font-size:1.6rem; }
 
 @media (max-width:400px){
   .kpi-card{ padding:8px 4px; }
   .kpi-card .kpi-label{ font-size:.62rem; }
   .kpi-card .kpi-valor{ font-size:.95rem; }
-  .kpi-card .kpi-sub{ font-size:.6rem; }
+  .kpi-card .kpi-sub{ font-size:.58rem; }
+  .kpi-card.kpi-xl .kpi-valor{ font-size:1.3rem; }
 }
 
 /* Contenedor con scroll propio: así el plano nunca queda "cortado"

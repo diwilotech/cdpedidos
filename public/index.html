@@ -351,13 +351,9 @@
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <!-- KPIs del turno (arriba del todo, con color) -->
-          <div id="resumenVentasPorUsuario" class="row g-2 mb-3">
-            <!-- tarjetas dinámicas (renderResumenVentas) -->
-          </div>
-
-          <!-- CAJA DEL DÍA: valor inicial / turno abierto -->
-          <div id="ventasCajaSlot" class="mb-3"><!-- lo pinta renderCajaEnVentas() --></div>
+          <!-- CAJA DEL TURNO: KPIs con color + controles (todo unificado acá,
+               sin repetir números) — lo pinta renderCajaEnVentas() -->
+          <div id="ventasCajaSlot" class="mb-3"></div>
 
           <div class="small fw-bold text-muted mb-2"><i class="bi bi-receipt me-1"></i> Ventas de la caja (turno) — tocá una para ver el detalle y editarla</div>
           <div id="listaVentas" style="max-height: 340px; overflow-y: auto;">

@@ -82,7 +82,6 @@ function sincronizarCargoFiado(v) {
 
 function abrirModalVentas() {
   renderCajaEnVentas();
-  renderResumenVentas();
   renderListaVentas();
   modalVentasBS.show();
 }
@@ -119,38 +118,6 @@ function alcanceVentasActual() {
     titulo: 'Caja sin abrir · ventas de hoy',
     abierto: false
   };
-}
-
-// KPIs del turno de caja actual (todas las personas), arriba del todo y con
-// color: vendido (cobrado), por cobrar y cuentas abiertas. 3 columnas que se
-// reparten parejo y se ven bien también en celular.
-function renderResumenVentas() {
-  const cont = document.getElementById('resumenVentasPorUsuario');
-  const { ventas, titulo } = alcanceVentasActual();
-
-  const cobrado = ventas.filter(v => !v.clienteId);
-  const totalCobrado = cobrado.reduce((s, v) => s + (v.total || 0), 0);
-  const credito = ventas.filter(v => v.clienteId);
-  const totalCredito = credito.reduce((s, v) => s + (v.total || 0), 0);
-  const abiertas = cuentasAbiertasResumen();
-
-  const kpi = (color, label, valor, sub) => `
-    <div class="col-4">
-      <div class="kpi-card ${color}">
-        <div class="kpi-label">${label}</div>
-        <div class="kpi-valor">${valor}</div>
-        <div class="kpi-sub">${sub}</div>
-      </div>
-    </div>`;
-
-  cont.innerHTML = `
-    <div class="col-12 small fw-bold text-muted"><i class="bi bi-cash-coin me-1"></i>${titulo}</div>
-    ${kpi('kpi-verde',   'Vendido',    formatMoney(totalCobrado), `${cobrado.length} ${cobrado.length === 1 ? 'venta' : 'ventas'} · cobrado`)}
-    ${kpi('kpi-naranja', 'Por cobrar', formatMoney(totalCredito), `${credito.length} a crédito`)}
-    ${kpi('kpi-azul',    'Abiertas',   String(abiertas.n),        `${formatMoney(abiertas.total)} sin liquidar`)}`;
-
-  // La caja del día vive en el mismo modal: mantené sus tarjetas al día.
-  renderCajaEnVentas();
 }
 
 function renderListaVentas() {
@@ -247,7 +214,7 @@ function agregarProductoAVenta(ventaId) {
   guardarVentas();
   sincronizarCargoFiado(v);
   refrescarVistasInventarioSiEstanAbiertas();
-  renderResumenVentas();
+  renderCajaEnVentas();
   renderListaVentas();
   mostrarNotificacion(`${prod.name} x${qty} agregado a la venta`, 'success', 'bi-check-circle-fill');
 }
@@ -265,7 +232,7 @@ function modificarLineaVenta(ventaId, idx, delta) {
   guardarVentas();
   sincronizarCargoFiado(v);
   refrescarVistasInventarioSiEstanAbiertas();
-  renderResumenVentas();
+  renderCajaEnVentas();
   renderListaVentas();
 }
 
@@ -280,7 +247,7 @@ function eliminarLineaVenta(ventaId, idx) {
   guardarVentas();
   sincronizarCargoFiado(v);
   refrescarVistasInventarioSiEstanAbiertas();
-  renderResumenVentas();
+  renderCajaEnVentas();
   renderListaVentas();
 }
 
@@ -360,45 +327,65 @@ function horaCorta(iso) {
   return new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
 }
 
-function cardCaja(label, valor, sub, cls) {
+// Una tarjeta KPI (col-4 por defecto). `color`: kpi-verde | kpi-naranja |
+// kpi-azul | kpi-gris | kpi-rojo.
+function kpiCard(color, label, valor, sub, colCls) {
   return `
-    <div class="border rounded-3 p-2 px-3 bg-white ${cls || ''}" style="min-width:132px">
-      <div class="small text-muted">${label}</div>
-      <div class="fw-bold fs-6">${valor}</div>
-      ${sub ? `<div class="small text-muted">${sub}</div>` : ''}
+    <div class="${colCls || 'col-4'}">
+      <div class="kpi-card ${color}">
+        <div class="kpi-label">${label}</div>
+        <div class="kpi-valor">${valor}</div>
+        ${sub ? `<div class="kpi-sub">${sub}</div>` : ''}
+      </div>
     </div>`;
 }
 
-/* --- RENDER dentro del modal "Mis Ventas" --- */
+/* --- RENDER unificado: KPIs con color + controles de caja, sin repetir
+   ningún número. Todo va en #ventasCajaSlot; el botón de cierre en
+   #ventasCajaCerrarSlot. --- */
 function renderCajaEnVentas() {
   const slot = document.getElementById('ventasCajaSlot');
   const cerrarSlot = document.getElementById('ventasCajaCerrarSlot');
   if (!slot) return;
 
-  // Sin caja abierta: pedir el VALOR INICIAL (antes de vender).
+  const { ventas, titulo } = alcanceVentasActual();
+  const abiertas = cuentasAbiertasResumen();
+
+  /* ---------- SIN caja abierta ---------- */
   if (!cajaActual) {
+    const cobr = ventas.filter(v => !v.clienteId).reduce((s, v) => s + (v.total || 0), 0);
+    const cred = ventas.filter(v => v.clienteId).reduce((s, v) => s + (v.total || 0), 0);
     slot.innerHTML = `
-      <div class="border rounded-3 p-3 bg-light">
-        <div class="fw-bold mb-1"><i class="bi bi-cash-coin me-1"></i> Caja del día</div>
-        <div class="small text-muted mb-2">Abrí la caja con el efectivo base antes de empezar a vender.</div>
+      <div class="row g-2">
+        <div class="col-12 small fw-bold text-muted"><i class="bi bi-cash-coin me-1"></i>${titulo}</div>
+        ${kpiCard('kpi-verde',   'Vendido',    formatMoney(cobr), 'cobrado')}
+        ${kpiCard('kpi-naranja', 'Por cobrar', formatMoney(cred), 'a crédito')}
+        ${kpiCard('kpi-azul',    'Abiertas',   String(abiertas.n), `${formatMoney(abiertas.total)} pend.`)}
+      </div>
+      <div class="border rounded-3 p-3 bg-light mt-2">
+        <div class="fw-bold mb-1"><i class="bi bi-unlock me-1"></i> Abrir la caja del día</div>
+        <div class="small text-muted mb-2">Poné el efectivo base antes de empezar a vender.</div>
         <div class="input-group input-group-sm" style="max-width:280px">
           <span class="input-group-text">$</span>
           <input type="number" id="cajaMontoInicial" class="form-control" min="0" step="1000" placeholder="Valor inicial" value="0">
-          <button class="btn btn-success fw-bold" onclick="abrirCaja()"><i class="bi bi-unlock me-1"></i> Abrir caja</button>
+          <button class="btn btn-success fw-bold" onclick="abrirCaja()">Abrir caja</button>
         </div>
       </div>`;
     if (cerrarSlot) cerrarSlot.innerHTML = '';
     return;
   }
 
+  /* ---------- CAJA abierta ---------- */
+  const inicial     = cajaActual.montoInicial;
   const tCobradas   = totalVentasTurno(false);
   const nCobradas   = ventasDelTurno(false).length;
   const tSinJust    = totalSalidasCaja('sin_justificar');
   const tPagoInv    = totalSalidasCaja('pago_inventario');
+  const tSalidas    = tSinJust + tPagoInv;
+  const esperado    = esperadoEnCaja();
   const ventasCred  = ventasDelTurno(true);
-  const tCredTurno  = ventasCred.reduce((s, v) => s + (v.total || 0), 0);
-  const tCredGlobal = (typeof saldoTotalPorCobrar === 'function') ? saldoTotalPorCobrar() : tCredTurno;
-  const abiertas    = cuentasAbiertasResumen();
+  const tCred       = ventasCred.reduce((s, v) => s + (v.total || 0), 0);
+  const tCredGlobal = (typeof saldoTotalPorCobrar === 'function') ? saldoTotalPorCobrar() : tCred;
   const salidas     = cajaActual.movimientos.filter(m => m.tipo === 'salida');
 
   const etiquetaCat = (m) => (m.categoria === 'pago_inventario')
@@ -422,42 +409,45 @@ function renderCajaEnVentas() {
     : `<div class="small text-muted fst-italic px-1">Sin ventas a crédito en el turno.</div>`;
 
   slot.innerHTML = `
-    <div class="border rounded-3 p-2 bg-light">
-      <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
-        <span class="fw-bold"><i class="bi bi-cash-coin me-1"></i> Caja del día</span>
+    <div class="row g-2">
+      <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-1">
+        <span class="small fw-bold text-muted"><i class="bi bi-cash-coin me-1"></i>${titulo}</span>
         <span class="small text-muted">Abrió ${cajaActual.usuarioNombre} · ${horaCorta(cajaActual.fecha)}</span>
       </div>
 
-      <div class="d-flex flex-wrap gap-2">
-        ${cardCaja('Valor inicial de caja', formatMoney(cajaActual.montoInicial))}
-        ${cardCaja('Ventas cobradas', formatMoney(tCobradas), `${nCobradas} · entra a caja`)}
-        ${cardCaja('Salida sin justificar', '−' + formatMoney(tSinJust), null, tSinJust ? 'border-danger' : '')}
-        ${cardCaja('Salida pago inventario', '−' + formatMoney(tPagoInv), null, tPagoInv ? 'border-danger' : '')}
-        ${cardCaja('Esperado en caja', formatMoney(esperadoEnCaja()), null, 'border-primary')}
-      </div>
+      ${kpiCard('kpi-gris',  'Inicial', formatMoney(inicial))}
+      ${kpiCard('kpi-verde', 'Vendido', formatMoney(tCobradas), `${nCobradas} · cobrado`)}
+      ${kpiCard('kpi-rojo',  'Salidas', '−' + formatMoney(tSalidas), `sin just. ${formatMoney(tSinJust)} · inv. ${formatMoney(tPagoInv)}`)}
 
-      <div class="d-flex gap-2 mt-2 flex-wrap">
-        <button class="btn btn-sm btn-outline-danger" onclick="agregarSalidaCaja('sin_justificar')"><i class="bi bi-dash-circle me-1"></i>Salida sin justificar</button>
-        <button class="btn btn-sm btn-outline-danger" onclick="agregarSalidaCaja('pago_inventario')"><i class="bi bi-truck me-1"></i>Pago de inventario</button>
-      </div>
-
-      <details class="mt-2">
-        <summary class="small text-muted" style="cursor:pointer">Ver detalle del turno</summary>
-        <div class="mt-2">
-          <div class="small fw-bold text-danger mb-1"><i class="bi bi-arrow-up-circle me-1"></i>Salidas de dinero</div>
-          ${listaSalidas}
-
-          <div class="small fw-bold mt-3 mb-1" style="color:#fd7e14"><i class="bi bi-person-vcard me-1"></i>Cuentas por cobrar a clientes</div>
-          <div class="d-flex justify-content-between small px-1"><span>De este turno</span><span class="fw-bold" style="color:#fd7e14">${formatMoney(tCredTurno)}</span></div>
-          <div class="d-flex justify-content-between small px-1 text-muted"><span>Total por cobrar (todos los clientes)</span><span>${formatMoney(tCredGlobal)}</span></div>
-          <div class="mt-1">${listaCredito}</div>
-
-          <div class="small fw-bold mt-3 mb-1 text-primary"><i class="bi bi-receipt-cutoff me-1"></i>Cuentas abiertas</div>
-          <div class="d-flex justify-content-between small px-1"><span>${abiertas.n} ${abiertas.n === 1 ? 'cuenta abierta' : 'cuentas abiertas'} en las mesas</span><span class="fw-bold">${formatMoney(abiertas.total)}</span></div>
-          <div class="small text-muted px-1">Todavía no liquidadas — no entran a la caja.</div>
+      <div class="col-12">
+        <div class="kpi-card kpi-azul kpi-xl">
+          <div class="kpi-label">Esperado en caja</div>
+          <div class="kpi-valor">${formatMoney(esperado)}</div>
         </div>
-      </details>
-    </div>`;
+      </div>
+
+      ${kpiCard('kpi-naranja', 'Por cobrar', formatMoney(tCred), 'no entra a caja', 'col-6')}
+      ${kpiCard('kpi-azul',    'Abiertas',   String(abiertas.n), `${formatMoney(abiertas.total)} · no entra`, 'col-6')}
+    </div>
+
+    <div class="d-flex gap-2 mt-2 flex-wrap">
+      <button class="btn btn-sm btn-outline-danger" onclick="agregarSalidaCaja('sin_justificar')"><i class="bi bi-dash-circle me-1"></i>Salida sin justificar</button>
+      <button class="btn btn-sm btn-outline-danger" onclick="agregarSalidaCaja('pago_inventario')"><i class="bi bi-truck me-1"></i>Pago de inventario</button>
+    </div>
+
+    <details class="mt-2">
+      <summary class="small text-muted" style="cursor:pointer">Ver movimientos del turno</summary>
+      <div class="mt-2">
+        <div class="small fw-bold text-danger mb-1"><i class="bi bi-arrow-up-circle me-1"></i>Salidas de dinero</div>
+        ${listaSalidas}
+
+        <div class="small fw-bold mt-3 mb-1" style="color:#fd7e14"><i class="bi bi-person-vcard me-1"></i>Ventas a crédito del turno</div>
+        ${listaCredito}
+        <div class="d-flex justify-content-between small px-1 text-muted mt-1">
+          <span>Total por cobrar histórico (todos los clientes)</span><span>${formatMoney(tCredGlobal)}</span>
+        </div>
+      </div>
+    </details>`;
 
   if (cerrarSlot) {
     cerrarSlot.innerHTML = `
@@ -467,10 +457,9 @@ function renderCajaEnVentas() {
   }
 }
 
-// Refresca la caja y el resto del modal "Mis Ventas".
+// Refresca la caja/KPIs y la lista del modal "Ventas del turno".
 function refrescarVentasYCaja() {
   renderCajaEnVentas();
-  renderResumenVentas();
   renderListaVentas();
 }
 
