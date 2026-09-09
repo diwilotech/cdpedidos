@@ -61,7 +61,8 @@ window.__dashInit = async function (user) {
 
   const [ventas, movs, inv, cat, cats, cli, fdo, prov, cxp] = await Promise.all([
     leer(STORAGE_KEY_VENTAS), leer(STORAGE_KEY_MOVIMIENTOS), leer(STORAGE_KEY_INVENTARIO),
-    leer(STORAGE_KEY_PRODUCTOS), leer(STORAGE_KEY_CATEGORIAS), leer(STORAGE_KEY_CLIENTES), leer(STORAGE_KEY_FIADOS),
+    leer(STORAGE_KEY_PRODUCTOS), leer(STORAGE_KEY_CATEGORIAS),
+    db.list('clientes').catch(() => []), db.list('mov_fiado').catch(() => []),
     leer(STORAGE_KEY_PROVEEDORES), leer(STORAGE_KEY_CXP)
   ]);
 
@@ -74,8 +75,7 @@ window.__dashInit = async function (user) {
   D.movimientos = Array.isArray(movs) ? movs : [];
   D.inventario = inv && typeof inv === 'object' ? inv : {};
   D.catalogo = (Array.isArray(cat) && cat.length) ? cat.map(p => ({ ...p })) : dbJSON.products.map(p => ({ ...p }));
-  D.clientes = (cli && Array.isArray(cli.clientes)) ? cli.clientes : [];
-  D.contadorClientes = (cli && typeof cli.contadorClientes === 'number') ? cli.contadorClientes : D.clientes.length;
+  D.clientes = Array.isArray(cli) ? cli : [];
   D.fiados = Array.isArray(fdo) ? fdo : [];
   D.proveedores = (prov && Array.isArray(prov.proveedores)) ? prov.proveedores : [];
   D.contadorProveedores = (prov && typeof prov.contadorProveedores === 'number') ? prov.contadorProveedores : D.proveedores.length;
@@ -159,11 +159,7 @@ function renderKPIs() {
   const cobradoHoy = cobradasHoy.reduce((s, v) => s + (v.total || 0), 0);
   const porCobrarHoy = creditoHoy.reduce((s, v) => s + (v.total || 0), 0);
 
-  const porCobrarTotal = D.clientes.reduce((s, c) => {
-    const saldo = D.fiados.filter(m => m.clienteId === c.id)
-      .reduce((a, m) => a + (m.tipo === 'cargo' ? m.monto : -m.monto), 0);
-    return s + Math.max(0, saldo);
-  }, 0);
+  const porCobrarTotal = D.clientes.reduce((s, c) => s + Math.max(0, saldoCli(c.id)), 0);
   const porPagar = D.proveedores.reduce((s, p) => {
     const saldo = D.cxp.filter(m => m.proveedorId === p.id)
       .reduce((a, m) => a + (m.tipo === 'factura' ? m.monto : -m.monto), 0);
@@ -554,18 +550,19 @@ function registrarMov(productId, productName, delta, motivo) {
   });
 }
 
-/* ---------- clientes / cuentas por cobrar ---------- */
+/* ---------- clientes / cuentas por cobrar (tablas relacionales) ---------- */
 function saldoCli(id) {
-  return D.fiados.filter(m => m.clienteId === id)
+  return D.fiados.filter(m => m.cliente_id === id)
     .reduce((a, m) => a + (m.tipo === 'cargo' ? m.monto : -m.monto), 0);
 }
-async function guardarClientesD() {
-  await escribir(STORAGE_KEY_CLIENTES, { clientes: D.clientes, contadorClientes: D.contadorClientes });
-}
-async function guardarFiadosD() { await escribir(STORAGE_KEY_FIADOS, D.fiados); }
 
-function movFiado(clienteId, tipo, monto, concepto) {
-  D.fiados.push({ id: uid('fdo'), fecha: new Date().toISOString(), clienteId, tipo, monto: Math.abs(monto), concepto, ventaId: null, usuarioNombre: D.usuario ? D.usuario.nombre : 'admin' });
+async function movFiado(clienteId, tipo, monto, concepto) {
+  const m = await db.crear('mov_fiado', {
+    cliente_id: clienteId, fecha: new Date().toISOString(), tipo,
+    monto: Math.abs(monto), concepto, venta_id: null,
+    usuario_nombre: D.usuario ? D.usuario.nombre : 'admin'
+  });
+  D.fiados.push(m);
 }
 
 function extractoHtml(movs, tCargo, tAbono) {
@@ -579,13 +576,14 @@ function extractoHtml(movs, tCargo, tAbono) {
 
     // Detalle expandible:
     //   · factura de reposición  -> m.items  [{nombre, cant, valor}]
-    //   · cargo de un cliente    -> productos de la venta ligada (m.ventaId)
+    //   · cargo de un cliente    -> productos de la venta ligada (m.venta_id)
     let lineas = null, totalRotulo = '';
+    const vId = m.venta_id || m.ventaId;
     if (Array.isArray(m.items) && m.items.length) {
       lineas = m.items.map(it => ({ nombre: it.nombre, cant: it.cant || 0, valor: it.valor }));
       totalRotulo = 'Total de la compra';
-    } else if (m.ventaId) {
-      const v = (D.ventas || []).find(x => x.id === m.ventaId);
+    } else if (vId) {
+      const v = (D.ventas || []).find(x => x.id === vId);
       if (v && Array.isArray(v.productos) && v.productos.length) {
         lineas = v.productos.map(p => ({ nombre: p.nombre, cant: p.cant || 0, valor: (p.cant || 0) * (p.precio || 0) }));
         totalRotulo = 'Total consumido';
@@ -639,14 +637,14 @@ function renderClientes() {
             <div class="small ${s > 0 ? 'text-danger' : s < 0 ? 'text-success' : 'text-muted'} fw-bold">${txt}</div>
           </div>
           <div class="d-flex gap-1 flex-wrap">
-            <button class="btn btn-sm btn-outline-secondary" onclick="cliDetalle(${c.id})" title="Ver consumos y pagos del cliente"><i class="bi bi-clock-history"></i> Ver cuenta</button>
-            <button class="btn btn-sm btn-outline-danger" onclick="cliCargo(${c.id})" title="Anotar consumo / cargo"><i class="bi bi-cart-plus"></i> Cargo</button>
-            <button class="btn btn-sm btn-outline-success" onclick="cliAbono(${c.id})" title="Registrar pago"><i class="bi bi-cash-coin"></i> Abono</button>
-            <button class="btn btn-sm btn-outline-primary" onclick="cliEditar(${c.id})" title="Editar nombre, teléfono y descripción"><i class="bi bi-pencil"></i></button>
-            <button class="btn btn-sm btn-outline-danger" onclick="cliBorrar(${c.id})"><i class="bi bi-trash3"></i></button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="cliDetalle('${c.id}')" title="Ver consumos y pagos del cliente"><i class="bi bi-clock-history"></i> Ver cuenta</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="cliCargo('${c.id}')" title="Anotar consumo / cargo"><i class="bi bi-cart-plus"></i> Cargo</button>
+            <button class="btn btn-sm btn-outline-success" onclick="cliAbono('${c.id}')" title="Registrar pago"><i class="bi bi-cash-coin"></i> Abono</button>
+            <button class="btn btn-sm btn-outline-primary" onclick="cliEditar('${c.id}')" title="Editar nombre, teléfono y descripción"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="cliBorrar('${c.id}')"><i class="bi bi-trash3"></i></button>
           </div>
         </div>
-        <div id="cliHist-${c.id}" class="mt-2 d-none">${extractoHtml(D.fiados.filter(m => m.clienteId === c.id), 'cargo', 'abono')}</div>
+        <div id="cliHist-${c.id}" class="mt-2 d-none">${extractoHtml(D.fiados.filter(m => m.cliente_id === c.id), 'cargo', 'abono')}</div>
       </div>`;
   }).join('');
 }
@@ -657,24 +655,22 @@ function cliDetalle(id) {
 async function cliNuevo() {
   const nombre = document.getElementById('nvCliNombre').value.trim();
   if (!nombre) { alert('Poné el nombre del cliente.'); return; }
-  D.contadorClientes++;
-  D.clientes.push({
-    id: D.contadorClientes,
-    nombre,
-    telefono: document.getElementById('nvCliTel').value.trim(),
-    descripcion: document.getElementById('nvCliDesc').value.trim()
-  });
-  await guardarClientesD();
-  document.getElementById('nvCliNombre').value = '';
-  document.getElementById('nvCliTel').value = '';
-  document.getElementById('nvCliDesc').value = '';
-  renderClientes(); toast(`Cliente "${nombre}" agregado`);
+  try {
+    const c = await db.crear('clientes', {
+      nombre,
+      telefono: document.getElementById('nvCliTel').value.trim(),
+      descripcion: document.getElementById('nvCliDesc').value.trim()
+    });
+    D.clientes.push(c);
+    ['nvCliNombre', 'nvCliTel', 'nvCliDesc'].forEach(id => { document.getElementById(id).value = ''; });
+    renderClientes(); toast(`Cliente "${nombre}" agregado`);
+  } catch (e) { alert('No se pudo agregar el cliente.'); }
 }
 
 function cliEditar(id) {
   const c = D.clientes.find(x => x.id === id);
   if (!c) return;
-  document.getElementById('ceCliId').value = String(c.id);
+  document.getElementById('ceCliId').value = id;
   document.getElementById('ceNombre').value = c.nombre || '';
   document.getElementById('ceTel').value = c.telefono || '';
   document.getElementById('ceDesc').value = c.descripcion || '';
@@ -685,39 +681,49 @@ function cliEditarCerrar() {
   document.getElementById('modalCliEditar').hidden = true;
 }
 async function cliEditarGuardar() {
-  const c = D.clientes.find(x => x.id === parseInt(document.getElementById('ceCliId').value, 10));
+  const id = document.getElementById('ceCliId').value;
+  const c = D.clientes.find(x => x.id === id);
   if (!c) { cliEditarCerrar(); return; }
   const nombre = document.getElementById('ceNombre').value.trim();
   if (!nombre) { alert('El cliente necesita un nombre.'); return; }
-  c.nombre = nombre;
-  c.telefono = document.getElementById('ceTel').value.trim();
-  c.descripcion = document.getElementById('ceDesc').value.trim();
-  await guardarClientesD();
-  cliEditarCerrar();
-  renderClientes();
-  toast('Cliente actualizado');
+  const datos = {
+    nombre,
+    telefono: document.getElementById('ceTel').value.trim(),
+    descripcion: document.getElementById('ceDesc').value.trim()
+  };
+  try {
+    await db.editar('clientes', id, datos);
+    Object.assign(c, datos);
+    cliEditarCerrar(); renderClientes(); toast('Cliente actualizado');
+  } catch (e) { alert('No se pudo guardar.'); }
 }
 async function cliBorrar(id) {
   const c = D.clientes.find(x => x.id === id);
   if (!c || !confirm(`¿Eliminar "${c.nombre}" y su historial de cuenta por cobrar?`)) return;
-  D.clientes = D.clientes.filter(x => x.id !== id);
-  D.fiados = D.fiados.filter(m => m.clienteId !== id);
-  await guardarClientesD(); await guardarFiadosD();
-  renderClientes(); renderKPIs();
+  try {
+    await db.borrar('clientes', id);
+    D.clientes = D.clientes.filter(x => x.id !== id);
+    D.fiados = D.fiados.filter(m => m.cliente_id !== id);
+    renderClientes(); renderKPIs();
+  } catch (e) { alert('No se pudo eliminar.'); }
 }
 async function cliCargo(id) {
   const m = parseFloat(String(prompt('Monto del consumo / cargo (COP):', '')).replace(/[^\d.-]/g, ''));
   if (isNaN(m) || m <= 0) return;
   const desc = (prompt('Descripción (qué consumió / concepto):', '') || '').trim();
-  movFiado(id, 'cargo', m, desc || 'Cargo manual');
-  await guardarFiadosD(); renderClientes(); renderKPIs(); toast('Cargo registrado');
+  try {
+    await movFiado(id, 'cargo', m, desc || 'Cargo manual');
+    renderClientes(); renderKPIs(); toast('Cargo registrado');
+  } catch (e) { alert('No se pudo registrar el cargo.'); }
 }
 async function cliAbono(id) {
   const m = parseFloat(String(prompt('Monto del pago / abono (COP):', '')).replace(/[^\d.-]/g, ''));
   if (isNaN(m) || m <= 0) return;
   const desc = (prompt('Nota del pago (opcional):', '') || '').trim();
-  movFiado(id, 'abono', m, desc || 'Abono');
-  await guardarFiadosD(); renderClientes(); renderKPIs(); toast('Abono registrado');
+  try {
+    await movFiado(id, 'abono', m, desc || 'Abono');
+    renderClientes(); renderKPIs(); toast('Abono registrado');
+  } catch (e) { alert('No se pudo registrar el abono.'); }
 }
 
 /* ---------- proveedores ---------- */

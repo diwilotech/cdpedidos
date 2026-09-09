@@ -110,6 +110,69 @@ async function usuarioActual(request, env) {
 }
 const publico = (u) => ({ email: u.email, nombre: u.nombre, rol: u.rol, negocio: u.negocio, orgId: u.org_id });
 
+/* ---------- CRUD genérico /api/db/:tabla ----------
+   Lista blanca: cada tabla declara sus columnas editables por el cliente y el
+   orden por defecto. `id`, `org_id` y `creado_en` los pone el servidor. */
+const TABLAS = {
+  clientes:  { cols: ["nombre", "telefono", "descripcion"], orden: "nombre COLLATE NOCASE" },
+  mov_fiado: { cols: ["cliente_id", "fecha", "tipo", "monto", "concepto", "venta_id", "usuario_id", "usuario_nombre"], orden: "fecha" },
+};
+
+async function manejarDb(path, request, env, url) {
+  const u = await usuarioActual(request, env);
+  if (!u) return json({ error: "no-auth" }, { status: 401 });
+  const org = u.org_id;
+  const partes = path.split("/").filter(Boolean); // ["api","db","<tabla>", "<id>?"]
+  const tabla = partes[2];
+  const id = partes[3] || null;
+  const def = TABLAS[tabla];
+  if (!def) return json({ error: "tabla no permitida" }, { status: 404 });
+  const m = request.method;
+
+  if (m === "GET" && !id) {
+    const where = ["org_id = ?"];
+    const vals = [org];
+    for (const c of def.cols) {
+      const v = url.searchParams.get(c);
+      if (v != null) { where.push(`${c} = ?`); vals.push(v); }
+    }
+    const { results } = await env.DB.prepare(
+      `SELECT * FROM ${tabla} WHERE ${where.join(" AND ")} ORDER BY ${def.orden}`
+    ).bind(...vals).all();
+    return json({ rows: results });
+  }
+
+  if (m === "POST" && !id) {
+    const body = await leerBody(request);
+    const usa = def.cols.filter((c) => body[c] !== undefined);
+    const nid = crypto.randomUUID();
+    const campos = ["id", "org_id", ...usa, "creado_en"];
+    const marks = campos.map(() => "?").join(", ");
+    const vals = [nid, org, ...usa.map((c) => body[c]), Date.now()];
+    await env.DB.prepare(`INSERT INTO ${tabla} (${campos.join(", ")}) VALUES (${marks})`).bind(...vals).run();
+    const row = await env.DB.prepare(`SELECT * FROM ${tabla} WHERE id = ? AND org_id = ?`).bind(nid, org).first();
+    return json({ row });
+  }
+
+  if (m === "PATCH" && id) {
+    const body = await leerBody(request);
+    const usa = def.cols.filter((c) => body[c] !== undefined);
+    if (!usa.length) return json({ error: "nada que actualizar" }, { status: 400 });
+    const set = usa.map((c) => `${c} = ?`).join(", ");
+    const vals = [...usa.map((c) => body[c]), id, org];
+    const r = await env.DB.prepare(`UPDATE ${tabla} SET ${set} WHERE id = ? AND org_id = ?`).bind(...vals).run();
+    if (!r.meta.changes) return json({ error: "no existe" }, { status: 404 });
+    return noContent();
+  }
+
+  if (m === "DELETE" && id) {
+    await env.DB.prepare(`DELETE FROM ${tabla} WHERE id = ? AND org_id = ?`).bind(id, org).run();
+    return noContent();
+  }
+
+  return json({ error: "método no soportado" }, { status: 405 });
+}
+
 /* ---------- API ---------- */
 async function manejarApi(path, request, env, url) {
   const m = request.method;
@@ -261,6 +324,11 @@ async function manejarApi(path, request, env, url) {
       await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(u.id).run();
       return json({ ok: true });
     }
+  }
+
+  /* ---- CRUD relacional genérico ---- */
+  if (path.startsWith("/api/db/")) {
+    return manejarDb(path, request, env, url);
   }
 
   /* ---- bloques JSON del negocio (requiere sesión; org_id de la sesión) ---- */

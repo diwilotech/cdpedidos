@@ -63,8 +63,6 @@ const _repoProductos   = crearRepo(CLAVES.productos);
 const _repoCategorias  = crearRepo(CLAVES.categorias);
 const _repoVentas      = crearRepo(CLAVES.ventas);
 const _repoMovimientos = crearRepo(CLAVES.movimientos);
-const _repoClientes    = crearRepo(CLAVES.clientes);
-const _repoFiados      = crearRepo(CLAVES.fiados);
 const _repoProveedores = crearRepo(CLAVES.proveedores);
 const _repoCxp         = crearRepo(CLAVES.cxp);
 const _repoCaja        = crearRepo(CLAVES.caja, { debounce: 0 });      // cambios puntuales -> persistir ya
@@ -85,11 +83,7 @@ function cargarVentasGuardadas() { return _repoVentas.cargar(); }
 function guardarMovimientos() { _repoMovimientos.guardar(movimientosInventario); }
 function cargarMovimientosGuardados() { return _repoMovimientos.cargar(); }
 
-function guardarClientes() { _repoClientes.guardar({ clientes: clientesData, contadorClientes }); }
-function cargarClientesGuardados() { return _repoClientes.cargar(); }
-
-function guardarFiados() { _repoFiados.guardar(movimientosFiado); }
-function cargarFiadosGuardados() { return _repoFiados.cargar(); }
+// clientes + fiados viven en tablas relacionales (window.db), no en bloque.
 
 function guardarProveedores() { _repoProveedores.guardar({ proveedores: proveedoresData, contadorProveedores }); }
 function cargarProveedoresGuardados() { return _repoProveedores.cargar(); }

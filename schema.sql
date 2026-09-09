@@ -70,3 +70,36 @@ CREATE TABLE IF NOT EXISTS bloques (
   ts     INTEGER NOT NULL,                     -- Date.now() de la última escritura
   PRIMARY KEY (org_id, clave)
 );
+
+
+-- ===========================================================================
+--  FASE 3 — Tablas relacionales por dominio (para reportes/saldos/filtros).
+--  Todas llevan org_id; el Worker lo inyecta desde la sesión.
+-- ===========================================================================
+
+-- ---- Dominio: clientes + cuentas por cobrar (fiados) ----
+CREATE TABLE IF NOT EXISTS clientes (
+  id          TEXT PRIMARY KEY,               -- uuid
+  org_id      TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  nombre      TEXT NOT NULL,
+  telefono    TEXT,
+  descripcion TEXT,
+  creado_en   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_clientes_org ON clientes (org_id);
+
+CREATE TABLE IF NOT EXISTS mov_fiado (
+  id             TEXT PRIMARY KEY,             -- uuid
+  org_id         TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  cliente_id     TEXT NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+  fecha          TEXT NOT NULL,                -- ISO 8601
+  tipo           TEXT NOT NULL,                -- 'cargo' | 'abono'
+  monto          INTEGER NOT NULL,            -- COP sin decimales
+  concepto       TEXT,
+  venta_id       TEXT,                         -- liga un cargo con su venta (dominio 4)
+  usuario_id     TEXT,
+  usuario_nombre TEXT,
+  creado_en      INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_movfiado_org_cli   ON mov_fiado (org_id, cliente_id);
+CREATE INDEX IF NOT EXISTS idx_movfiado_org_venta ON mov_fiado (org_id, venta_id);

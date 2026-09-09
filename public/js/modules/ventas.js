@@ -85,10 +85,10 @@ function registrarVenta(mesaId, cuenta, medioPago) {
 // el cargo del cliente igual al total de la venta (cuando se edita la venta).
 function sincronizarCargoFiado(v) {
   if (!v || !v.clienteId || typeof movimientosFiado === 'undefined') return;
-  const cargo = movimientosFiado.find(m => m.ventaId === v.id && m.tipo === 'cargo');
-  if (!cargo) return;
+  const cargo = movimientosFiado.find(m => m.venta_id === v.id && m.tipo === 'cargo');
+  if (!cargo || cargo.monto === v.total) return;
   cargo.monto = v.total;
-  guardarFiados();
+  if (window.db) db.editar('mov_fiado', cargo.id, { monto: v.total }).catch(e => console.error('sincronizar fiado:', e));
   const modalFi = document.getElementById('modalFiados');
   if (modalFi && modalFi.classList.contains('show') && typeof renderListaClientes === 'function') {
     renderListaClientes();

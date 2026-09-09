@@ -52,17 +52,14 @@ window.__cdpArrancar = async function arrancarApp() {
     movimientosInventario = movimientosGuardados;
   }
 
-  // 1.d) Clientes + fiados (cuentas por cobrar).
-  const clientesGuardados = await cargarClientesGuardados();
-  if (clientesGuardados && Array.isArray(clientesGuardados.clientes)) {
-    clientesData = clientesGuardados.clientes;
-    if (typeof clientesGuardados.contadorClientes === 'number') {
-      contadorClientes = clientesGuardados.contadorClientes;
-    }
-  }
-  const fiadosGuardados = await cargarFiadosGuardados();
-  if (Array.isArray(fiadosGuardados)) {
-    movimientosFiado = fiadosGuardados;
+  // 1.d) Clientes + fiados (cuentas por cobrar) — tablas relacionales (window.db).
+  try {
+    const [cli, fdo] = await Promise.all([db.list('clientes'), db.list('mov_fiado')]);
+    clientesData = Array.isArray(cli) ? cli : [];
+    movimientosFiado = Array.isArray(fdo) ? fdo : [];
+  } catch (e) {
+    console.warn('No se pudieron cargar clientes/fiados:', e && e.message);
+    clientesData = []; movimientosFiado = [];
   }
 
   // 1.e) Flujo de caja (turno abierto + cierres).
