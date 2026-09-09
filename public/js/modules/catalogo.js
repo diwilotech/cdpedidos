@@ -17,10 +17,24 @@ function abrirCatalogoProductos(destino) {
   if (titulo) titulo.innerHTML = `<i class="bi bi-journal-album me-2"></i> Seleccionar Producto para ${obj && obj.esVenta ? 'la Venta' : 'la Cuenta'}`;
   if (btnVolver) btnVolver.textContent = obj && obj.esVenta ? 'Volver a la venta' : 'Volver a la Cuenta';
 
+  const buscar = document.getElementById('catalogoBuscar');
+  if (buscar) buscar.value = '';
+
   renderCategoriasTabs();
   renderGridProductos();
   actualizarEncabezadoCatalogo();
   modalCatalogoBS.show();
+}
+
+// Minúsculas + sin tildes/acentos, para que "cafe" encuentre "Café".
+function normalizarBusqueda(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function limpiarBuscadorCatalogo() {
+  const inp = document.getElementById('catalogoBuscar');
+  if (inp) { inp.value = ''; inp.focus(); }
+  renderGridProductos();
 }
 
 // Objetivo actual del catálogo: la venta apuntada o la cuenta activa.
@@ -76,9 +90,31 @@ function renderGridProductos() {
   const grid = document.getElementById('gridCatalogoProductos');
   grid.innerHTML = '';
 
-  const filtrados = categoriaSeleccionada === 'cat-all'
-    ? dbJSON.products
-    : dbJSON.products.filter(p => p.categoryId === categoriaSeleccionada);
+  const inp = document.getElementById('catalogoBuscar');
+  const tokens = normalizarBusqueda(inp ? inp.value : '').split(/\s+/).filter(Boolean);
+
+  let filtrados;
+  if (tokens.length) {
+    // Con búsqueda: en TODO el catálogo. Cada palabra escrita debe aparecer
+    // en algún lugar del texto del producto (nombre + código + categoría),
+    // sin importar el orden ni que sea el comienzo de una palabra.
+    filtrados = dbJSON.products.filter(prod => {
+      const cat = dbJSON.categories.find(c => c.id === prod.categoryId);
+      const texto = normalizarBusqueda(`${prod.name} ${prod.code} ${cat ? cat.name : ''}`);
+      return tokens.every(t => texto.includes(t));
+    });
+  } else {
+    filtrados = categoriaSeleccionada === 'cat-all'
+      ? dbJSON.products
+      : dbJSON.products.filter(p => p.categoryId === categoriaSeleccionada);
+  }
+
+  if (filtrados.length === 0) {
+    grid.innerHTML = `<div class="col-12 text-center text-muted small py-4">${
+      tokens.length ? 'Ningún producto coincide con la búsqueda.' : 'No hay productos en esta categoría.'
+    }</div>`;
+    return;
+  }
 
   const obj = catalogoObjetivo();
   const lineas = obj ? obj.productos : [];

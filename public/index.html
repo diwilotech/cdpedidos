@@ -256,12 +256,20 @@
         </div>
         <div class="modal-body">
           <!-- Cuenta activa + saldo en tiempo real, siempre visible mientras se agrega -->
-          <div class="d-flex justify-content-between align-items-center bg-light border rounded-3 p-2 mb-3">
+          <div class="d-flex justify-content-between align-items-center bg-light border rounded-3 p-2 mb-2">
             <span class="small fw-bold text-secondary" id="catalogoCuentaNombre"><i class="bi bi-receipt me-1"></i> Cuenta</span>
             <span class="fs-5 fw-bold text-success" id="catalogoSaldoTexto">$0.00</span>
           </div>
 
-          <!-- Filtro por Categorías -->
+          <!-- Buscador de productos: por nombre, código o categoría; ignora
+               tildes y encuentra palabras sueltas en cualquier orden. -->
+          <div class="input-group input-group-sm mb-2">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" id="catalogoBuscar" class="form-control" placeholder="Buscar producto…" autocomplete="off" oninput="renderGridProductos()">
+            <button type="button" class="btn btn-outline-secondary" onclick="limpiarBuscadorCatalogo()" title="Limpiar búsqueda"><i class="bi bi-x-lg"></i></button>
+          </div>
+
+          <!-- Filtro por Categorías (se ignora mientras hay texto en el buscador) -->
           <ul class="nav nav-pills gap-2 mb-3 pb-2 border-bottom flex-nowrap overflow-x-auto" id="categoriasTabs">
             <!-- Categorías dinámicas -->
           </ul>
