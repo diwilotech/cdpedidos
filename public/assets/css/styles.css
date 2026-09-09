@@ -371,7 +371,7 @@ body {
 }
 
 /* ===================== MENÚ INFERIOR (móvil + escritorio) =====================
-   Barra fija abajo con: Piso · Cuentas · Inventario · Ventas · Clientes.
+   Barra fija abajo con: Piso · Clientes · Inventario · Ventas · Cuentas.
    "Usuario" y "Edición" son menús de la barra superior. */
 body[class]{ padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
 
@@ -414,6 +414,15 @@ body[class]{ padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
   .cdp-bb-item{ min-width:0; }
   .cdp-bb-item i{ font-size:1.2rem; }
   .cdp-bb-label{ font-size:.7rem; }
+}
+/* En computador: barra un poco más grande y los ítems centrados
+   (no estirados de borde a borde). */
+@media (min-width:768px){
+  .cdp-bottombar{ justify-content:center; gap:4px; }
+  .cdp-bb-item{ flex:0 0 auto; min-width:124px; padding:10px 12px 9px; gap:3px; }
+  .cdp-bb-item i{ font-size:1.5rem; }
+  .cdp-bb-label{ font-size:.82rem; }
+  body[class]{ padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* Dropup del menú inferior (Piso) */

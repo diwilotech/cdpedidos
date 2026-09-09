@@ -549,17 +549,16 @@
   </div>
 
   <!-- ===================== MENÚ INFERIOR (móvil + escritorio) =====================
-       Orden: Piso · Cuentas · Inventario · Ventas · Clientes.
+       Orden: Piso · Clientes · Inventario · Ventas · Cuentas.
        "Usuario" y "Edición" están arriba; "Caja" vive dentro de Ventas. -->
   <nav class="cdp-bottombar" id="cdpBottomBar" aria-label="Menú principal">
     <button type="button" class="cdp-bb-item cdp-menu-trigger" id="bbPiso" onclick="cdpToggleMenu('piso')">
       <i class="bi bi-layers-half"></i>
       <span class="cdp-bb-label" id="bbPisoLabel">Piso</span>
     </button>
-    <button type="button" class="cdp-bb-item" id="bbCuentas" onclick="cdpCerrarMenus(); toggleCuentasFlotante();">
-      <i class="bi bi-receipt-cutoff"></i>
-      <span class="cdp-bb-label">Cuentas</span>
-      <span class="cdp-bb-badge d-none" id="bbCuentasBadge">0</span>
+    <button type="button" class="cdp-bb-item" onclick="cdpCerrarMenus(); abrirModalClientes();">
+      <i class="bi bi-people"></i>
+      <span class="cdp-bb-label">Clientes</span>
     </button>
     <button type="button" class="cdp-bb-item" onclick="cdpCerrarMenus(); abrirModalInventario();">
       <i class="bi bi-box-seam"></i>
@@ -570,9 +569,10 @@
       <span class="cdp-bb-label">Ventas</span>
       <span class="cdp-bb-dot d-none" id="bbVentasDot" title="Caja abierta"></span>
     </button>
-    <button type="button" class="cdp-bb-item" onclick="cdpCerrarMenus(); abrirModalClientes();">
-      <i class="bi bi-people"></i>
-      <span class="cdp-bb-label">Clientes</span>
+    <button type="button" class="cdp-bb-item" id="bbCuentas" onclick="cdpCerrarMenus(); toggleCuentasFlotante();">
+      <i class="bi bi-receipt-cutoff"></i>
+      <span class="cdp-bb-label">Cuentas</span>
+      <span class="cdp-bb-badge d-none" id="bbCuentasBadge">0</span>
     </button>
   </nav>
 
