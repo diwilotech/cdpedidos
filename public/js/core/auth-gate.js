@@ -154,6 +154,16 @@
     cerrarVista();
     pintarChip(user);
     if (typeof window.__cdpArrancar === 'function') await window.__cdpArrancar();
+
+    // Vengo del Dashboard ("Factura" de un proveedor) -> abrir Inventario
+    // en modo reposición con ese proveedor listo.
+    try {
+      const rep = new URLSearchParams(location.search).get('reponer');
+      if (rep) {
+        limpiarUrl();
+        if (typeof abrirModalInventarioParaReponer === 'function') abrirModalInventarioParaReponer(rep);
+      }
+    } catch (e) {}
   }
 
   // Rellena #authUserSlot, que ahora vive dentro del dropup "Usuario" del

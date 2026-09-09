@@ -69,6 +69,10 @@ let cambiosStockPend = {};
 // "Guardar reposición" (proveedor + costo + forma de pago).
 let repoPendiente = null;
 
+// Proveedor a preseleccionar en el modal de reposición cuando se llega desde
+// el Dashboard (botón "Factura" -> /?reponer=<id>). Se consume una vez.
+let repoProvPre = null;
+
 // --- FLUJO DE CAJA (POS) ---
 let cajaActual = null;       // turno abierto: { id, fecha, usuarioNombre, montoInicial, movimientos:[{tipo:'entrada'|'salida',...}] }
 let cajaHist = [];           // cierres archivados

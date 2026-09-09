@@ -681,7 +681,7 @@ function renderProveedores() {
             <div class="small ${s > 0 ? 'text-danger' : s < 0 ? 'text-success' : 'text-muted'} fw-bold">${txt}</div>
           </div>
           <div class="d-flex gap-1 flex-wrap">
-            <button class="btn btn-sm btn-outline-danger" onclick="provFactura(${p.id})" title="Registrar una compra / factura"><i class="bi bi-receipt"></i> Factura</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="provFactura(${p.id})" title="Registrar una compra: abre Inventario (stock + forma de pago)"><i class="bi bi-box-arrow-up-right"></i> Factura</button>
             <button class="btn btn-sm btn-outline-success" onclick="provPago(${p.id})" title="Registrar un pago"><i class="bi bi-cash-coin"></i> Pago</button>
             <button class="btn btn-sm btn-outline-secondary" onclick="provDetalle(${p.id})" title="Ver compras y pagos"><i class="bi bi-clock-history"></i></button>
             <button class="btn btn-sm btn-outline-primary" onclick="provEditar(${p.id})" title="Editar nombre, NIT y celular"><i class="bi bi-pencil"></i></button>
@@ -741,12 +741,11 @@ async function provBorrar(id) {
 function movCxp(proveedorId, tipo, monto, concepto) {
   D.cxp.push({ id: uid('cxp'), fecha: new Date().toISOString(), proveedorId, tipo, monto: Math.abs(monto), concepto, usuarioNombre: D.usuario ? D.usuario.nombre : 'admin' });
 }
-async function provFactura(id) {
-  const m = parseFloat(String(prompt('Monto de la factura / compra (COP):', '')).replace(/[^\d.-]/g, ''));
-  if (isNaN(m) || m <= 0) return;
-  const desc = (prompt('Descripción de la compra (qué compraste):', '') || '').trim();
-  movCxp(id, 'factura', m, desc || 'Factura de compra');
-  await guardarCxp(); renderProveedores(); renderKPIs(); toast('Factura registrada');
+// Registrar una compra = ajustar stock + proveedor + forma de pago. Ese
+// flujo vive en el modal de Inventario de la app principal, así que se
+// redirige allá con el proveedor ya seleccionado (/?reponer=<id>).
+function provFactura(id) {
+  location.href = '/?reponer=' + encodeURIComponent(id);
 }
 async function provPago(id) {
   const m = parseFloat(String(prompt('Monto del pago al proveedor (COP):', '')).replace(/[^\d.-]/g, ''));

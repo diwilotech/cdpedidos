@@ -126,13 +126,28 @@ function renderListaMovimientos() {
        cuánto se pagó/pagará y si ya se pagó (sale de la caja) o es a crédito.
    El catálogo (crear productos, costo, precio) vive en el Dashboard. */
 function abrirModalInventario(motivo) {
+  if (motivo !== 'pago') repoProvPre = null;   // solo el flujo "pago" preselecciona proveedor
   cambiosStockPend = {};                       // arrancar sin ediciones colgadas
   renderCategoriasInventarioTabs();
   renderListaInventario();
   actualizarResumenInv();
   const banner = document.getElementById('invPagoBanner');
-  if (banner) banner.classList.toggle('d-none', motivo !== 'pago');
+  if (banner) {
+    const esPago = motivo === 'pago';
+    banner.classList.toggle('d-none', !esPago);
+    if (esPago) {
+      const p = repoProvPre ? proveedoresData.find(x => String(x.id) === repoProvPre) : null;
+      banner.innerHTML = `<i class="bi bi-truck me-1"></i> <strong>${p ? 'Compra de ' + p.nombre : 'Pago de inventario'}:</strong> ajustá las unidades que llegaron y pulsá <strong>"Guardar reposición…"</strong> abajo para registrar el proveedor y la forma de pago.`;
+    }
+  }
   modalInventarioBS.show();
+}
+
+// Llega desde el Dashboard (botón "Factura" del proveedor): abre Inventario
+// en modo "pago" con ese proveedor listo para la reposición.
+function abrirModalInventarioParaReponer(provId) {
+  repoProvPre = String(provId);
+  abrirModalInventario('pago');
 }
 
 function renderCategoriasInventarioTabs() {
@@ -319,8 +334,12 @@ function abrirModalReposicion() {
     .map(p => `<option value="${p.id}">${p.nombre}${p.nit ? ' · NIT ' + p.nit : ''}</option>`)
     .join('');
   sel.innerHTML = opciones + `<option value="__nuevo__">➕ Registrar proveedor nuevo…</option>`;
-  // Si no hay proveedores, arrancar en "nuevo".
-  sel.value = proveedoresData.length ? String(proveedoresData[0].id) : '__nuevo__';
+  // Preselección: el proveedor que venía del Dashboard (se consume una vez);
+  // si no, el primero de la lista; si no hay ninguno, "nuevo".
+  const pre = repoProvPre;
+  repoProvPre = null;
+  sel.value = (pre && proveedoresData.some(p => String(p.id) === pre)) ? pre
+    : (proveedoresData.length ? String(proveedoresData[0].id) : '__nuevo__');
 
   document.getElementById('repoValorInput').value = '';
   document.getElementById('repoNvNombre').value = '';
