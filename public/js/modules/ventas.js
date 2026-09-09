@@ -309,6 +309,14 @@ function cuentasAbiertasResumen() {
   return { n, total };
 }
 
+// Compras de inventario A CRÉDITO del turno (reposición sin pagar): NO
+// descuentan la caja; se muestran en rojo como "por pagar".
+function comprasCreditoTurno() {
+  if (!cajaActual) return { total: 0, items: [] };
+  const items = cajaActual.movimientos.filter(m => m.tipo === 'compra_credito');
+  return { total: items.reduce((s, m) => s + m.monto, 0), items };
+}
+
 function esperadoEnCaja() {
   if (!cajaActual) return 0;
   return cajaActual.montoInicial
@@ -387,18 +395,29 @@ function renderCajaEnVentas() {
   const tCred       = ventasCred.reduce((s, v) => s + (v.total || 0), 0);
   const tCredGlobal = (typeof saldoTotalPorCobrar === 'function') ? saldoTotalPorCobrar() : tCred;
   const salidas     = cajaActual.movimientos.filter(m => m.tipo === 'salida');
+  const compras     = comprasCreditoTurno();
 
   const etiquetaCat = (m) => (m.categoria === 'pago_inventario')
-    ? '<span class="badge text-bg-light border">Pago inventario</span>'
+    ? '<span class="badge text-bg-light border">Pago proveedor</span>'
     : '<span class="badge text-bg-light border">Sin justificar</span>';
+
+  const und = (m) => m.unidades ? ` · ${m.unidades} und` : '';
 
   const listaSalidas = salidas.length
     ? salidas.slice().reverse().map(m => `
         <div class="d-flex justify-content-between align-items-center small border-bottom py-1">
-          <span>${etiquetaCat(m)} ${m.concepto} <span class="text-muted">· ${horaCorta(m.fecha)} · ${m.usuarioNombre}</span></span>
+          <span>${etiquetaCat(m)} ${m.concepto}${und(m)} <span class="text-muted">· ${formatFecha(m.fecha)} · ${m.usuarioNombre}</span></span>
           <span class="fw-bold text-danger">−${formatMoney(m.monto)}</span>
         </div>`).join('')
     : `<div class="small text-muted fst-italic px-1">Sin salidas registradas.</div>`;
+
+  const listaCompras = compras.items.length
+    ? compras.items.slice().reverse().map(m => `
+        <div class="d-flex justify-content-between align-items-center small border-bottom py-1">
+          <span><i class="bi bi-truck me-1 text-danger"></i>${m.concepto}${und(m)} <span class="text-muted">· ${formatFecha(m.fecha)} · ${m.usuarioNombre}</span></span>
+          <span class="fw-bold text-danger">−${formatMoney(m.monto)}</span>
+        </div>`).join('')
+    : `<div class="small text-muted fst-italic px-1">Sin compras a crédito en el turno.</div>`;
 
   const listaCredito = ventasCred.length
     ? ventasCred.slice().reverse().map(v => `
@@ -417,7 +436,7 @@ function renderCajaEnVentas() {
 
       ${kpiCard('kpi-gris',  'Inicial', formatMoney(inicial))}
       ${kpiCard('kpi-verde', 'Vendido', formatMoney(tCobradas), `${nCobradas} · cobrado`)}
-      ${kpiCard('kpi-rojo',  'Salidas', '−' + formatMoney(tSalidas), `sin just. ${formatMoney(tSinJust)} · inv. ${formatMoney(tPagoInv)}`)}
+      ${kpiCard('kpi-rojo',  'Salidas', '−' + formatMoney(tSalidas), `sin just. ${formatMoney(tSinJust)} · prov. ${formatMoney(tPagoInv)}`)}
 
       <div class="col-12">
         <div class="kpi-card kpi-azul kpi-xl">
@@ -426,20 +445,24 @@ function renderCajaEnVentas() {
         </div>
       </div>
 
-      ${kpiCard('kpi-naranja', 'Por cobrar', formatMoney(tCred), 'no entra a caja', 'col-6')}
-      ${kpiCard('kpi-azul',    'Abiertas',   String(abiertas.n), `${formatMoney(abiertas.total)} · no entra`, 'col-6')}
+      ${kpiCard('kpi-naranja', 'Por cobrar', formatMoney(tCred), 'clientes · no entra', 'col-4')}
+      ${kpiCard('kpi-rojo',    'Por pagar',  formatMoney(compras.total), 'a crédito · no entra', 'col-4')}
+      ${kpiCard('kpi-azul',    'Abiertas',   String(abiertas.n), `${formatMoney(abiertas.total)} · no entra`, 'col-4')}
     </div>
 
     <div class="d-flex gap-2 mt-2 flex-wrap">
-      <button class="btn btn-sm btn-outline-danger" onclick="agregarSalidaCaja('sin_justificar')"><i class="bi bi-dash-circle me-1"></i>Salida sin justificar</button>
-      <button class="btn btn-sm btn-outline-danger" onclick="agregarSalidaCaja('pago_inventario')"><i class="bi bi-truck me-1"></i>Pago de inventario</button>
+      <button class="btn btn-sm btn-outline-danger" onclick="agregarSalidaSinJustificar()"><i class="bi bi-dash-circle me-1"></i>Salida sin justificar</button>
+      <button class="btn btn-sm btn-outline-danger" onclick="abrirModalInventario('pago')"><i class="bi bi-truck me-1"></i>Pago de inventario</button>
     </div>
 
     <details class="mt-2">
       <summary class="small text-muted" style="cursor:pointer">Ver movimientos del turno</summary>
       <div class="mt-2">
-        <div class="small fw-bold text-danger mb-1"><i class="bi bi-arrow-up-circle me-1"></i>Salidas de dinero</div>
+        <div class="small fw-bold text-danger mb-1"><i class="bi bi-arrow-up-circle me-1"></i>Salidas de dinero (sale de la caja)</div>
         ${listaSalidas}
+
+        <div class="small fw-bold mt-3 mb-1 text-danger"><i class="bi bi-truck me-1"></i>Compras a crédito del turno (por pagar)</div>
+        ${listaCompras}
 
         <div class="small fw-bold mt-3 mb-1" style="color:#fd7e14"><i class="bi bi-person-vcard me-1"></i>Ventas a crédito del turno</div>
         ${listaCredito}
@@ -480,72 +503,34 @@ function abrirCaja() {
   mostrarNotificacion(`Caja abierta con ${formatMoney(monto)}`, 'success', 'bi-unlock');
 }
 
-// Salida de efectivo de la caja. `categoria`:
-//   'sin_justificar'  -> retiro sin respaldo.
-//   'pago_inventario' -> pago de mercadería; si el texto coincide con el
-//                        nombre de un proveedor, además baja su cuenta por pagar.
-function agregarSalidaCaja(categoria) {
+// Salida de efectivo SIN justificación (retiro sin respaldo). El pago de
+// inventario NO pasa por acá: se hace desde el modal de Inventario
+// ("Guardar reposición…"), que además ajusta el stock y el proveedor.
+function agregarSalidaSinJustificar() {
   if (!cajaActual) return;
-  const esInv = categoria === 'pago_inventario';
-  pedirTexto(
-    esInv ? 'Monto pagado por inventario / mercadería (COP):' : 'Monto que SALE de la caja sin justificar (COP):',
-    '',
-    (valor) => {
-      const monto = parseFloat(String(valor).replace(/[^\d.-]/g, ''));
-      if (isNaN(monto) || monto <= 0) {
-        mostrarNotificacion('Ingresa un monto válido.', 'danger', 'bi-exclamation-triangle-fill');
-        return;
-      }
-      const porDefecto = esInv
-        ? ((typeof proveedoresData !== 'undefined' && proveedoresData[0] && proveedoresData[0].nombre) || 'Proveedor')
-        : 'Sin justificación';
-      setTimeout(() => {
-        pedirTexto(esInv ? '¿A qué proveedor? (o descripción del pago):' : 'Nota (opcional):', porDefecto, (txt) => {
-          const concepto = txt.trim() || (esInv ? 'Pago de inventario' : 'Sin justificación');
-          let proveedorId = null;
-
-          if (esInv && typeof proveedoresData !== 'undefined') {
-            const prov = proveedoresData.find(p => (p.nombre || '').toLowerCase() === concepto.toLowerCase());
-            if (prov) {
-              proveedorId = prov.id;
-              movimientosCxp.push({
-                id: 'cxp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-                fecha: new Date().toISOString(),
-                proveedorId: prov.id,
-                tipo: 'pago',
-                monto: Math.abs(monto),
-                concepto: 'Pago desde caja',
-                usuarioNombre: obtenerNombreUsuarioActivo()
-              });
-              if (movimientosCxp.length > MAX_MOV_CXP_GUARDADOS) {
-                movimientosCxp.splice(0, movimientosCxp.length - MAX_MOV_CXP_GUARDADOS);
-              }
-              guardarCxp();
-            }
-          }
-
-          cajaActual.movimientos.push({
-            id: 'cm-' + Date.now(),
-            fecha: new Date().toISOString(),
-            tipo: 'salida',
-            categoria,
-            monto: Math.abs(monto),
-            concepto,
-            proveedorId,
-            usuarioNombre: obtenerNombreUsuarioActivo()
-          });
-          guardarCaja();
-          refrescarVentasYCaja();
-          mostrarNotificacion(
-            esInv
-              ? (proveedorId ? 'Pago de inventario registrado (baja la cuenta por pagar)' : 'Pago de inventario registrado')
-              : 'Salida sin justificar registrada',
-            'success', 'bi-check-circle-fill'
-          );
-        });
-      }, 350);
+  pedirTexto('Monto que SALE de la caja sin justificar (COP):', '', (valor) => {
+    const monto = parseFloat(String(valor).replace(/[^\d.-]/g, ''));
+    if (isNaN(monto) || monto <= 0) {
+      mostrarNotificacion('Ingresa un monto válido.', 'danger', 'bi-exclamation-triangle-fill');
+      return;
     }
-  );
+    setTimeout(() => {
+      pedirTexto('Nota (opcional):', 'Sin justificación', (txt) => {
+        cajaActual.movimientos.push({
+          id: 'cm-' + Date.now(),
+          fecha: new Date().toISOString(),
+          tipo: 'salida',
+          categoria: 'sin_justificar',
+          monto: Math.abs(monto),
+          concepto: txt.trim() || 'Sin justificación',
+          usuarioNombre: obtenerNombreUsuarioActivo()
+        });
+        guardarCaja();
+        refrescarVentasYCaja();
+        mostrarNotificacion('Salida sin justificar registrada', 'success', 'bi-check-circle-fill');
+      });
+    }, 350);
+  });
 }
 
 function cerrarCaja() {
@@ -570,7 +555,8 @@ function cerrarCaja() {
             ventasCobradasTurno: totalVentasTurno(false),
             ventasPorCobrarTurno: totalVentasTurno(true),
             salidaSinJustificar: totalSalidasCaja('sin_justificar'),
-            salidaPagoInventario: totalSalidasCaja('pago_inventario')
+            salidaPagoInventario: totalSalidasCaja('pago_inventario'),
+            comprasCreditoTurno: comprasCreditoTurno().total
           };
           cajaHist.push(turno);
           if (cajaHist.length > MAX_CIERRES_CAJA_GUARDADOS) {

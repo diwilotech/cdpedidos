@@ -49,6 +49,19 @@ function pedirConfirmacion(mensaje, onConfirmar) {
   modalConfirmarBS.show();
 }
 
+// Confirmación con DOS caminos: onSi (botón Aceptar) y onNo (Cancelar / cerrar).
+// Útil cuando ambas respuestas tienen que hacer algo.
+function pedirSiNo(mensaje, onSi, onNo) {
+  const modalEl = document.getElementById('modalConfirmarAccion');
+  let dijoSi = false;
+  const alCerrar = () => {
+    modalEl.removeEventListener('hidden.bs.modal', alCerrar);
+    if (!dijoSi && typeof onNo === 'function') onNo();
+  };
+  modalEl.addEventListener('hidden.bs.modal', alCerrar);
+  pedirConfirmacion(mensaje, () => { dijoSi = true; if (typeof onSi === 'function') onSi(); });
+}
+
 function pedirColor(colorInicial, onConfirmar) {
   const picker = document.getElementById('colorPickerOculto');
   picker.value = colorInicial || '#0d6efd';

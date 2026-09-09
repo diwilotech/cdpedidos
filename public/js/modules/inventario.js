@@ -119,13 +119,19 @@ function renderListaMovimientos() {
 }
 
 /* --- MODAL DE INVENTARIO ---
-   Acá el personal SOLO ajusta stock (contar / cargar mercadería / registrar
-   pérdida con "Guardar total") y ve sus movimientos. El catálogo (crear
-   productos, costo, precio de venta, % de ganancia) vive en el Dashboard. */
-function abrirModalInventario() {
+   El personal escribe el TOTAL que debe quedar de cada producto y al final
+   guarda TODO junto desde el footer:
+     · "Guardar ajuste"       -> correcciones / merma.
+     · "Guardar reposición…"  -> mercadería de un proveedor: pregunta proveedor,
+       cuánto se pagó/pagará y si ya se pagó (sale de la caja) o es a crédito.
+   El catálogo (crear productos, costo, precio) vive en el Dashboard. */
+function abrirModalInventario(motivo) {
+  cambiosStockPend = {};                       // arrancar sin ediciones colgadas
   renderCategoriasInventarioTabs();
   renderListaInventario();
-  renderRepoProveedor();
+  actualizarResumenInv();
+  const banner = document.getElementById('invPagoBanner');
+  if (banner) banner.classList.toggle('d-none', motivo !== 'pago');
   modalInventarioBS.show();
 }
 
@@ -166,16 +172,19 @@ function renderListaInventario() {
 
   filtrados.forEach(prod => {
     const stock = obtenerStock(prod.id);
+    const nuevo = (prod.id in cambiosStockPend) ? cambiosStockPend[prod.id] : stock;
+    const dif = nuevo - stock;
     const badgeClase = stock === 0 ? 'bg-danger' : stock <= 5 ? 'bg-warning text-dark' : 'bg-success';
     const esPersonalizado = prod.id.startsWith('custom-');
 
     const row = document.createElement('div');
     row.className = 'd-flex justify-content-between align-items-center flex-wrap gap-2 border rounded-3 p-2 mb-2';
     row.dataset.prodrow = '';
+    row.dataset.prodid = prod.id;
     row.dataset.stockactual = stock;
-    // Se escribe el TOTAL que debe quedar (los botones - / + solo mueven ese
-    // número, no guardan). "dif" muestra el cambio contra el stock actual.
-    // "Guardar total" fija ese número y registra el movimiento por la diferencia.
+    // Se escribe el TOTAL que debe quedar (los − / + solo mueven ese número).
+    // El cambio se acumula en cambiosStockPend y se guarda todo junto desde el
+    // footer. "dif" muestra el cambio contra el stock actual.
     row.innerHTML = `
       <div>
         <div class="fw-bold">${prod.name} ${esPersonalizado ? '<span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size:.65rem;">Nuevo</span>' : ''}</div>
@@ -185,206 +194,189 @@ function renderListaInventario() {
         <span class="badge ${badgeClase}" title="Stock actual">${stock} und.</span>
         <div class="input-group input-group-sm" style="width:132px;">
           <button class="btn btn-outline-secondary" type="button" onclick="ajustarCampoStock(this,-1)">−</button>
-          <input type="number" min="0" class="form-control text-center stock-input" value="${stock}" oninput="actualizarDifStock(this)">
+          <input type="number" min="0" class="form-control text-center stock-input" value="${nuevo}" oninput="registrarCambioStock(this)">
           <button class="btn btn-outline-secondary" type="button" onclick="ajustarCampoStock(this,1)">+</button>
         </div>
-        <span class="stock-dif fw-bold text-muted" style="min-width:34px;text-align:center;">0</span>
-        <button class="btn btn-sm btn-success fw-bold" onclick="guardarStockTotalDesdeFila(this,'${prod.id}')" title="Fijar el total y registrar la diferencia">
-          <i class="bi bi-check-lg me-1"></i>Guardar total
-        </button>
+        <span class="stock-dif fw-bold ${dif > 0 ? 'text-success' : dif < 0 ? 'text-danger' : 'text-muted'}" style="min-width:34px;text-align:center;">${dif > 0 ? '+' : ''}${dif}</span>
       </div>
     `;
     cont.appendChild(row);
   });
 }
 
-// Los botones - / + solo cambian el número del campo (no guardan).
+// Los − / + solo cambian el número del campo (no guardan).
 function ajustarCampoStock(btn, delta) {
-  const row = btn.closest('[data-prodrow]');
-  const input = row.querySelector('.stock-input');
+  const input = btn.closest('[data-prodrow]').querySelector('.stock-input');
   input.value = Math.max(0, (parseInt(input.value, 10) || 0) + delta);
-  actualizarDifStock(input);
+  registrarCambioStock(input);
 }
 
-// Muestra la diferencia (nuevo total − stock actual) al lado del campo.
-function actualizarDifStock(input) {
+// Anota la edición pendiente del producto y refresca "dif" + el resumen del footer.
+function registrarCambioStock(input) {
   const row = input.closest('[data-prodrow]');
+  const pid = row.dataset.prodid;
   const actual = parseInt(row.dataset.stockactual, 10) || 0;
-  const dif = (parseInt(input.value, 10) || 0) - actual;
+  const nuevo = Math.max(0, parseInt(input.value, 10) || 0);
+
+  if (nuevo === actual) delete cambiosStockPend[pid];
+  else cambiosStockPend[pid] = nuevo;
+
+  const dif = nuevo - actual;
   const el = row.querySelector('.stock-dif');
   el.textContent = (dif > 0 ? '+' : '') + dif;
   el.className = 'stock-dif fw-bold ' + (dif > 0 ? 'text-success' : dif < 0 ? 'text-danger' : 'text-muted');
+  actualizarResumenInv();
 }
 
-function guardarStockTotalDesdeFila(btn, productId) {
-  const row = btn.closest('[data-prodrow]');
-  guardarStockTotal(productId, row.querySelector('.stock-input').value);
+// Alias histórico (por si algún onclick viejo llama a esto).
+function actualizarDifStock(input) { registrarCambioStock(input); }
+
+// Lista de cambios pendientes -> [{ productId, actual, nuevo, dif }] (dif !== 0).
+function recolectarCambiosInv() {
+  return Object.keys(cambiosStockPend).map(pid => {
+    const actual = obtenerStock(pid);
+    const nuevo = Math.max(0, parseInt(cambiosStockPend[pid], 10) || 0);
+    return { productId: pid, actual, nuevo, dif: nuevo - actual };
+  }).filter(c => c.dif !== 0);
 }
 
-// Fija el stock al total indicado y registra UN movimiento por la diferencia.
-function guardarStockTotal(productId, nuevoTotal) {
-  nuevoTotal = Math.max(0, parseInt(nuevoTotal, 10) || 0);
-  const actual = obtenerStock(productId);
-  const dif = nuevoTotal - actual;
-  if (dif === 0) {
-    mostrarNotificacion('Sin cambios: el total es igual al stock actual.', 'warning', 'bi-info-circle');
+function actualizarResumenInv() {
+  const el = document.getElementById('invCambiosResumen');
+  if (!el) return;
+  const c = recolectarCambiosInv();
+  if (!c.length) { el.textContent = 'Sin cambios'; return; }
+  const mas = c.filter(x => x.dif > 0).reduce((s, x) => s + x.dif, 0);
+  const menos = c.filter(x => x.dif < 0).reduce((s, x) => s + x.dif, 0);
+  const partes = [];
+  if (mas) partes.push('+' + mas);
+  if (menos) partes.push(String(menos));
+  el.textContent = `${c.length} ${c.length === 1 ? 'producto' : 'productos'} · ${partes.join(' / ')} und.`;
+}
+
+// Aplica los cambios de stock y registra un movimiento por cada uno.
+function aplicarCambiosInv(cambios, motivoIngreso) {
+  cambios.forEach(c => {
+    inventario[c.productId] = c.nuevo;
+    registrarMovimientoInventario(c.productId, c.dif, c.dif > 0 ? motivoIngreso : 'Ajuste de pérdida');
+  });
+  guardarInventario();
+}
+
+function cerrarModalInventarioTrasGuardar() {
+  cambiosStockPend = {};
+  renderListaInventario();
+  actualizarResumenInv();
+  modalInventarioBS.hide();
+  refrescarVistasInventarioSiEstanAbiertas();
+  if (typeof refrescarVentasYCaja === 'function') refrescarVentasYCaja();
+  if (typeof actualizarBadgeCaja === 'function') actualizarBadgeCaja();
+}
+
+/* --- FOOTER: "Guardar ajuste" (correcciones / merma, sin proveedor) --- */
+function guardarInventarioAjuste() {
+  const cambios = recolectarCambiosInv();
+  if (!cambios.length) {
+    mostrarNotificacion('No hay cambios que guardar.', 'warning', 'bi-info-circle');
     return;
   }
-  inventario[productId] = nuevoTotal;
-  guardarInventario();
-
-  // Motivo del movimiento:
-  //  · dif < 0  -> ajuste de pérdida / merma
-  //  · dif > 0  -> reposición. Si hay una "reposición por proveedor" activa,
-  //    queda atribuida a ese proveedor y suma a sus unidades ingresadas.
-  let motivo;
-  if (dif < 0) {
-    motivo = 'Ajuste de pérdida';
-  } else if (reposicionActiva) {
-    motivo = 'Reposición · ' + reposicionActiva.proveedorNombre;
-  } else {
-    motivo = 'Reposición / ajuste';
-  }
-  registrarMovimientoInventario(productId, dif, motivo);
-
-  if (dif > 0 && reposicionActiva) {
-    reposicionActiva.unidades += dif;
-    actualizarRepoActivoUnds();
-  }
-
-  const prod = dbJSON.products.find(p => p.id === productId);
+  aplicarCambiosInv(cambios, 'Reposición / ajuste');
+  const mas = cambios.filter(x => x.dif > 0).reduce((s, x) => s + x.dif, 0);
+  const menos = -cambios.filter(x => x.dif < 0).reduce((s, x) => s + x.dif, 0);
   mostrarNotificacion(
-    `${prod ? prod.name : 'Producto'}: ${dif > 0 ? '+' : ''}${dif} und. · total ${nuevoTotal}`,
+    `Stock actualizado · ${cambios.length} prod. (+${mas} / −${menos})`,
     'success', 'bi-check-circle-fill'
   );
-  renderListaInventario();
-  refrescarVistasInventarioSiEstanAbiertas();
+  cerrarModalInventarioTrasGuardar();
 }
 
-/* ============================================================================
-   REPOSICIÓN POR PROVEEDOR
-   ----------------------------------------------------------------------------
-   Antes de subir stock se declara de qué proveedor llegó la mercadería y
-   cuánto valió: eso crea una cuenta por pagar (factura). Mientras la
-   reposición está "activa", cada "Guardar total" que SUBE stock se registra
-   como entrada atribuida a ese proveedor. Gestionar proveedores a fondo
-   (pagos, extractos) sigue siendo cosa del Dashboard.
-   ========================================================================== */
-function toggleRepoPanel() {
-  const body = document.getElementById('repoProveedorBody');
-  const chev = document.getElementById('repoChevron');
-  if (!body) return;
-  body.classList.toggle('d-none');
-  if (chev) chev.className = body.classList.contains('d-none') ? 'bi bi-chevron-down' : 'bi bi-chevron-up';
+/* --- FOOTER: "Guardar reposición…" (mercadería de un proveedor) ---
+   Pregunta proveedor -> cuánto se pagó/pagará -> ¿ya se pagó?
+     · pagado   -> factura + pago en cuentas por pagar + SALIDA de la caja.
+     · crédito  -> factura en cuentas por pagar + línea informativa en la caja. */
+function resolverProveedor(nombre) {
+  const n = (nombre || '').trim();
+  let p = proveedoresData.find(x => (x.nombre || '').toLowerCase() === n.toLowerCase());
+  if (!p) {
+    contadorProveedores++;
+    p = { id: contadorProveedores, nombre: n || 'Proveedor', telefono: '' };
+    proveedoresData.push(p);
+    guardarProveedores();
+  }
+  return p;
 }
 
-function renderRepoProveedor() {
-  const sel = document.getElementById('repoProvSel');
-  const inactivo = document.getElementById('repoInactivo');
-  const activo = document.getElementById('repoActivo');
-  if (!sel || !inactivo || !activo) return;
-
-  if (reposicionActiva) {
-    inactivo.classList.add('d-none');
-    activo.classList.remove('d-none');
-    const p = document.getElementById('repoActivoProv');
-    const v = document.getElementById('repoActivoValor');
-    if (p) p.textContent = reposicionActiva.proveedorNombre;
-    if (v) v.textContent = formatMoney(reposicionActiva.valor);
-    actualizarRepoActivoUnds();
-    // dejar el panel abierto para que se vea el estado activo
-    const body = document.getElementById('repoProveedorBody');
-    if (body && body.classList.contains('d-none')) toggleRepoPanel();
+function guardarInventarioReposicion() {
+  const cambios = recolectarCambiosInv();
+  if (!cambios.length) {
+    mostrarNotificacion('No hay cambios que guardar.', 'warning', 'bi-info-circle');
+    return;
+  }
+  const unidades = cambios.filter(x => x.dif > 0).reduce((s, x) => s + x.dif, 0);
+  if (unidades <= 0) {
+    mostrarNotificacion('Una reposición necesita al menos un ingreso de stock. Usá "Guardar ajuste".', 'warning', 'bi-info-circle');
     return;
   }
 
-  inactivo.classList.remove('d-none');
-  activo.classList.add('d-none');
-  sel.innerHTML = proveedoresData.length
-    ? proveedoresData.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('')
-    : `<option value="">— sin proveedores —</option>`;
-}
-
-function actualizarRepoActivoUnds() {
-  const u = document.getElementById('repoActivoUnds');
-  if (u && reposicionActiva) u.textContent = reposicionActiva.unidades;
-}
-
-function agregarProveedorReposicion() {
-  const inp = document.getElementById('repoNuevoProv');
-  const nombre = (inp.value || '').trim();
-  if (!nombre) {
-    mostrarNotificacion('Escribí el nombre del proveedor.', 'danger', 'bi-exclamation-triangle-fill');
-    return;
-  }
-  contadorProveedores++;
-  const nuevo = { id: contadorProveedores, nombre, telefono: '' };
-  proveedoresData.push(nuevo);
-  guardarProveedores();
-  inp.value = '';
-  renderRepoProveedor();
-  const sel = document.getElementById('repoProvSel');
-  if (sel) sel.value = String(nuevo.id);
-  mostrarNotificacion(`Proveedor "${nombre}" agregado`, 'success', 'bi-truck');
-}
-
-function iniciarReposicion() {
-  const sel = document.getElementById('repoProvSel');
-  const provId = parseInt(sel.value, 10);
-  const prov = proveedoresData.find(p => p.id === provId);
-  if (!prov) {
-    mostrarNotificacion('Elegí un proveedor (o agregá uno).', 'danger', 'bi-exclamation-triangle-fill');
-    return;
-  }
-  const valor = Math.max(0, parseFloat(document.getElementById('repoValor').value) || 0);
-  if (valor <= 0) {
-    mostrarNotificacion('Indicá cuánto valió la mercancía.', 'danger', 'bi-exclamation-triangle-fill');
-    return;
-  }
-  const desc = (document.getElementById('repoDesc').value || '').trim();
-
-  // 1) Cuenta por pagar: le debemos esa plata al proveedor.
-  const cxpId = 'cxp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
-  movimientosCxp.push({
-    id: cxpId,
-    fecha: new Date().toISOString(),
-    proveedorId: provId,
-    tipo: 'factura',
-    monto: valor,
-    concepto: desc || 'Compra de mercancía',
-    usuarioNombre: obtenerNombreUsuarioActivo()
+  const provDefault = (proveedoresData[0] && proveedoresData[0].nombre) || 'Proveedor';
+  pedirTexto('Proveedor de la mercadería:', provDefault, (nombreProv) => {
+    const prov = resolverProveedor(nombreProv);
+    setTimeout(() => {
+      pedirTexto('¿Cuánto se pagó o se pagará por esta mercadería? (COP):', '', (valorStr) => {
+        const monto = parseFloat(String(valorStr).replace(/[^\d.-]/g, ''));
+        if (isNaN(monto) || monto <= 0) {
+          mostrarNotificacion('Ingresá un monto válido.', 'danger', 'bi-exclamation-triangle-fill');
+          return;
+        }
+        setTimeout(() => {
+          pedirSiNo(
+            `Reposición de ${prov.nombre}\n${unidades} und · ${formatMoney(monto)}\n\n¿Ya se pagó en efectivo (sale de la caja)?\nAceptar = pagado  ·  Cancelar = a crédito`,
+            () => finalizarReposicionInv(cambios, prov, monto, unidades, true),
+            () => finalizarReposicionInv(cambios, prov, monto, unidades, false)
+          );
+        }, 350);
+      });
+    }, 350);
   });
+}
+
+function finalizarReposicionInv(cambios, prov, monto, unidades, pagado) {
+  // 1) Stock (ingresos atribuidos al proveedor).
+  aplicarCambiosInv(cambios, 'Reposición · ' + prov.nombre);
+
+  // 2) Cuentas por pagar: factura de compra (+ pago si ya se pagó).
+  const rid = Math.random().toString(36).slice(2, 6);
+  const base = { fecha: new Date().toISOString(), proveedorId: prov.id, usuarioNombre: obtenerNombreUsuarioActivo() };
+  movimientosCxp.push({ ...base, id: 'cxp-' + Date.now() + '-f' + rid, tipo: 'factura', monto: Math.abs(monto), concepto: `Reposición · ${unidades} und` });
+  if (pagado) {
+    movimientosCxp.push({ ...base, id: 'cxp-' + Date.now() + '-p' + rid, tipo: 'pago', monto: Math.abs(monto), concepto: 'Pago desde caja' });
+  }
   if (movimientosCxp.length > MAX_MOV_CXP_GUARDADOS) {
     movimientosCxp.splice(0, movimientosCxp.length - MAX_MOV_CXP_GUARDADOS);
   }
   guardarCxp();
 
-  // 2) Turno de reposición activo.
-  reposicionActiva = {
-    proveedorId: provId,
-    proveedorNombre: prov.nombre,
-    valor,
-    descripcion: desc || 'Compra de mercancía',
-    fecha: new Date().toISOString(),
-    cxpId,
-    unidades: 0
-  };
-  document.getElementById('repoValor').value = '';
-  document.getElementById('repoDesc').value = '';
-  renderRepoProveedor();
+  // 3) Caja: si se pagó -> SALIDA real; si es a crédito -> línea informativa
+  //    (no descuenta la caja, se muestra en rojo en el flujo del turno).
+  if (typeof cajaActual !== 'undefined' && cajaActual) {
+    cajaActual.movimientos.push({
+      id: 'cm-' + Date.now() + rid,
+      fecha: new Date().toISOString(),
+      tipo: pagado ? 'salida' : 'compra_credito',
+      categoria: 'pago_inventario',
+      monto: Math.abs(monto),
+      concepto: 'Reposición · ' + prov.nombre,
+      proveedorId: prov.id,
+      unidades,
+      usuarioNombre: obtenerNombreUsuarioActivo()
+    });
+    guardarCaja();
+  } else if (pagado) {
+    mostrarNotificacion('Sin caja abierta: se registró como pagado en cuentas por pagar.', 'warning', 'bi-info-circle');
+  }
+
   mostrarNotificacion(
-    `Reposición de ${prov.nombre} iniciada · ${formatMoney(valor)} a cuentas por pagar`,
+    `Reposición de ${prov.nombre}: +${unidades} und · ${formatMoney(monto)} ${pagado ? '(pagado · sale de caja)' : '(a crédito)'}`,
     'success', 'bi-truck'
   );
-}
-
-function finalizarReposicion() {
-  if (!reposicionActiva) return;
-  const r = reposicionActiva;
-  reposicionActiva = null;
-  renderRepoProveedor();
-  mostrarNotificacion(
-    `Reposición de ${r.proveedorNombre}: ${r.unidades} und. ingresadas · ${formatMoney(r.valor)}`,
-    'success', 'bi-check-circle-fill'
-  );
+  cerrarModalInventarioTrasGuardar();
 }

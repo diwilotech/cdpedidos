@@ -257,7 +257,7 @@
 
   <!-- MODAL 3: INVENTARIO DE PRODUCTOS -->
   <div class="modal fade" id="modalInventario" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header bg-success text-white d-flex justify-content-between align-items-center flex-nowrap">
           <h5 class="modal-title mb-0 text-truncate me-2"><i class="bi bi-box-seam me-2"></i>Inventario de Productos</h5>
@@ -269,61 +269,11 @@
           </div>
         </div>
         <div class="modal-body">
-          <div class="alert alert-light border py-2 px-3 mb-3 small text-muted">
-            <i class="bi bi-info-circle me-1"></i> El stock baja/sube solo con las ventas. Para corregirlo o cargar mercadería nueva: escribí el <strong>total</strong> que debe quedar (o usá − / +), mirá la diferencia y pulsá <strong>"Guardar total"</strong>.
+          <div id="invPagoBanner" class="alert alert-primary border py-2 px-3 mb-3 small d-none">
+            <i class="bi bi-truck me-1"></i> <strong>Pago de inventario:</strong> ajustá las unidades que llegaron y pulsá <strong>"Guardar reposición…"</strong> abajo para registrar el proveedor y el pago.
           </div>
-
-          <!-- REPOSICIÓN POR PROVEEDOR: antes de subir stock se declara de qué
-               proveedor llegó la mercadería y cuánto valió (queda como cuenta
-               por pagar). Mientras está activa, cada "Guardar total" que SUBE
-               stock cuenta como entrada de ese proveedor. -->
-          <div class="border rounded-3 mb-3" id="repoProveedorPanel">
-            <button class="btn btn-sm btn-outline-primary w-100 d-flex justify-content-between align-items-center border-0" type="button" onclick="toggleRepoPanel()">
-              <span><i class="bi bi-truck me-1"></i> Reposición por proveedor</span>
-              <i class="bi bi-chevron-down" id="repoChevron"></i>
-            </button>
-            <div id="repoProveedorBody" class="p-2 pt-0 d-none">
-
-              <div id="repoInactivo">
-                <div class="row g-2">
-                  <div class="col-12 col-md-6">
-                    <label class="form-label small mb-1 fw-bold">Proveedor</label>
-                    <select id="repoProvSel" class="form-select form-select-sm"></select>
-                  </div>
-                  <div class="col-7 col-md-4">
-                    <label class="form-label small mb-1 fw-bold">¿Cuánto valió?</label>
-                    <input type="number" id="repoValor" class="form-control form-control-sm" min="0" step="1000" placeholder="Total $">
-                  </div>
-                  <div class="col-5 col-md-2 d-grid align-self-end">
-                    <button class="btn btn-sm btn-primary fw-bold" onclick="iniciarReposicion()"><i class="bi bi-play-fill"></i> Iniciar</button>
-                  </div>
-                  <div class="col-12">
-                    <input type="text" id="repoDesc" class="form-control form-control-sm" maxlength="80" placeholder="Descripción / N° de factura (opcional)">
-                  </div>
-                  <div class="col-12">
-                    <div class="input-group input-group-sm">
-                      <input type="text" id="repoNuevoProv" class="form-control" maxlength="40" placeholder="… o escribí un proveedor nuevo">
-                      <button class="btn btn-outline-secondary" type="button" onclick="agregarProveedorReposicion()"><i class="bi bi-plus-lg"></i> Proveedor</button>
-                    </div>
-                    <div class="form-text small">La gestión a fondo (pagos, extractos) sigue en el Dashboard.</div>
-                  </div>
-                </div>
-              </div>
-
-              <div id="repoActivo" class="d-none">
-                <div class="alert alert-primary py-2 px-3 small mb-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                  <span>
-                    <i class="bi bi-truck me-1"></i> Reposición activa ·
-                    <strong id="repoActivoProv">—</strong> ·
-                    <span id="repoActivoValor">$0</span> ·
-                    <strong id="repoActivoUnds">0</strong> und. ingresadas
-                  </span>
-                  <button class="btn btn-sm btn-outline-dark" onclick="finalizarReposicion()"><i class="bi bi-check-lg me-1"></i> Finalizar</button>
-                </div>
-                <div class="small text-muted"><i class="bi bi-info-circle me-1"></i> Cargá las unidades que llegaron: escribí el total en cada producto y pulsá <strong>Guardar total</strong>. Cada subida queda como <strong>entrada de este proveedor</strong>.</div>
-              </div>
-
-            </div>
+          <div class="alert alert-light border py-2 px-3 mb-3 small text-muted">
+            <i class="bi bi-info-circle me-1"></i> Escribí el <strong>total</strong> que debe quedar de cada producto (o usá − / +). Al terminar, pulsá abajo <strong>"Guardar ajuste"</strong> (correcciones / merma) o <strong>"Guardar reposición…"</strong> (mercadería de un proveedor, con su costo).
           </div>
 
           <ul class="nav nav-pills gap-2 pb-2 mb-2 flex-nowrap overflow-x-auto" id="categoriasInventarioTabs">
@@ -331,8 +281,19 @@
           </ul>
           <div class="small text-muted mb-2"><i class="bi bi-info-circle me-1"></i> Crear productos y precios se hace en el <strong>Dashboard</strong> (solo el administrador).</div>
 
-          <div id="listaInventario" style="max-height: 380px; overflow-y: auto;">
+          <div id="listaInventario">
             <!-- Filas de inventario dinámicas -->
+          </div>
+        </div>
+        <div class="modal-footer justify-content-between flex-wrap gap-2">
+          <span class="small text-muted" id="invCambiosResumen">Sin cambios</span>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary" onclick="guardarInventarioAjuste()">
+              <i class="bi bi-check-lg me-1"></i> Guardar ajuste
+            </button>
+            <button type="button" class="btn btn-success fw-bold" onclick="guardarInventarioReposicion()">
+              <i class="bi bi-truck me-1"></i> Guardar reposición…
+            </button>
           </div>
         </div>
       </div>
