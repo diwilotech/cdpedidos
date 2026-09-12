@@ -129,3 +129,17 @@ CREATE TABLE IF NOT EXISTS mov_fiado (
 );
 CREATE INDEX IF NOT EXISTS idx_movfiado_org_cli   ON mov_fiado (org_id, cliente_id);
 CREATE INDEX IF NOT EXISTS idx_movfiado_org_venta ON mov_fiado (org_id, venta_id);
+
+-- ---- Códigos de descuento (los gestiona el admin desde el Dashboard) ----
+CREATE TABLE IF NOT EXISTS codigos_descuento (
+  id          TEXT PRIMARY KEY,               -- uuid
+  org_id      TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  codigo      TEXT NOT NULL,                  -- lo escribe el mesero al cobrar; se guarda en mayúsculas
+  tipo        TEXT NOT NULL DEFAULT 'porcentaje', -- 'porcentaje' (0-100) | 'monto' (COP fijo)
+  valor       INTEGER NOT NULL,
+  activo      INTEGER NOT NULL DEFAULT 1,
+  descripcion TEXT,
+  creado_en   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_descuentos_org ON codigos_descuento (org_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_descuentos_org_codigo ON codigos_descuento (org_id, codigo);

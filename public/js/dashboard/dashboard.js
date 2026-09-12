@@ -27,7 +27,8 @@ const D = {
   fiados: [],
   proveedores: [],
   contadorProveedores: 0,
-  cxp: []
+  cxp: [],
+  descuentos: []
 };
 let chartSemana = null;
 let chartCategoria = null;
@@ -59,11 +60,12 @@ window.__dashInit = async function (user) {
   D.esAdmin = user.rol === 'admin';
   if (!D.esAdmin) D.filtroUsuario = user.nombre;  // el personal queda fijo en lo suyo
 
-  const [ventas, movs, inv, cat, cats, cli, fdo, prov, cxp] = await Promise.all([
+  const [ventas, movs, inv, cat, cats, cli, fdo, prov, cxp, desc] = await Promise.all([
     leer(STORAGE_KEY_VENTAS), leer(STORAGE_KEY_MOVIMIENTOS), leer(STORAGE_KEY_INVENTARIO),
     leer(STORAGE_KEY_PRODUCTOS), leer(STORAGE_KEY_CATEGORIAS),
     db.list('clientes').catch(() => []), db.list('mov_fiado').catch(() => []),
-    leer(STORAGE_KEY_PROVEEDORES), leer(STORAGE_KEY_CXP)
+    leer(STORAGE_KEY_PROVEEDORES), leer(STORAGE_KEY_CXP),
+    db.list('codigos_descuento').catch(() => [])
   ]);
 
   D.categorias = (Array.isArray(cats) && cats.length)
@@ -80,6 +82,7 @@ window.__dashInit = async function (user) {
   D.proveedores = (prov && Array.isArray(prov.proveedores)) ? prov.proveedores : [];
   D.contadorProveedores = (prov && typeof prov.contadorProveedores === 'number') ? prov.contadorProveedores : D.proveedores.length;
   D.cxp = Array.isArray(cxp) ? cxp : [];
+  D.descuentos = Array.isArray(desc) ? desc : [];
 
   // stock efectivo: lo guardado tiene prioridad sobre el del catálogo
   D.catalogo.forEach(p => { if (D.inventario[p.id] === undefined) D.inventario[p.id] = p.stock || 0; });
@@ -109,6 +112,7 @@ window.__dashInit = async function (user) {
     renderCatalogo();
     renderClientes();
     renderProveedores();
+    renderDescuentos();
     renderGraficoSemana();
     renderGraficoGanancias();
     renderGraficoCategoria();
@@ -848,6 +852,103 @@ async function provPago(id) {
   const desc = (prompt('Nota del pago (opcional, p. ej. abono factura X):', '') || '').trim();
   movCxp(id, 'pago', m, desc || 'Pago a proveedor', medio ? { medio } : null);
   await guardarCxp(); renderProveedores(); renderKPIs(); toast('Pago registrado');
+}
+
+/* ---------- códigos de descuento ---------- */
+function renderDescuentos() {
+  const cont = document.getElementById('listaDesc');
+  if (!cont) return;
+  const activos = D.descuentos.filter(d => d.activo).length;
+  const badge = document.getElementById('descTotalActivos');
+  if (badge) badge.textContent = activos + ' activo' + (activos === 1 ? '' : 's');
+  if (D.descuentos.length === 0) { cont.innerHTML = '<div class="text-muted small py-2">Sin códigos todavía.</div>'; return; }
+  cont.innerHTML = [...D.descuentos].sort((a, b) => (b.creado_en || 0) - (a.creado_en || 0)).map(d => {
+    const valorTxt = d.tipo === 'porcentaje' ? `${d.valor}%` : formatMoney(d.valor);
+    return `
+      <div class="border rounded-3 p-2 mb-2 ${d.activo ? '' : 'bg-light opacity-75'}">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+          <div>
+            <div class="fw-bold">
+              <i class="bi bi-tag-fill me-1 text-primary"></i>${d.codigo}
+              <span class="badge text-bg-light border ms-1">${valorTxt}</span>
+              ${d.activo ? '<span class="badge text-bg-success ms-1">Activo</span>' : '<span class="badge text-bg-secondary ms-1">Inactivo</span>'}
+            </div>
+            ${d.descripcion ? `<div class="small text-muted">${d.descripcion}</div>` : ''}
+          </div>
+          <div class="d-flex gap-1 flex-wrap">
+            <button class="btn btn-sm btn-outline-${d.activo ? 'secondary' : 'success'}" onclick="descToggle('${d.id}')" title="${d.activo ? 'Desactivar' : 'Activar'}"><i class="bi ${d.activo ? 'bi-pause-fill' : 'bi-play-fill'}"></i></button>
+            <button class="btn btn-sm btn-outline-primary" onclick="descEditar('${d.id}')" title="Editar"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="descBorrar('${d.id}')"><i class="bi bi-trash3"></i></button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function descNuevo() {
+  const codigo = document.getElementById('nvDescCodigo').value.trim().toUpperCase();
+  const tipo = document.getElementById('nvDescTipo').value;
+  const valor = Math.max(0, parseFloat(document.getElementById('nvDescValor').value) || 0);
+  const descripcion = document.getElementById('nvDescDesc').value.trim();
+  if (!codigo) { alert('Poné el código.'); return; }
+  if (valor <= 0) { alert('Poné un valor mayor a 0.'); return; }
+  try {
+    const d = await db.crear('codigos_descuento', { codigo, tipo, valor, activo: 1, descripcion });
+    D.descuentos.push(d);
+    ['nvDescCodigo', 'nvDescValor', 'nvDescDesc'].forEach(id => { document.getElementById(id).value = ''; });
+    renderDescuentos(); toast(`Código "${codigo}" creado`);
+  } catch (e) { alert('No se pudo crear el código (¿ya existe uno igual?).'); }
+}
+
+function descEditar(id) {
+  const d = D.descuentos.find(x => x.id === id);
+  if (!d) return;
+  document.getElementById('deDescId').value = id;
+  document.getElementById('deCodigo').value = d.codigo || '';
+  document.getElementById('deTipo').value = d.tipo || 'porcentaje';
+  document.getElementById('deValor').value = d.valor || 0;
+  document.getElementById('deDesc').value = d.descripcion || '';
+  document.getElementById('deActivo').checked = !!d.activo;
+  document.getElementById('modalDescEditar').hidden = false;
+  setTimeout(() => document.getElementById('deCodigo').focus(), 40);
+}
+function descEditarCerrar() { document.getElementById('modalDescEditar').hidden = true; }
+async function descEditarGuardar() {
+  const id = document.getElementById('deDescId').value;
+  const d = D.descuentos.find(x => x.id === id);
+  if (!d) { descEditarCerrar(); return; }
+  const codigo = document.getElementById('deCodigo').value.trim().toUpperCase();
+  const valor = Math.max(0, parseFloat(document.getElementById('deValor').value) || 0);
+  if (!codigo) { alert('El código no puede quedar vacío.'); return; }
+  const datos = {
+    codigo, tipo: document.getElementById('deTipo').value, valor,
+    descripcion: document.getElementById('deDesc').value.trim(),
+    activo: document.getElementById('deActivo').checked ? 1 : 0
+  };
+  try {
+    await db.editar('codigos_descuento', id, datos);
+    Object.assign(d, datos);
+    descEditarCerrar(); renderDescuentos(); toast('Código actualizado');
+  } catch (e) { alert('No se pudo guardar (¿el código ya existe?).'); }
+}
+async function descToggle(id) {
+  const d = D.descuentos.find(x => x.id === id);
+  if (!d) return;
+  const activo = d.activo ? 0 : 1;
+  try {
+    await db.editar('codigos_descuento', id, { activo });
+    d.activo = activo;
+    renderDescuentos();
+  } catch (e) { alert('No se pudo actualizar.'); }
+}
+async function descBorrar(id) {
+  const d = D.descuentos.find(x => x.id === id);
+  if (!d || !confirm(`¿Eliminar el código "${d.codigo}"?`)) return;
+  try {
+    await db.borrar('codigos_descuento', id);
+    D.descuentos = D.descuentos.filter(x => x.id !== id);
+    renderDescuentos();
+  } catch (e) { alert('No se pudo eliminar.'); }
 }
 
 /* ---------- gráficos ---------- */

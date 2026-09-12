@@ -89,6 +89,13 @@ let catalogoDestino = null;
 
 // Liquidación en curso mientras se elige el medio de pago: { mesaId, cuentaIndex }.
 let liquidacionPend = null;
+let liquidacionTotalBase = 0;   // total de productos de la cuenta que se está liquidando (sin descuento)
+let liquidacionTotalPend = 0;   // total a pagar YA con el descuento aplicado (lo que debe cuadrar el pago)
+let descuentoAplicado = null;   // { id, codigo, tipo, valor, monto } o null si no se usó código
+
+// Producto que se está moviendo de una cuenta a otra en el modal de Cuentas:
+// { mesaId, cuentaIndex, prodIndex }.
+let moverProductoPend = null;
 
 let elementosSeleccionados = new Set();
 let itemMenuContextual = null;
@@ -101,6 +108,7 @@ const modalCatalogoBS = new bootstrap.Modal(document.getElementById('modalCatalo
 const modalInventarioBS = new bootstrap.Modal(document.getElementById('modalInventario'));
 const modalReposicionBS = new bootstrap.Modal(document.getElementById('modalReposicion'));
 const modalMedioPagoBS = new bootstrap.Modal(document.getElementById('modalMedioPago'));
+const modalMoverProductoBS = new bootstrap.Modal(document.getElementById('modalMoverProducto'));
 const modalClienteEditarBS = new bootstrap.Modal(document.getElementById('modalClienteEditar'));
 const modalVentasBS = new bootstrap.Modal(document.getElementById('modalVentas'));
 const modalMovimientosBS = new bootstrap.Modal(document.getElementById('modalMovimientos'));

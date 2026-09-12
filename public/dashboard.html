@@ -144,6 +144,32 @@
           </div>
         </div>
 
+        <!-- Códigos de descuento -->
+        <div class="col-12 col-xl-6 solo-admin">
+          <div class="card-dash h-100">
+            <div class="hd d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <span><i class="bi bi-tags me-2"></i>Códigos de descuento</span>
+              <span class="badge text-bg-secondary" id="descTotalActivos">0 activos</span>
+            </div>
+            <div class="bd">
+              <div class="small text-muted mb-2"><i class="bi bi-info-circle me-1"></i>Se aplican al cobrar una cuenta, en el paso de "¿Cómo pagó?".</div>
+              <div class="row g-2 mb-2">
+                <div class="col-6 col-sm-3"><input id="nvDescCodigo" class="form-control form-control-sm text-uppercase" placeholder="CÓDIGO" maxlength="30"></div>
+                <div class="col-6 col-sm-3">
+                  <select id="nvDescTipo" class="form-select form-select-sm">
+                    <option value="porcentaje">% Porcentaje</option>
+                    <option value="monto">$ Monto fijo</option>
+                  </select>
+                </div>
+                <div class="col-6 col-sm-2"><input id="nvDescValor" type="number" min="0" step="1" class="form-control form-control-sm" placeholder="Valor"></div>
+                <div class="col-6 col-sm-3"><input id="nvDescDesc" class="form-control form-control-sm" placeholder="Descripción"></div>
+                <div class="col-12 col-sm-1 d-grid"><button class="btn btn-sm btn-secondary" onclick="descNuevo()"><i class="bi bi-plus-lg"></i></button></div>
+              </div>
+              <div id="listaDesc" class="tabla-scroll"></div>
+            </div>
+          </div>
+        </div>
+
         <!-- Catálogo -->
         <div class="col-12 solo-admin">
           <div class="card-dash">
@@ -270,6 +296,38 @@
         <div class="d-flex justify-content-end gap-2">
           <button class="btn btn-sm btn-outline-secondary" onclick="cliEditarCerrar()">Cancelar</button>
           <button class="btn btn-sm btn-dark fw-bold" onclick="cliEditarGuardar()"><i class="bi bi-check-lg me-1"></i> Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: editar código de descuento -->
+  <div id="modalDescEditar" class="dash-overlay" hidden onclick="if(event.target===this) descEditarCerrar()">
+    <div class="dash-modal" style="max-width:420px">
+      <div class="dash-modal-hd">
+        <div class="fw-bold"><i class="bi bi-tag me-2"></i>Editar código</div>
+        <button class="btn btn-sm btn-outline-secondary" onclick="descEditarCerrar()"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div class="dash-modal-bd">
+        <input type="hidden" id="deDescId">
+        <label class="form-label small fw-bold mb-1">Código</label>
+        <input id="deCodigo" class="form-control form-control-sm mb-2 text-uppercase" maxlength="30" onkeydown="if(event.key==='Enter')descEditarGuardar()">
+        <label class="form-label small fw-bold mb-1">Tipo</label>
+        <select id="deTipo" class="form-select form-select-sm mb-2">
+          <option value="porcentaje">% Porcentaje</option>
+          <option value="monto">$ Monto fijo</option>
+        </select>
+        <label class="form-label small fw-bold mb-1">Valor</label>
+        <input id="deValor" type="number" min="0" step="1" class="form-control form-control-sm mb-2" onkeydown="if(event.key==='Enter')descEditarGuardar()">
+        <label class="form-label small fw-bold mb-1">Descripción / nota</label>
+        <textarea id="deDesc" class="form-control form-control-sm mb-2" rows="2" maxlength="240"></textarea>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="deActivo">
+          <label class="form-check-label small" for="deActivo">Activo (se puede usar al cobrar)</label>
+        </div>
+        <div class="d-flex justify-content-end gap-2">
+          <button class="btn btn-sm btn-outline-secondary" onclick="descEditarCerrar()">Cancelar</button>
+          <button class="btn btn-sm btn-dark fw-bold" onclick="descEditarGuardar()"><i class="bi bi-check-lg me-1"></i> Guardar</button>
         </div>
       </div>
     </div>

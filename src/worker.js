@@ -159,6 +159,9 @@ async function bloqueoEscritura(env, orgId) {
 const TABLAS = {
   clientes:  { cols: ["nombre", "telefono", "descripcion"], orden: "nombre COLLATE NOCASE" },
   mov_fiado: { cols: ["cliente_id", "fecha", "tipo", "monto", "concepto", "venta_id", "usuario_id", "usuario_nombre"], orden: "fecha" },
+  // Solo el admin crea/edita/borra códigos; cualquiera con sesión los puede
+  // leer (hace falta para validarlos al cobrar una cuenta).
+  codigos_descuento: { cols: ["codigo", "tipo", "valor", "activo", "descripcion"], orden: "creado_en DESC", soloAdminEscribe: true },
 };
 
 async function manejarDb(path, request, env, url) {
@@ -175,6 +178,9 @@ async function manejarDb(path, request, env, url) {
   if (m !== "GET") {
     const cortar = await bloqueoEscritura(env, org);
     if (cortar) return cortar;
+    if (def.soloAdminEscribe && u.rol !== "admin") {
+      return json({ error: "Solo el administrador puede hacer eso" }, { status: 403 });
+    }
   }
 
   if (m === "GET" && !id) {

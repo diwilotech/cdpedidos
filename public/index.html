@@ -232,8 +232,19 @@
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
+
+          <!-- Código de descuento (opcional) -->
+          <div class="mb-2">
+            <label class="form-label small fw-bold mb-1"><i class="bi bi-tag me-1"></i>Código de descuento</label>
+            <div class="input-group input-group-sm">
+              <input type="text" id="medioPagoCodigoInput" class="form-control text-uppercase" placeholder="Opcional" maxlength="30" onkeydown="if(event.key==='Enter'){event.preventDefault();aplicarCodigoDescuento();}">
+              <button class="btn btn-outline-success" type="button" onclick="aplicarCodigoDescuento()">Aplicar</button>
+            </div>
+            <div id="medioPagoDescuentoInfo" class="small mt-1"></div>
+          </div>
+
           <div class="text-center mb-3">
-            <div class="small text-muted">Total de la cuenta</div>
+            <div class="small text-muted">Total a pagar</div>
             <div class="fs-4 fw-bold text-success" id="medioPagoTotal">$0</div>
           </div>
           <div class="d-grid gap-2">
@@ -241,6 +252,58 @@
             <button class="btn btn-outline-primary fw-bold" onclick="confirmarMedioPago('transferencia')"><i class="bi bi-arrow-left-right me-2"></i>Transferencia</button>
             <button class="btn btn-outline-dark fw-bold" onclick="confirmarMedioPago('tarjeta')"><i class="bi bi-credit-card me-2"></i>Tarjeta</button>
           </div>
+
+          <!-- Repartir el pago entre dos o más medios -->
+          <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+            <span class="small fw-bold text-muted"><i class="bi bi-collection me-1"></i>¿Pagó con varios medios?</span>
+            <button class="btn btn-sm btn-outline-secondary" type="button" onclick="toggleMedioPagoMixto()"><i class="bi bi-plus-lg me-1"></i>Dividir pago</button>
+          </div>
+          <div id="medioPagoMixtoBox" class="d-none mt-2">
+            <div class="row g-2">
+              <div class="col-4">
+                <label class="form-label small mb-1"><i class="bi bi-cash"></i> Efvo.</label>
+                <input type="number" id="mpMixEfectivo" class="form-control form-control-sm" min="0" step="500" value="0" oninput="actualizarResumenMedioPagoMixto()">
+              </div>
+              <div class="col-4">
+                <label class="form-label small mb-1"><i class="bi bi-arrow-left-right"></i> Transf.</label>
+                <input type="number" id="mpMixTransferencia" class="form-control form-control-sm" min="0" step="500" value="0" oninput="actualizarResumenMedioPagoMixto()">
+              </div>
+              <div class="col-4">
+                <label class="form-label small mb-1"><i class="bi bi-credit-card"></i> Tarj.</label>
+                <input type="number" id="mpMixTarjeta" class="form-control form-control-sm" min="0" step="500" value="0" oninput="actualizarResumenMedioPagoMixto()">
+              </div>
+            </div>
+            <div id="mpMixResumen" class="small mt-2 text-muted">Falta $0</div>
+            <button class="btn btn-success w-100 fw-bold mt-2" id="mpMixConfirmarBtn" onclick="confirmarMedioPagoMixto()" disabled>
+              <i class="bi bi-check-lg me-1"></i> Confirmar pago dividido
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: MOVER PRODUCTO A OTRA CUENTA (repartir la cuenta antes de pagar) -->
+  <div class="modal fade" id="modalMoverProducto" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <div class="modal-header py-2 bg-primary text-white">
+          <h6 class="modal-title mb-0"><i class="bi bi-arrow-left-right me-1"></i> Mover producto</h6>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="fw-bold mb-2" id="moverProdNombre">Producto</div>
+          <label class="form-label small fw-bold mb-1">Cantidad a mover</label>
+          <input type="number" id="moverProdCant" class="form-control form-control-sm mb-3" min="1" value="1">
+          <label class="form-label small fw-bold mb-1">Mover a</label>
+          <select id="moverProdDestino" class="form-select form-select-sm"></select>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary btn-sm fw-bold" onclick="confirmarMoverProducto()">
+            <i class="bi bi-check-lg me-1"></i> Mover
+          </button>
         </div>
       </div>
     </div>

@@ -168,7 +168,8 @@ function agregarProductoDesdeCatalogo(productId) {
       cant = 1;
     }
     ajustarStock(productId, -1, 'Venta (agregado a venta)');
-    v.total = v.productos.reduce((s, p) => s + p.cant * p.precio, 0);
+    if (typeof recalcularTotalVenta === 'function') recalcularTotalVenta(v);
+    else v.total = v.productos.reduce((s, p) => s + p.cant * p.precio, 0);
     guardarVentas();
     if (typeof sincronizarCargoFiado === 'function') sincronizarCargoFiado(v);
 

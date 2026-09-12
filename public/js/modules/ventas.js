@@ -33,19 +33,29 @@ function rotuloMedioPago(m) {
     : m === 'efectivo' ? 'Efectivo'
     : '';
 }
-// Una venta cobrada cuenta como EFECTIVO si su medio es 'efectivo' o si no
-// tiene medio (ventas de versiones anteriores).
-function ventaEsEfectivo(v) {
-  return !v.medioPago || v.medioPago === 'efectivo';
+// Cuánto de una venta se cobró con un medio en particular. Si se pagó con
+// dos o más medios (v.pagos), suma solo las partes de ese medio; si no,
+// cae al comportamiento de siempre (toda la venta a un solo medio).
+function montoPorMedio(v, medio) {
+  if (Array.isArray(v.pagos) && v.pagos.length) {
+    return v.pagos.filter(p => p.medio === medio).reduce((s, p) => s + (p.monto || 0), 0);
+  }
+  const m = v.medioPago || 'efectivo';
+  return m === medio ? (v.total || 0) : 0;
 }
 
-function registrarVenta(mesaId, cuenta, medioPago) {
+function registrarVenta(mesaId, cuenta, pagos, descuento) {
   if (!cuenta) return;
-  const total = cuenta.productos.reduce((s, p) => s + (p.cant * p.precio), 0);
-  if (total <= 0) return; // no tiene sentido registrar una cuenta vacía
+  const totalBruto = cuenta.productos.reduce((s, p) => s + (p.cant * p.precio), 0);
+  if (totalBruto <= 0) return; // no tiene sentido registrar una cuenta vacía
+
+  const montoDescuento = (descuento && descuento.monto > 0) ? Math.min(descuento.monto, totalBruto) : 0;
+  const total = totalBruto - montoDescuento;
 
   const el = document.querySelector(`[data-mesaid="${mesaId}"]`);
   const mesaNombre = el ? el.querySelector('.nombre-label').innerText : 'Mesa';
+
+  const pagosLimpios = Array.isArray(pagos) ? pagos.filter(p => p && p.monto > 0) : [];
 
   const venta = {
     id: 'venta-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
@@ -54,7 +64,10 @@ function registrarVenta(mesaId, cuenta, medioPago) {
     cuentaId: cuenta.idCuenta || null,     // trazabilidad hacia la cuenta de origen
     cuentaNombre: cuenta.nombreCuenta,
     usuarioNombre: cuenta.usuarioNombre || obtenerNombreUsuarioActivo(),
-    medioPago: medioPago || null,          // 'efectivo' | 'transferencia' | 'tarjeta'
+    pagos: pagosLimpios,                   // [{medio:'efectivo'|'transferencia'|'tarjeta', monto}] — 1 o repartido
+    medioPago: pagosLimpios.length === 1 ? pagosLimpios[0].medio : null,  // compat: solo si NO se repartió
+    descuento: montoDescuento > 0 ? { id: descuento.id, codigo: descuento.codigo, tipo: descuento.tipo, valor: descuento.valor, monto: montoDescuento } : null,
+    totalBruto,
     total,
     productos: cuenta.productos.map(p => {
       const prod = dbJSON.products.find(x => x.id === p.productId);
@@ -156,14 +169,15 @@ function renderListaVentas() {
     const chipCliente = v.clienteNombre
       ? `<span class="badge text-bg-warning ms-1" title="Esta venta está en la cuenta por cobrar del cliente: al editarla cambia lo que debe"><i class="bi bi-person-vcard me-1"></i>${v.clienteNombre} · por cobrar</span>`
       : '';
-    const chipMedio = (!v.clienteNombre && v.medioPago)
-      ? `<span class="badge ms-1 ${v.medioPago === 'efectivo' ? 'text-bg-success' : v.medioPago === 'transferencia' ? 'text-bg-primary' : 'text-bg-dark'}">${rotuloMedioPago(v.medioPago)}</span>`
+    const chipMedio = v.clienteNombre ? '' : chipMedioVenta(v);
+    const chipDescuento = v.descuento
+      ? `<span class="badge ms-1 text-bg-warning text-dark" title="Código ${v.descuento.codigo}">−${formatMoney(v.descuento.monto)}</span>`
       : '';
     return `
       <div class="border rounded-3 mb-2 ${v.clienteNombre ? 'border-warning' : ''}">
         <div class="d-flex justify-content-between align-items-center p-2" style="cursor:pointer" onclick="toggleVentaDetalle('${v.id}')">
           <div>
-            <div class="fw-bold"><i class="bi ${abierta ? 'bi-chevron-down' : 'bi-chevron-right'} me-1"></i>${v.mesaNombre} · ${v.cuentaNombre}${chipCliente}${chipMedio}</div>
+            <div class="fw-bold"><i class="bi ${abierta ? 'bi-chevron-down' : 'bi-chevron-right'} me-1"></i>${v.mesaNombre} · ${v.cuentaNombre}${chipCliente}${chipMedio}${chipDescuento}</div>
             <div class="small text-muted">${formatFecha(v.fecha)} · ${unidades} und. · <i class="bi bi-person-fill"></i> ${v.usuarioNombre || 'Sin asignar'}</div>
           </div>
           <span class="fs-6 fw-bold text-success">${formatMoney(v.total)}</span>
@@ -171,6 +185,17 @@ function renderListaVentas() {
         ${abierta ? renderVentaDetalle(v) : ''}
       </div>`;
   }).join('');
+}
+
+// Insignia de medio de pago de una venta: un solo medio, o "Mixto" con el
+// desglose en el tooltip si se repartió entre varios.
+function chipMedioVenta(v) {
+  if (Array.isArray(v.pagos) && v.pagos.length > 1) {
+    const detalle = v.pagos.map(p => rotuloMedioPago(p.medio) + ' ' + formatMoney(p.monto)).join(' + ');
+    return `<span class="badge ms-1 text-bg-info" title="${detalle}"><i class="bi bi-collection me-1"></i>Mixto</span>`;
+  }
+  if (!v.medioPago) return '';
+  return `<span class="badge ms-1 ${v.medioPago === 'efectivo' ? 'text-bg-success' : v.medioPago === 'transferencia' ? 'text-bg-primary' : 'text-bg-dark'}">${rotuloMedioPago(v.medioPago)}</span>`;
 }
 
 function toggleVentaDetalle(ventaId) {
@@ -197,8 +222,18 @@ function renderVentaDetalle(v) {
         <td class="text-center"><button class="btn btn-sm btn-link text-danger p-0" onclick="eliminarLineaVenta('${v.id}',${i})" title="Quitar de la venta"><i class="bi bi-trash"></i></button></td>
       </tr>`).join('');
 
+  const pagosTxt = (Array.isArray(v.pagos) && v.pagos.length)
+    ? v.pagos.map(p => rotuloMedioPago(p.medio) + ' ' + formatMoney(p.monto)).join(' + ')
+    : (v.medioPago ? rotuloMedioPago(v.medioPago) : '');
+  const resumenPago = (pagosTxt || v.descuento) ? `
+      <div class="small text-muted mb-2">
+        ${v.descuento ? `Bruto ${formatMoney(v.totalBruto || v.total)} · Descuento <span class="text-warning fw-bold">${v.descuento.codigo}</span> (−${formatMoney(v.descuento.monto)}) · ` : ''}
+        ${pagosTxt ? `Pagó: <strong>${pagosTxt}</strong>` : ''}
+      </div>` : '';
+
   return `
     <div class="border-top p-2 bg-light">
+      ${resumenPago}
       <div class="d-flex justify-content-between align-items-center bg-white border rounded p-2 mb-2">
         <span class="small text-muted fw-bold">Editá los productos de esta venta</span>
         <button class="btn btn-sm btn-primary fw-bold" onclick="abrirCatalogoDesdeVenta('${v.id}')">
@@ -209,6 +244,30 @@ function renderVentaDetalle(v) {
         <table class="table table-sm align-middle mb-0"><tbody>${filas}</tbody></table>
       </div>
     </div>`;
+}
+
+// Recalcula v.total tras editar cantidades: vuelve a aplicar el descuento
+// (si tenía código) y reparte el nuevo total proporcionalmente entre los
+// medios de pago ya registrados, para que sigan sumando exacto.
+function recalcularTotalVenta(v) {
+  const bruto = v.productos.reduce((s, p) => s + p.cant * p.precio, 0);
+  v.totalBruto = bruto;
+  if (v.descuento) {
+    if (v.descuento.tipo === 'porcentaje') v.descuento.monto = Math.round(bruto * v.descuento.valor / 100);
+    else v.descuento.monto = Math.min(bruto, v.descuento.valor);
+  }
+  const nuevoTotal = Math.max(0, bruto - (v.descuento ? v.descuento.monto : 0));
+
+  if (Array.isArray(v.pagos) && v.pagos.length && v.total > 0 && nuevoTotal !== v.total) {
+    const factor = nuevoTotal / v.total;
+    v.pagos = v.pagos.map(p => ({ medio: p.medio, monto: Math.round(p.monto * factor) }));
+    const suma = v.pagos.reduce((s, p) => s + p.monto, 0);
+    const dif = nuevoTotal - suma;
+    if (dif !== 0) v.pagos[v.pagos.length - 1].monto += dif;
+    v.pagos = v.pagos.filter(p => p.monto > 0);
+    v.medioPago = v.pagos.length === 1 ? v.pagos[0].medio : null;
+  }
+  v.total = nuevoTotal;
 }
 
 // Abre el mismo "Catálogo de Productos" que las cuentas, pero apuntando a
@@ -228,7 +287,7 @@ function modificarLineaVenta(ventaId, idx, delta) {
   if (p.productId) ajustarStock(p.productId, -delta, delta > 0 ? 'Venta (editada)' : 'Devolución (venta editada)');
   p.cant += delta;
   if (p.cant <= 0) v.productos.splice(idx, 1);
-  v.total = v.productos.reduce((s, x) => s + x.cant * x.precio, 0);
+  recalcularTotalVenta(v);
   guardarVentas();
   sincronizarCargoFiado(v);
   refrescarVistasInventarioSiEstanAbiertas();
@@ -243,7 +302,7 @@ function eliminarLineaVenta(ventaId, idx) {
   if (!p) return;
   if (p.productId) ajustarStock(p.productId, p.cant, 'Devolución (venta editada)');
   v.productos.splice(idx, 1);
-  v.total = v.productos.reduce((s, x) => s + x.cant * x.precio, 0);
+  recalcularTotalVenta(v);
   guardarVentas();
   sincronizarCargoFiado(v);
   refrescarVistasInventarioSiEstanAbiertas();
@@ -296,12 +355,13 @@ function totalVentasTurno(soloCredito) {
 function ventasCobradasDelTurno() { return totalVentasTurno(false); } // compat
 
 // Ventas cobradas del turno separadas por medio de pago. Solo el EFECTIVO
-// entra físicamente a la caja; transferencia y tarjeta no.
+// entra físicamente a la caja; transferencia y tarjeta no. Una venta pagada
+// con dos medios (ver montoPorMedio) aporta solo su parte a cada bolsa.
 function totalEfectivoTurno() {
-  return ventasDelTurno(false).filter(ventaEsEfectivo).reduce((s, v) => s + (v.total || 0), 0);
+  return ventasDelTurno(false).reduce((s, v) => s + montoPorMedio(v, 'efectivo'), 0);
 }
 function totalOtroMedioTurno() {
-  return ventasDelTurno(false).filter(v => !ventaEsEfectivo(v)).reduce((s, v) => s + (v.total || 0), 0);
+  return ventasDelTurno(false).reduce((s, v) => s + ((v.total || 0) - montoPorMedio(v, 'efectivo')), 0);
 }
 
 // Cuentas (comandas) abiertas en TODAS las mesas y su total pendiente.
@@ -485,8 +545,8 @@ function renderCajaEnVentas() {
       <div class="mt-2">
         <div class="small fw-bold text-success mb-1"><i class="bi bi-cash-coin me-1"></i>Ventas cobradas del turno por medio</div>
         <div class="d-flex justify-content-between small px-1"><span><i class="bi bi-cash me-1"></i>Efectivo (entra a la caja)</span><span class="fw-bold text-success">${formatMoney(efvo)}</span></div>
-        <div class="d-flex justify-content-between small px-1"><span><i class="bi bi-arrow-left-right me-1"></i>Transferencia</span><span>${formatMoney(ventasDelTurno(false).filter(v => v.medioPago === 'transferencia').reduce((s, v) => s + (v.total || 0), 0))}</span></div>
-        <div class="d-flex justify-content-between small px-1"><span><i class="bi bi-credit-card me-1"></i>Tarjeta</span><span>${formatMoney(ventasDelTurno(false).filter(v => v.medioPago === 'tarjeta').reduce((s, v) => s + (v.total || 0), 0))}</span></div>
+        <div class="d-flex justify-content-between small px-1"><span><i class="bi bi-arrow-left-right me-1"></i>Transferencia</span><span>${formatMoney(ventasDelTurno(false).reduce((s, v) => s + montoPorMedio(v, 'transferencia'), 0))}</span></div>
+        <div class="d-flex justify-content-between small px-1"><span><i class="bi bi-credit-card me-1"></i>Tarjeta</span><span>${formatMoney(ventasDelTurno(false).reduce((s, v) => s + montoPorMedio(v, 'tarjeta'), 0))}</span></div>
 
         <div class="small fw-bold text-danger mt-3 mb-1"><i class="bi bi-arrow-up-circle me-1"></i>Salidas de dinero (sale de la caja)</div>
         ${listaSalidas}
