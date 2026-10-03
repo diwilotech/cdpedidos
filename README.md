@@ -2,7 +2,7 @@
 
 Sistema para **restaurantes, bares y negocios de mostrador** con:
 
-- **Acceso multiusuario** — un **único login** por correo + PIN para todos (admin y personal). El admin agrega al personal por correo y cada uno se auto-registra con un link de invitación. Todo lo que hace cada persona (ventas, inventario, fiados, proveedores, mesas) queda **registrado a su nombre**; el operador de cada sesión es quien inició sesión (no hay lista de usuarios "por dispositivo").
+- **Acceso multiusuario** — un **único login** por correo + contraseña para todos (admin y personal). Los negocios, sus dueños y las suscripciones se manejan desde **Diwilo Web** (`diwilo.com/admin`). El admin agrega al personal por correo y cada uno se auto-registra con un link de invitación. Todo lo que hace cada persona (ventas, inventario, fiados, proveedores, mesas) queda **registrado a su nombre**; el operador de cada sesión es quien inició sesión (no hay lista de usuarios "por dispositivo").
 - **Ventas** — plano interactivo de mesas/zonas por pisos, cuentas y comandas por mesa, liquidar o **guardar la cuenta para pago después** (a nombre de un cliente).
 - **Inventario** — stock por producto, baja automática al vender, reposición e historial.
 - **Clientes** — cuentas por cobrar: cargos (consumos), abonos (pagos) y saldo por cliente.
@@ -26,11 +26,12 @@ Cambiar el backend **no obliga a tocar los módulos**, solo `public/js/core/stor
 
 ### Autenticación (resumen)
 
-- PIN de 4 a 8 dígitos, guardado **hasheado** (PBKDF2-SHA256 + salt por usuario). Nunca en claro.
+- Contraseña de mínimo 8 caracteres, guardada **hasheada** (PBKDF2-SHA256 + salt por usuario) en `pin_hash`/`pin_salt`. Nunca en claro. Los PIN de antes siguen entrando hasta que la persona cree su contraseña.
 - Sesión = token aleatorio en tabla `sessions`, cookie `HttpOnly; Secure; SameSite=Lax` (30 días).
 - 5 intentos fallidos → bloqueo temporal de 15 min.
-- **Admin sembrado:** `yomar006@gmail.com`, sin PIN. Se define en el primer arranque desde la pantalla *"Primera vez · configurar administrador"* (endpoint `/api/setup`, funciona una sola vez).
-- **Alta de personal:** el admin abre *Personal · Accesos* → agrega nombre + correo → obtiene un **link de invitación** (`/?registro=<token>`) → se lo pasa a la persona → esta lo abre en su teléfono, elige su PIN y queda activa.
+- **Alta de negocios y dueños:** desde Diwilo Web, que llama a `/api/platform/*` con `Authorization: Bearer PLATFORM_KEY`. Diwilo entrega un **link de invitación** (`/?registro=<token>`) para que el dueño cree su contraseña. El mismo link sirve para restablecer una contraseña olvidada.
+- **Alta de personal:** el admin abre *Personal · Accesos* → agrega nombre + correo → obtiene un **link de invitación** → se lo pasa a la persona → esta lo abre en su teléfono, elige su contraseña y queda activa.
+- **Suscripción:** `organizations.pagado_hasta` (lo fija Diwilo Web al registrar un pago). Si la fecha ya pasó, la app queda en **solo lectura**: el Worker responde 402 a toda escritura y se ve una barra roja arriba.
 
 ## Estructura de carpetas
 
@@ -47,7 +48,7 @@ cdpedidos/
 │   └── js/
 │       ├── core/
 │       │   ├── storage.js       window.storage: local (localStorage) | remoto (/api/estado)
-│       │   ├── auth-gate.js     Portón: login / setup / registro; luego dispara el arranque
+│       │   ├── auth-gate.js     Portón: login / registro por invitación; luego dispara el arranque
 │       │   ├── config.js        APP_CONFIG, claves, límites
 │       │   ├── format.js        moneda (COP), fecha, color
 │       │   ├── state.js         Estado en memoria + modales Bootstrap
@@ -61,7 +62,8 @@ cdpedidos/
 │       │   ├── usuarios.js           Operador actual = quien inició sesión (helpers)
 │       │   └── personal-accesos.js   Gestión de accesos del personal (solo admin)
 │       └── app.js              Define window.__cdpArrancar (NO arranca solo)
-├── src/worker.js               Worker: /api/auth, /api/personal, /api/estado + assets
+├── src/worker.js               Worker: login, /api/personal, /api/platform (Diwilo), datos + assets
+├── migraciones/                Cambios de esquema para la base que ya existe
 ├── schema.sql                  DDL de la base D1 (estado, users, sessions + seed admin)
 ├── wrangler.jsonc              Config del Worker (assets = ./public, binding DB)
 ├── package.json                wrangler + scripts
@@ -88,17 +90,29 @@ npx wrangler dev            # http://localhost:8787
 **Publicar:** `npx wrangler deploy`, o `git push` a `main` (build automático en
 Workers & Pages con deploy command `npx wrangler deploy`).
 
+**Secreto compartido con Diwilo Web** (el mismo valor en los dos proyectos):
+
+```bash
+npx wrangler secret put PLATFORM_KEY
+```
+
 Cuando cambie `schema.sql`, aplicarlo también a producción:
 
 ```bash
 npx wrangler d1 execute cdpedidos-db --file=schema.sql --remote
 ```
 
+Base creada antes de Diwilo Web: correr una vez la migración que pasa las suscripciones a `pagado_hasta`:
+
+```bash
+npx wrangler d1 execute cdpedidos-db --file=migraciones/0001_plataforma_diwilo.sql --remote
+```
+
 ### Primer uso
 
-1. Abrí la app publicada → pantalla de login → **"Primera vez · configurar administrador"**.
-2. Correo `yomar006@gmail.com` + un PIN → entrás como admin.
-3. Botón **Personal** (arriba a la derecha) → agregá al personal por correo → pasales el link.
+1. En Diwilo Web → **Negocios → Pedidos → Nuevo negocio** → copiá el link de invitación y pasáselo al dueño.
+2. El dueño abre el link, elige su contraseña y entra como admin.
+3. Botón **Personal** → agregá al personal por correo → pasales el link.
 
 ### Instalar en el teléfono
 
@@ -110,4 +124,4 @@ npx wrangler d1 execute cdpedidos-db --file=schema.sql --remote
 - Tablas D1 "de verdad" (`ventas`, `clientes`…) para reportes con SQL (ver bloque comentado en `schema.sql`).
 - Cierre de caja diario y arqueo.
 - Vincular reposición de inventario con una factura de proveedor.
-- Bajar el PIN a hash con más iteraciones / migrar a WebAuthn si hace falta más seguridad.
+- Subir las iteraciones del hash / migrar a passkeys (WebAuthn) si hace falta más seguridad.

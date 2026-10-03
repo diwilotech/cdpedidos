@@ -4,7 +4,7 @@
    Modal donde el administrador:
      · agrega personal por correo -> se genera un LINK de invitación
      · comparte ese link (WhatsApp, etc.); la persona abre el link, elige su
-       PIN y queda registrada
+       contraseña y queda registrada
      · ve el estado de cada uno (pendiente / activo) y puede eliminarlos
    Habla con el Worker: /api/personal (GET, POST, /reenviar, /eliminar).
    ========================================================================== */

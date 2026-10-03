@@ -10,6 +10,8 @@
 --
 --  Modelo: un solo negocio = una fila en `organizations`. Toda la data lleva
 --  `org_id`; el Worker lo toma de la sesión y NUNCA lo acepta del cliente.
+--  Los negocios y sus suscripciones se crean desde Diwilo Web (/api/platform).
+--  Base que ya existía antes de eso: correr migraciones/0001_plataforma_diwilo.sql
 -- ===========================================================================
 
 PRAGMA foreign_keys = ON;
@@ -21,16 +23,17 @@ CREATE TABLE IF NOT EXISTS organizations (
   id                   TEXT PRIMARY KEY,   -- uuid
   nombre               TEXT NOT NULL,      -- nombre del restaurante
   creado_en            INTEGER NOT NULL,
-  gracia_hasta         INTEGER,            -- epoch ms; hasta cuándo puede usar sin pagar (signup: +15 días)
-  bloqueo_manual_hasta INTEGER             -- epoch ms; si > ahora, el super-admin la mantiene habilitada aunque deba
+  pagado_hasta         TEXT                -- 'YYYY-MM-DD' inclusive, lo fija Diwilo Web; NULL = sin límite.
+                                           -- Vencido -> la app queda en solo lectura (402 en escrituras)
 );
 
 -- ---------------------------------------------------------------------------
 --  USUARIOS y SESIONES
 --  · Cada usuario pertenece a UN negocio (org_id).
---  · rol: 'admin' (el que crea el negocio + los que él ascienda) | 'personal'
---  · estado: 'pendiente' (invitado, sin PIN) | 'activo' | 'inactivo'
---  · el PIN se guarda hasheado (PBKDF2-SHA256) con salt por usuario; nunca en claro
+--  · rol: 'admin' (dueño, lo invita Diwilo Web) | 'personal'
+--  · estado: 'pendiente' (invitado, sin contraseña) | 'activo' | 'inactivo'
+--  · la contraseña se guarda hasheada (PBKDF2-SHA256) con salt por usuario en
+--    pin_hash/pin_salt (nombre histórico: antes era un PIN); nunca en claro
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
   id              TEXT PRIMARY KEY,            -- uuid
@@ -38,11 +41,10 @@ CREATE TABLE IF NOT EXISTS users (
   email           TEXT NOT NULL UNIQUE,        -- login global (una persona = un negocio)
   nombre          TEXT NOT NULL,
   rol             TEXT NOT NULL DEFAULT 'personal',
-  es_super        INTEGER NOT NULL DEFAULT 0,  -- 1 = super-admin de la plataforma (ve /admin, cobra)
-  pin_hash        TEXT,                        -- NULL hasta que la persona se registra
+  pin_hash        TEXT,                        -- contraseña; NULL hasta que la persona se registra
   pin_salt        TEXT,
   estado          TEXT NOT NULL DEFAULT 'pendiente',
-  invite_token    TEXT,                        -- token del link de invitación; se borra al usarlo
+  invite_token    TEXT,                        -- link para crear/restablecer la contraseña; se borra al usarlo
   fallos          INTEGER NOT NULL DEFAULT 0,
   bloqueado_hasta INTEGER,
   creado_en       INTEGER NOT NULL,
@@ -73,30 +75,6 @@ CREATE TABLE IF NOT EXISTS bloques (
   ts     INTEGER NOT NULL,                     -- Date.now() de la última escritura
   PRIMARY KEY (org_id, clave)
 );
-
--- ---------------------------------------------------------------------------
---  SUSCRIPCIONES (panel /admin del super-admin)
---  · precio mensual global en plataforma_config
---  · un pago por (negocio, año, mes): la FILA existe = ese mes está pagado
---  · negocio "al día" si el mes en curso está pagado, o está en gracia, o el
---    super-admin puso bloqueo_manual_hasta en el futuro. Si no -> SOLO LECTURA.
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS plataforma_config (
-  clave TEXT PRIMARY KEY,
-  valor TEXT NOT NULL
-);
-INSERT OR IGNORE INTO plataforma_config (clave, valor) VALUES ('precio_mensual', '0');
-
-CREATE TABLE IF NOT EXISTS suscripcion_pagos (
-  org_id     TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  anio       INTEGER NOT NULL,
-  mes        INTEGER NOT NULL,                 -- 1..12
-  monto      INTEGER,                          -- COP cobrado ese mes
-  fecha_pago TEXT,                             -- ISO 8601
-  nota       TEXT,
-  PRIMARY KEY (org_id, anio, mes)
-);
-
 
 -- ===========================================================================
 --  FASE 3 — Tablas relacionales por dominio (para reportes/saldos/filtros).
