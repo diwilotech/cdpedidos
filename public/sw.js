@@ -8,8 +8,8 @@
                              cache y actualiza en segundo plano
    Al cambiar de versión (CACHE) se borran las cachés viejas.
    ========================================================================== */
-const CACHE = 'cdp-v1';
-const APP_SHELL = ['/', '/index.html', '/404.html', '/manifest.webmanifest', '/assets/css/styles.css'];
+const CACHE = 'cdp-v2';
+const APP_SHELL = ['/', '/index.html', '/404.html', '/manifest.webmanifest', '/assets/css/styles.css', '/assets/css/diwilo-login.css'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(APP_SHELL)).then(() => self.skipWaiting()));
