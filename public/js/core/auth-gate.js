@@ -39,12 +39,12 @@
       overlay.style.cssText = '--dl-accent:#0d6efd;--dl-accent-2:#3dd5f3;--dl-m1:hsla(270,50%,72%,1);--dl-m2:hsla(215,85%,68%,1);--dl-m3:hsla(190,80%,70%,1);--dl-m4:hsla(35,100%,70%,1);z-index:20000';
       document.documentElement.appendChild(overlay);
     }
-    overlay.innerHTML = `${BANNER}
+    overlay.innerHTML = `<div class="dl-box">${BANNER}
       <main class="dl-side"><div class="dl-card">
         <div class="dl-icon"><i class="bi bi-box-seam"></i></div>
         ${html}
         <p class="dl-powered">Control de Pedidos · por <a href="https://diwilo.com" target="_blank" rel="noopener">Diwilo</a></p>
-      </div></main>`;
+      </div></main></div>`;
   }
   function cerrarVista() { if (overlay) { overlay.remove(); overlay = null; } }
 
