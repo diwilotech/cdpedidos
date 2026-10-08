@@ -175,6 +175,7 @@
         ? `<a class="btn btn-sm btn-outline-dark" href="/dashboard.html" title="Panel de administración"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
            <button class="btn btn-sm btn-outline-primary" onclick="cdpCerrarMenus(); abrirModalPersonal()" title="Gestionar accesos del personal"><i class="bi bi-people-fill me-1"></i>Personal</button>`
         : `<button class="btn btn-sm btn-outline-dark" onclick="cdpCerrarMenus(); abrirModalMovimientos()" title="Ver mis movimientos de inventario"><i class="bi bi-arrow-down-up me-1"></i>Mis movimientos</button>`}
+      <button class="btn btn-sm btn-outline-secondary" onclick="cdpCerrarMenus(); cdpCambiarClave()" title="Cambiar contraseña"><i class="bi bi-key me-1"></i>Cambiar contraseña</button>
       <button class="btn btn-sm btn-outline-danger" onclick="cdpCerrarSesion()" title="Cerrar sesión"><i class="bi bi-box-arrow-right me-1"></i>Cerrar sesión</button>
     `;
   }
@@ -197,6 +198,48 @@
       (admin ? 'Ponete al día para reactivar los cambios.' : 'Avisale al administrador.');
     document.body.insertAdjacentElement('afterbegin', b);
   }
+
+
+  // Ventana "Cambiar contraseña" (misma en todas las apps de Diwilo). enviar(actual, nueva) devuelve un error o nada.
+  function abrirCambioClave(enviar) {
+    let d = document.getElementById('dlgClave');
+    if (!d) {
+      d = document.createElement('dialog');
+      d.id = 'dlgClave';
+      d.style.cssText = 'border:0;border-radius:14px;padding:22px;max-width:360px;width:calc(100% - 32px);box-shadow:0 20px 50px rgba(0,0,0,.25)';
+      d.innerHTML = '<form class="d-grid gap-2">' +
+        '<h2 class="h5 mb-1">Cambiar contraseña</h2>' +
+        '<input class="form-control" type="password" name="current" placeholder="Contraseña actual" autocomplete="current-password" required>' +
+        '<input class="form-control" type="password" name="password" placeholder="Nueva contraseña (mínimo 8)" minlength="8" maxlength="200" autocomplete="new-password" required>' +
+        '<input class="form-control" type="password" name="confirm" placeholder="Repite la nueva contraseña" minlength="8" maxlength="200" autocomplete="new-password" required>' +
+        '<div class="small text-danger" data-err></div>' +
+        '<div class="d-flex gap-2 justify-content-end mt-1"><button type="button" class="btn btn-light" data-cancel>Cancelar</button><button class="btn btn-primary" data-ok>Guardar</button></div>' +
+        '</form>';
+      document.body.appendChild(d);
+      d.querySelector('[data-cancel]').onclick = () => d.close();
+    }
+    const f = d.querySelector('form'), err = d.querySelector('[data-err]'), ok = d.querySelector('[data-ok]');
+    f.reset(); err.textContent = '';
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      if (f.password.value !== f.confirm.value) { err.textContent = 'Las contraseñas nuevas no coinciden'; return; }
+      ok.disabled = true;
+      try {
+        const msg = await enviar(f.current.value, f.password.value);
+        if (msg) err.textContent = msg;
+        else { d.close(); alert('Contraseña actualizada. Se cerraron tus otras sesiones abiertas.'); }
+      } catch (_) { err.textContent = 'No se pudo conectar. Intenta de nuevo.'; }
+      finally { ok.disabled = false; }
+    };
+    d.showModal();
+  }
+
+  window.cdpCambiarClave = function () {
+    abrirCambioClave(async (current, password) => {
+      const { ok, data } = await api('/api/password', { method: 'POST', body: JSON.stringify({ current, password }) });
+      return ok ? null : (data.error || 'No se pudo cambiar la contraseña');
+    });
+  };
 
   window.cdpCerrarSesion = async function () {
     try { await api('/api/logout', { method: 'POST' }); } catch (e) {}

@@ -7,14 +7,14 @@
         · /api/registro -> la persona invitada crea su contraseña con el link
         · /api/personal -> el admin invita personal a SU negocio
      2. Plataforma: /api/platform/* -> Diwilo Web crea negocios, invita dueños
-        y fija hasta cuándo está paga la suscripción (Bearer PLATFORM_KEY).
+        y fija hasta cuándo está paga la suscripción (RPC Platform.call).
      3. Datos: GET/POST/DELETE /api/bloque  -> tabla `bloques` de D1 (JSON por
         negocio). Requiere sesión; el `org_id` sale de la sesión, nunca del
         cliente. (Fase 3: se suman /api/db/:tabla y endpoints transaccionales.)
      4. Todo lo demás -> archivos estáticos de public/ (env.ASSETS).
 
    Bindings (wrangler.jsonc):  env.ASSETS -> public/ ,  env.DB -> D1 "cdpedidos-db"
-   Secreto: PLATFORM_KEY (el mismo valor en Diwilo Web).
+   Diwilo Web entra por RPC: export class Platform (service binding, sin clave).
 
    Seguridad:
      · Contraseña con PBKDF2-SHA256 (100k) + salt por usuario. Nunca en claro.
@@ -24,6 +24,9 @@
      · Bloqueo temporal tras 5 intentos fallidos.
      · Aislamiento: toda query filtra por el org_id de la sesión.
    ========================================================================== */
+
+import { WorkerEntrypoint } from "cloudflare:workers";
+import { platformCall, isPlatformCall } from "./platform-rpc.js";
 
 const COOKIE = "cdp_sesion";
 const SESION_MS = 30 * 24 * 3600 * 1000; // 30 días
@@ -211,13 +214,14 @@ async function manejarDb(path, request, env, url) {
 
 /* ---------- plataforma (Diwilo Web) ----------
    Diwilo Web es el único panel que crea negocios, invita dueños y maneja
-   suscripciones. Llama a estas rutas con "Authorization: Bearer PLATFORM_KEY".
+   suscripciones. Llega solo por RPC (service binding, entrypoint "Platform").
    Contrato común a las apps de Diwilo (pedidos, nutrición, citas):
      GET    /api/platform/businesses
      POST   /api/platform/businesses                 { name, owner_email, owner_name?, paid_until }
      GET    /api/platform/businesses/:id
      PATCH  /api/platform/businesses/:id             { name?, paid_until? }
      POST   /api/platform/businesses/:id/users       { email, name?, role: owner|staff } -> invite_path
+     PATCH  /api/platform/businesses/:id/users/:uid  { role: owner|staff }  solo cambia permisos
      DELETE /api/platform/businesses/:id/users/:uid
    Los roles se traducen: admin <-> owner, personal <-> staff. */
 const ROL_PLATAFORMA = { admin: "owner", personal: "staff" };
@@ -249,8 +253,8 @@ async function negociosPlataforma(env, orgId) {
 }
 
 async function manejarPlataforma(path, request, env) {
-  const auth = request.headers.get("Authorization") || "";
-  if (!env.PLATFORM_KEY || !iguales(auth, `Bearer ${env.PLATFORM_KEY}`)) {
+  // Solo por RPC desde Diwilo Web (Platform.call, ver platform-rpc.js); desde internet da 401.
+  if (!isPlatformCall(request)) {
     return json({ error: "no autorizado" }, { status: 401 });
   }
   const m = request.method;
@@ -317,6 +321,21 @@ async function manejarPlataforma(path, request, env) {
     return json({ id, invite_path: linkRegistro(invite) }, { status: 201 });
   }
 
+  // Cambia solo el rol (permisos), sin link nuevo ni tocar la contraseña. Siempre queda al menos un dueño.
+  if (sub === "users" && userId && m === "PATCH") {
+    const b = await leerBody(request);
+    if (b.role !== "owner" && b.role !== "staff") return json({ error: "Rol no válido" }, { status: 400 });
+    const rol = b.role === "owner" ? "admin" : "personal";
+    const u = await env.DB.prepare("SELECT id, rol FROM users WHERE id = ? AND org_id = ?").bind(userId, orgId).first();
+    if (!u) return json({ error: "El usuario no pertenece a este negocio" }, { status: 404 });
+    if (u.rol === "admin" && rol !== "admin") {
+      const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM users WHERE org_id = ? AND rol = 'admin'").bind(orgId).first();
+      if (n.n <= 1) return json({ error: "Es el único dueño: primero asigna otro dueño" }, { status: 409 });
+    }
+    await env.DB.prepare("UPDATE users SET rol = ? WHERE id = ?").bind(rol, u.id).run();
+    return json({ ok: true, role: b.role });
+  }
+
   if (sub === "users" && userId && m === "DELETE") {
     await env.DB.batch([
       env.DB.prepare("DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE id = ? AND org_id = ?)").bind(userId, orgId),
@@ -373,6 +392,23 @@ async function manejarApi(path, request, env, url) {
     const tok = cookies(request)[COOKIE];
     if (tok) await env.DB.prepare("DELETE FROM sessions WHERE token = ?").bind(tok).run();
     return json({ ok: true }, { headers: { "Set-Cookie": delCookie } });
+  }
+
+  /* ---- cambiar contraseña (con sesión; sirve aunque la suscripción esté vencida) ---- */
+  if (path === "/api/password" && m === "POST") {
+    const yo = await usuarioActual(request, env);
+    if (!yo) return json({ error: "no-auth" }, { status: 401 });
+    const { current, password } = await leerBody(request);
+    const u = await env.DB.prepare("SELECT id, pin_hash, pin_salt FROM users WHERE id = ?").bind(yo.id).first();
+    if (!u.pin_hash || !iguales(await derivarPin(String(current || ""), u.pin_salt), u.pin_hash))
+      return json({ error: "La contraseña actual no es correcta" }, { status: 401 });
+    if (!claveValida(password)) return json({ error: ERROR_CLAVE }, { status: 400 });
+    const salt = randHex(16);
+    await env.DB.batch([
+      env.DB.prepare("UPDATE users SET pin_hash = ?, pin_salt = ?, invite_token = NULL WHERE id = ?").bind(await derivarPin(password, salt), salt, u.id),
+      env.DB.prepare("DELETE FROM sessions WHERE user_id = ? AND token <> ?").bind(u.id, cookies(request)[COOKIE]),
+    ]);
+    return json({ ok: true });
   }
 
   /* ---- me ---- */
@@ -516,7 +552,7 @@ async function manejarApi(path, request, env, url) {
 }
 
 /* ---------- entrypoint ---------- */
-export default {
+const worker = {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -536,3 +572,11 @@ export default {
     return env.ASSETS.fetch(request);
   },
 };
+export default worker;
+
+// Diwilo Web administra esta app por RPC (service binding con entrypoint "Platform"), sin clave compartida.
+export class Platform extends WorkerEntrypoint {
+  call(method, path, body, origin) {
+    return platformCall(worker, this.env, this.ctx, method, path, body, origin);
+  }
+}

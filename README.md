@@ -29,7 +29,7 @@ Cambiar el backend **no obliga a tocar los módulos**, solo `public/js/core/stor
 - Contraseña de mínimo 8 caracteres, guardada **hasheada** (PBKDF2-SHA256 + salt por usuario) en `pin_hash`/`pin_salt`. Nunca en claro. Los PIN de antes siguen entrando hasta que la persona cree su contraseña.
 - Sesión = token aleatorio en tabla `sessions`, cookie `HttpOnly; Secure; SameSite=Lax` (30 días).
 - 5 intentos fallidos → bloqueo temporal de 15 min.
-- **Alta de negocios y dueños:** desde Diwilo Web, que llama a `/api/platform/*` con `Authorization: Bearer PLATFORM_KEY`. Diwilo entrega un **link de invitación** (`/?registro=<token>`) para que el dueño cree su contraseña. El mismo link sirve para restablecer una contraseña olvidada.
+- **Alta de negocios y dueños:** desde Diwilo Web, que llama a `/api/platform/*` por RPC (service binding, `export class Platform`), sin clave compartida. Diwilo entrega un **link de invitación** (`/?registro=<token>`) para que el dueño cree su contraseña. El mismo link sirve para restablecer una contraseña olvidada.
 - **Alta de personal:** el admin abre *Personal · Accesos* → agrega nombre + correo → obtiene un **link de invitación** → se lo pasa a la persona → esta lo abre en su teléfono, elige su contraseña y queda activa.
 - **Suscripción:** `organizations.pagado_hasta` (lo fija Diwilo Web al registrar un pago). Si la fecha ya pasó, la app queda en **solo lectura**: el Worker responde 402 a toda escritura y se ve una barra roja arriba.
 
@@ -90,11 +90,7 @@ npx wrangler dev            # http://localhost:8787
 **Publicar:** `npx wrangler deploy`, o `git push` a `main` (build automático en
 Workers & Pages con deploy command `npx wrangler deploy`).
 
-**Secreto compartido con Diwilo Web** (el mismo valor en los dos proyectos):
-
-```bash
-npx wrangler secret put PLATFORM_KEY
-```
+**Diwilo Web** administra la app por RPC (`export class Platform` en src/worker.js): no hay secreto compartido.
 
 Cuando cambie `schema.sql`, aplicarlo también a producción:
 
