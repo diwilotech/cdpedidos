@@ -23,8 +23,17 @@ CREATE TABLE IF NOT EXISTS organizations (
   id                   TEXT PRIMARY KEY,   -- uuid
   nombre               TEXT NOT NULL,      -- nombre del restaurante
   creado_en            INTEGER NOT NULL,
-  pagado_hasta         TEXT                -- 'YYYY-MM-DD' inclusive, lo fija Diwilo Web; NULL = sin límite.
+  pagado_hasta         TEXT,               -- 'YYYY-MM-DD' inclusive, lo fija Diwilo Web; NULL = sin límite.
                                            -- Vencido -> la app queda en solo lectura (402 en escrituras)
+  archivado_en         TEXT                -- archivado desde Diwilo: nadie entra; a los 20 días se borra por lotes
+);
+
+-- Pases de un solo uso (2 minutos) para que Diwilo abra la app como el dueño. Solo se guarda el SHA-256.
+CREATE TABLE IF NOT EXISTS sso_tickets (
+  id          TEXT PRIMARY KEY,
+  business_id TEXT NOT NULL,
+  user_id     TEXT NOT NULL,
+  expires_at  TEXT NOT NULL
 );
 
 -- ---------------------------------------------------------------------------

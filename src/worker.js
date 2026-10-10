@@ -27,6 +27,7 @@
 
 import { WorkerEntrypoint } from "cloudflare:workers";
 import { platformCall, isPlatformCall } from "./platform-rpc.js";
+import { purgeArchived, purgeDate, issueSsoTicket, takeSsoTicket } from "./platform-tools.js";
 
 const COOKIE = "cdp_sesion";
 const SESION_MS = 30 * 24 * 3600 * 1000; // 30 días
@@ -106,7 +107,7 @@ async function usuarioActual(request, env) {
     `SELECT u.id, u.org_id, u.email, u.nombre, u.rol, u.estado, s.expira_en, o.nombre AS negocio
        FROM sessions s
        JOIN users u ON u.id = s.user_id
-       JOIN organizations o ON o.id = u.org_id
+       JOIN organizations o ON o.id = u.org_id AND o.archivado_en IS NULL
       WHERE s.token = ?`
   ).bind(tok).first();
   if (!row) return null;
@@ -221,7 +222,11 @@ async function manejarDb(path, request, env, url) {
      GET    /api/platform/businesses/:id
      PATCH  /api/platform/businesses/:id             { name?, paid_until? }
      POST   /api/platform/businesses/:id/users       { email, name?, role: owner|staff } -> invite_path
-     PATCH  /api/platform/businesses/:id/users/:uid  { role: owner|staff }  solo cambia permisos
+     PATCH  /api/platform/businesses/:id/users/:uid  { role?: owner|staff, email? }  permisos y/o correo
+     DELETE /api/platform/businesses/:id           archiva (a los 20 días se borra por lotes)
+     POST   /api/platform/businesses/:id/restore   lo saca del archivo
+     POST   /api/platform/businesses/:id/sso       pase para entrar como el dueño -> { path: /api/sso?t=... }
+     POST   /api/platform/purge                    borra por lotes los archivados vencidos (cron de Diwilo)
      DELETE /api/platform/businesses/:id/users/:uid
    Los roles se traducen: admin <-> owner, personal <-> staff. */
 const ROL_PLATAFORMA = { admin: "owner", personal: "staff" };
@@ -229,9 +234,9 @@ const ESTADO_PLATAFORMA = { activo: "active", pendiente: "invited", inactivo: "i
 const fechaValida = (v) => v === null || (/^\d{4}-\d{2}-\d{2}$/.test(String(v)) && !isNaN(Date.parse(v)));
 const linkRegistro = (token) => `/?registro=${token}`;
 
-async function negociosPlataforma(env, orgId) {
-  const filtro = orgId ? " WHERE id = ?" : "";
-  const orgs = env.DB.prepare(`SELECT id, nombre, creado_en, pagado_hasta FROM organizations${filtro} ORDER BY creado_en`);
+async function negociosPlataforma(env, orgId, archivados = false) {
+  const filtro = orgId ? " WHERE id = ?" : ` WHERE archivado_en IS ${archivados ? "NOT NULL" : "NULL"}`;
+  const orgs = env.DB.prepare(`SELECT id, nombre, creado_en, pagado_hasta, archivado_en FROM organizations${filtro} ORDER BY creado_en`);
   const users = env.DB.prepare(
     `SELECT id, org_id, email, nombre, rol, estado, invite_token FROM users${orgId ? " WHERE org_id = ?" : ""} ORDER BY rol, nombre`
   );
@@ -243,6 +248,8 @@ async function negociosPlataforma(env, orgId) {
     created_at: new Date(org.creado_en).toISOString(),
     paid_until: org.pagado_hasta || null,
     read_only: vencida(org.pagado_hasta),
+    archived_at: org.archivado_en || null,
+    purge_on: purgeDate(org.archivado_en),
     users: u.results.filter((x) => x.org_id === org.id).map((x) => ({
       id: x.id, email: x.email, name: x.nombre,
       role: ROL_PLATAFORMA[x.rol] || x.rol,
@@ -252,16 +259,24 @@ async function negociosPlataforma(env, orgId) {
   }));
 }
 
-async function manejarPlataforma(path, request, env) {
+async function manejarPlataforma(path, request, env, url) {
   // Solo por RPC desde Diwilo Web (Platform.call, ver platform-rpc.js); desde internet da 401.
   if (!isPlatformCall(request)) {
     return json({ error: "no autorizado" }, { status: 401 });
   }
   const m = request.method;
   const [, , recurso, orgId, sub, userId] = path.split("/").filter(Boolean); // api/platform/businesses/:id/users/:uid
+
+  // Borra por lotes los negocios archivados hace más de 20 días (lo llama el cron de Diwilo).
+  if (recurso === "purge" && m === "POST") {
+    const b = await leerBody(request).catch(() => ({}));
+    const days = Math.max(1, Math.min(365, Number(b.days) || 20));
+    return json(await purgeArchived(env, { table: "organizations", tenantCol: "org_id", archivedCol: "archivado_en" }, { days }));
+  }
   if (recurso !== "businesses") return json({ error: "ruta no encontrada" }, { status: 404 });
 
-  if (!orgId && m === "GET") return json({ businesses: await negociosPlataforma(env) });
+  // ?archived=1: solo los archivados
+  if (!orgId && m === "GET") return json({ businesses: await negociosPlataforma(env, null, url.searchParams.get("archived") === "1") });
 
   if (!orgId && m === "POST") {
     const b = await leerBody(request);
@@ -290,6 +305,30 @@ async function manejarPlataforma(path, request, env) {
 
   if (!sub && m === "GET") return json((await negociosPlataforma(env, orgId))[0]);
 
+  // Archivar: nadie entra y sale de la lista; a los 20 días se borra por lotes.
+  if (!sub && m === "DELETE") {
+    const o = await env.DB.prepare("SELECT archivado_en FROM organizations WHERE id = ?").bind(orgId).first();
+    const at = o.archivado_en || new Date().toISOString();
+    await env.DB.batch([
+      env.DB.prepare("UPDATE organizations SET archivado_en = ? WHERE id = ?").bind(at, orgId),
+      env.DB.prepare("DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE org_id = ?)").bind(orgId),
+    ]);
+    return json({ ok: true, archived_at: at, purge_on: purgeDate(at) });
+  }
+  if (sub === "restore" && m === "POST") {
+    await env.DB.prepare("UPDATE organizations SET archivado_en = NULL WHERE id = ?").bind(orgId).run();
+    return json({ ok: true });
+  }
+  // Entrar como el dueño sin contraseña: pase de un solo uso que Diwilo abre en el navegador.
+  if (sub === "sso" && m === "POST") {
+    const dueno = await env.DB.prepare(
+      `SELECT u.id FROM users u JOIN organizations o ON o.id = u.org_id AND o.archivado_en IS NULL
+        WHERE u.org_id = ? AND u.rol = 'admin' AND u.estado = 'activo' ORDER BY u.creado_en LIMIT 1`
+    ).bind(orgId).first();
+    if (!dueno) return json({ error: "El negocio no tiene dueño activo o está archivado" }, { status: 404 });
+    return json({ path: `/api/sso?t=${await issueSsoTicket(env, orgId, dueno.id)}` });
+  }
+
   if (!sub && m === "PATCH") {
     const b = await leerBody(request);
     if (b.name !== undefined && !String(b.name).trim()) return json({ error: "Nombre vacío" }, { status: 400 });
@@ -308,6 +347,8 @@ async function manejarPlataforma(path, request, env) {
     const invite = randHex(16);
     const existe = await env.DB.prepare("SELECT id, org_id FROM users WHERE email = ?").bind(norm(b.email)).first();
     if (existe && existe.org_id !== orgId) return json({ error: "Ese correo ya tiene cuenta en otro negocio de Pedidos" }, { status: 409 });
+    // Un solo dueño: si este pasa a serlo, el anterior queda como personal.
+    if (rol === "admin") await env.DB.prepare("UPDATE users SET rol = 'personal' WHERE org_id = ? AND rol = 'admin' AND email <> ?").bind(orgId, norm(b.email)).run();
     if (existe) {
       // Ya existe en este negocio: nuevo link para crear/restablecer su contraseña.
       await env.DB.prepare("UPDATE users SET invite_token = ?, rol = ? WHERE id = ?").bind(invite, rol, existe.id).run();
@@ -321,22 +362,35 @@ async function manejarPlataforma(path, request, env) {
     return json({ id, invite_path: linkRegistro(invite) }, { status: 201 });
   }
 
-  // Cambia solo el rol (permisos), sin link nuevo ni tocar la contraseña. Siempre queda al menos un dueño.
+  // Cambia el rol (permisos) y/o el correo, sin link nuevo ni tocar la contraseña. Un solo dueño: al asignar
+  // otro, el anterior queda como personal.
   if (sub === "users" && userId && m === "PATCH") {
     const b = await leerBody(request);
-    if (b.role !== "owner" && b.role !== "staff") return json({ error: "Rol no válido" }, { status: 400 });
-    const rol = b.role === "owner" ? "admin" : "personal";
-    const u = await env.DB.prepare("SELECT id, rol FROM users WHERE id = ? AND org_id = ?").bind(userId, orgId).first();
+    if (b.role !== undefined && b.role !== "owner" && b.role !== "staff") return json({ error: "Rol no válido" }, { status: 400 });
+    if (b.email !== undefined && !emailValido(b.email)) return json({ error: "Correo inválido" }, { status: 400 });
+    if (b.role === undefined && b.email === undefined) return json({ error: "Indica el rol o el correo" }, { status: 400 });
+    const u = await env.DB.prepare("SELECT id, rol, email FROM users WHERE id = ? AND org_id = ?").bind(userId, orgId).first();
     if (!u) return json({ error: "El usuario no pertenece a este negocio" }, { status: 404 });
-    if (u.rol === "admin" && rol !== "admin") {
-      const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM users WHERE org_id = ? AND rol = 'admin'").bind(orgId).first();
-      if (n.n <= 1) return json({ error: "Es el único dueño: primero asigna otro dueño" }, { status: 409 });
+    const stmts = [];
+    const mail = b.email !== undefined ? norm(b.email) : null;
+    if (mail && mail !== u.email) {
+      if (await env.DB.prepare("SELECT 1 FROM users WHERE email = ? AND id <> ?").bind(mail, u.id).first())
+        return json({ error: "Ese correo ya tiene cuenta en Pedidos" }, { status: 409 });
+      stmts.push(env.DB.prepare("UPDATE users SET email = ? WHERE id = ?").bind(mail, u.id));
     }
-    await env.DB.prepare("UPDATE users SET rol = ? WHERE id = ?").bind(rol, u.id).run();
-    return json({ ok: true, role: b.role });
+    const rol = b.role === undefined ? u.rol : b.role === "owner" ? "admin" : "personal";
+    if (rol !== u.rol) {
+      if (u.rol === "admin") return json({ error: "Es el dueño: para cambiarlo, asigna otro dueño" }, { status: 409 });
+      stmts.push(env.DB.prepare("UPDATE users SET rol = 'personal' WHERE org_id = ? AND rol = 'admin'").bind(orgId),
+        env.DB.prepare("UPDATE users SET rol = ? WHERE id = ?").bind(rol, u.id));
+    }
+    if (stmts.length) await env.DB.batch(stmts);
+    return json({ ok: true, role: ROL_PLATAFORMA[rol] || rol, email: mail || u.email });
   }
 
   if (sub === "users" && userId && m === "DELETE") {
+    const u = await env.DB.prepare("SELECT rol FROM users WHERE id = ? AND org_id = ?").bind(userId, orgId).first();
+    if (u?.rol === "admin") return json({ error: "No se puede quitar al dueño: primero asigna otro dueño" }, { status: 409 });
     await env.DB.batch([
       env.DB.prepare("DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE id = ? AND org_id = ?)").bind(userId, orgId),
       env.DB.prepare("DELETE FROM users WHERE id = ? AND org_id = ?").bind(userId, orgId),
@@ -357,7 +411,7 @@ async function manejarApi(path, request, env, url) {
     const clave = String(password ?? pin ?? "");
     const generico = json({ error: "Correo o contraseña incorrectos" }, { status: 401 });
     const u = await env.DB.prepare(
-      `SELECT u.*, o.nombre AS negocio FROM users u JOIN organizations o ON o.id = u.org_id WHERE u.email = ?`
+      `SELECT u.*, o.nombre AS negocio FROM users u JOIN organizations o ON o.id = u.org_id AND o.archivado_en IS NULL WHERE u.email = ?`
     ).bind(norm(email)).first();
     if (!u || !u.pin_hash) return generico;
     if (u.estado !== "activo") return json({ error: "Usuario inactivo. Contactá al administrador." }, { status: 403 });
@@ -505,9 +559,21 @@ async function manejarApi(path, request, env, url) {
     }
   }
 
+  /* ---- entrar como el dueño desde Diwilo (pase de un solo uso) ---- */
+  if (path === "/api/sso" && m === "GET") {
+    const t = await takeSsoTicket(env, url.searchParams.get("t"));
+    const u = t && await env.DB.prepare(
+      `SELECT u.id FROM users u JOIN organizations o ON o.id = u.org_id AND o.archivado_en IS NULL
+        WHERE u.id = ? AND u.org_id = ? AND u.rol = 'admin' AND u.estado = 'activo'`
+    ).bind(t.user_id, t.business_id).first();
+    if (!u) return new Response("Este acceso ya se usó o venció. Vuelve a abrirlo desde Diwilo.", { status: 410, headers: { "content-type": "text/plain; charset=utf-8" } });
+    const tok = await crearSesion(env, u.id);
+    return new Response(null, { status: 302, headers: { location: "/", "set-cookie": setCookie(tok), "cache-control": "no-store" } });
+  }
+
   /* ---- plataforma: Diwilo Web ---- */
   if (path.startsWith("/api/platform/")) {
-    return manejarPlataforma(path, request, env);
+    return manejarPlataforma(path, request, env, url);
   }
 
   /* ---- CRUD relacional genérico ---- */
