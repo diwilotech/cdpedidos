@@ -105,6 +105,17 @@
           </div>
         </div>
 
+        <!-- Profundidad: más vendido, horas pico, stock bajo, sin rotación y descargas -->
+        <div class="col-12 solo-admin">
+          <div id="profundidad"></div>
+          <div class="card-dash mt-3"><div class="bd d-flex flex-wrap gap-2 align-items-center">
+            <b class="me-auto small text-uppercase text-muted">Descargar</b>
+            <button class="btn btn-sm btn-outline-secondary" data-csv="ventas"><i class="bi bi-download me-1"></i>Ventas</button>
+            <button class="btn btn-sm btn-outline-secondary" data-csv="inventario"><i class="bi bi-download me-1"></i>Inventario</button>
+            <button class="btn btn-sm btn-outline-secondary" data-csv="clientes"><i class="bi bi-download me-1"></i>Por cobrar</button>
+          </div></div>
+        </div>
+
         <!-- Clientes / cuentas por cobrar -->
         <div class="col-12 col-xl-6 solo-admin">
           <div class="card-dash h-100">
@@ -340,7 +351,9 @@
   <script src="js/core/storage.js"></script>
   <script src="js/core/repo.js"></script>
   <script src="js/core/db.js"></script>
+  <script src="js/vendor/dwviz.js"></script>
   <script src="js/dashboard/dashboard.js"></script>
+  <script src="js/dashboard/profundidad.js"></script>
   <script src="js/dashboard/gate.js"></script>
 </body>
 </html>
