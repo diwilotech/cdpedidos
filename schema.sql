@@ -25,7 +25,9 @@ CREATE TABLE IF NOT EXISTS organizations (
   creado_en            INTEGER NOT NULL,
   pagado_hasta         TEXT,               -- 'YYYY-MM-DD' inclusive, lo fija Diwilo Web; NULL = sin límite.
                                            -- Vencido -> la app queda en solo lectura (402 en escrituras)
-  archivado_en         TEXT                -- archivado desde Diwilo: nadie entra; a los 20 días se borra por lotes
+  archivado_en         TEXT,               -- archivado desde Diwilo: nadie entra; a los 20 días se borra por lotes
+  slug                 TEXT,               -- dirección corta (chats, tarjetas y links públicos de los módulos centrales)
+  logo_key             TEXT
 );
 
 -- Pases de un solo uso (2 minutos) para que Diwilo abra la app como el dueño. Solo se guarda el SHA-256.
@@ -57,7 +59,8 @@ CREATE TABLE IF NOT EXISTS users (
   fallos          INTEGER NOT NULL DEFAULT 0,
   bloqueado_hasta INTEGER,
   creado_en       INTEGER NOT NULL,
-  registrado_en   INTEGER
+  registrado_en   INTEGER,
+  modulos         TEXT                         -- módulos que puede abrir (JSON); NULL = los de su rol
 );
 CREATE INDEX IF NOT EXISTS idx_users_org    ON users (org_id);
 CREATE INDEX IF NOT EXISTS idx_users_invite ON users (invite_token);
@@ -130,3 +133,50 @@ CREATE TABLE IF NOT EXISTS codigos_descuento (
 );
 CREATE INDEX IF NOT EXISTS idx_descuentos_org ON codigos_descuento (org_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_descuentos_org_codigo ON codigos_descuento (org_id, codigo);
+
+-- Base común de las apps Diwilo (ver migraciones/0003_modulos_comunes.sql)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_organizations_slug ON organizations (slug) WHERE slug IS NOT NULL;
+CREATE TABLE IF NOT EXISTS business_settings (
+  business_id  TEXT PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
+  tema         TEXT NOT NULL DEFAULT 'turquesa',
+  modo         TEXT NOT NULL DEFAULT 'light',
+  logo_key     TEXT,
+  updated_by   TEXT REFERENCES users(id) ON DELETE SET NULL,
+  updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE TABLE IF NOT EXISTS business_modules (
+  business_id  TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  modulo       TEXT NOT NULL,
+  activo       INTEGER NOT NULL DEFAULT 1,
+  desde        TEXT,
+  hasta        TEXT,
+  synced_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  PRIMARY KEY (business_id, modulo)
+);
+CREATE TABLE IF NOT EXISTS business_modules_sync (
+  business_id TEXT PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
+  version TEXT NOT NULL,
+  synced_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE TABLE IF NOT EXISTS audit_log (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  business_id  TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id      TEXT,
+  origen       TEXT NOT NULL DEFAULT 'app',
+  modulo       TEXT,
+  accion       TEXT NOT NULL,
+  detalle      TEXT,
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS audit_log_business ON audit_log (business_id, created_at);
+CREATE TABLE IF NOT EXISTS mcp_tokens (
+  id            TEXT PRIMARY KEY,
+  business_id   TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name          TEXT NOT NULL,
+  token_hash    TEXT NOT NULL UNIQUE,
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  last_used_at  TEXT,
+  revoked_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS mcp_tokens_business ON mcp_tokens (business_id);

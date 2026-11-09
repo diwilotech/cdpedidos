@@ -8,7 +8,7 @@
                              cache y actualiza en segundo plano
    Al cambiar de versión (CACHE) se borran las cachés viejas.
    ========================================================================== */
-const CACHE = 'cdp-v3';
+const CACHE = 'cdp-v4';
 const APP_SHELL = ['/', '/index.html', '/404.html', '/manifest.webmanifest', '/assets/css/styles.css', '/assets/css/diwilo-login.css'];
 
 self.addEventListener('install', (e) => {
@@ -29,6 +29,9 @@ self.addEventListener('fetch', (e) => {
 
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;         // CDNs: los maneja el navegador
+
+  // El panel común y los módulos centrales (sesión, tema, código de Diwilo Modulos) van siempre a la red
+  if (/^\/(staff|m|panel|mcp|chat|v1|wa|l|c|validar|shell)(\/|$)/.test(url.pathname)) return;
 
   if (url.pathname.startsWith('/api/')) {
     e.respondWith(fetch(req));                         // datos y sesión: siempre red

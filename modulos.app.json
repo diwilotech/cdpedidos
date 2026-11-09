@@ -1,0 +1,73 @@
+{
+  "app": "cdpedidos",
+  "nombre": "CD Pedidos",
+  "tema": "turquesa",
+  "centrales": [
+    "finanzas",
+    "marketing",
+    "nomina",
+    "whatsapp",
+    "marca",
+    "ai",
+    "dashboard"
+  ],
+  "modulos": [
+    {
+      "id": "ventas",
+      "nombre": "Ventas",
+      "icono": "bi-grid-3x3-gap",
+      "menu": {
+        "ruta": "/staff/ventas.html",
+        "orden": 10
+      },
+      "permisos": {
+        "ver": "staff",
+        "configurar": "admin"
+      },
+      "widgets": [],
+      "depende_de": [],
+      "tipo": "propio",
+      "tablas": [
+        "bloques"
+      ],
+      "mcp": {
+        "guia": "Ventas: el plano de mesas por pisos, las cuentas y comandas por mesa, el cobro (efectivo, transferencia, descuentos), guardar la cuenta a nombre de un cliente, la caja y el inventario que baja al vender. La IA consulta las ventas del día y del mes y lo que se vende más; el cobro se hace desde la app.",
+        "ejemplos": [
+          "Pídele: «¿Cuánto vendimos hoy y quién vendió más?»",
+          "Pídele: «¿Qué productos se venden más esta semana?»"
+        ],
+        "flujos": []
+      }
+    },
+    {
+      "id": "tablero",
+      "nombre": "Tablero",
+      "icono": "bi-speedometer2",
+      "menu": {
+        "ruta": "/staff/tablero.html",
+        "orden": 20
+      },
+      "permisos": {
+        "ver": "admin",
+        "configurar": "admin"
+      },
+      "widgets": [],
+      "depende_de": [],
+      "tipo": "propio",
+      "tablas": [
+        "bloques",
+        "clientes",
+        "mov_fiado",
+        "codigos_descuento"
+      ],
+      "mcp": {
+        "guia": "Tablero: ventas por personal, ganancias de la semana, ventas por categoría, catálogo y precios, clientes con cuentas por cobrar, proveedores, descuentos y movimientos de inventario. Solo propietario y administrador.",
+        "ejemplos": [
+          "Pídele: «¿Qué productos tienen el stock bajo?»",
+          "Pídele: «¿Cuánto nos deben los clientes?»"
+        ],
+        "flujos": []
+      }
+    }
+  ]
+}

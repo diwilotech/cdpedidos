@@ -27,6 +27,7 @@
 
 import { WorkerEntrypoint } from "cloudflare:workers";
 import { platformCall, isPlatformCall } from "./platform-rpc.js";
+import { shellFetch } from "./shell/index.js";
 import { purgeArchived, purgeDate, issueSsoTicket, takeSsoTicket } from "./platform-tools.js";
 
 const COOKIE = "cdp_sesion";
@@ -626,6 +627,10 @@ const worker = {
     if (path === "/api/health") {
       return json({ ok: true, app: "cdpedidos", hora: new Date().toISOString() });
     }
+    // Capa común de las apps Diwilo (módulos centrales, /api/me, MCP, panel /panel y /staff/*)
+    const comun = await shellFetch(request, env, ctx, (p, req, u) => manejarApi(p, req, env, u));
+    if (comun) return comun;
+
     if (path.startsWith("/api/")) {
       try {
         return await manejarApi(path, request, env, url);
