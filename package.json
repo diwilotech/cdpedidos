@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "tail": "wrangler tail"
+    "tail": "wrangler tail",
+    "db:migrate:local": "wrangler d1 execute cdpedidos-db --local --persist-to .wrangler/state --file=schema.sql",
+    "test": "node scripts/test-local.mjs"
   },
   "devDependencies": {
-    "wrangler": "^4.42.0"
+    "wrangler": "^4.153.0"
   }
 }
